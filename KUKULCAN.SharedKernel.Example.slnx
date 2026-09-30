@@ -16,5 +16,6 @@
   </Folder>
   <Folder Name="/Tests/">
     <File Path="Tests\README.md" />
+    <Project Path="Tests/KUKULCAN.SharedKernel.Example.Web.UnitTests/KUKULCAN.SharedKernel.Example.Web.UnitTests.csproj" />
   </Folder>
 </Solution>
