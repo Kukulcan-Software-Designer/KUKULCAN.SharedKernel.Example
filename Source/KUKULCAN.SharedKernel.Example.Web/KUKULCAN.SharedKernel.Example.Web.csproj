@@ -8,5 +8,6 @@
 
   <ItemGroup>
     <PackageReference Include="KUKULCAN.SharedKernel" Version="1.0.0" />
+    <PackageReference Include="KUKULCAN.SharedKernel.Auth" Version="1.0.0" />
   </ItemGroup>
 </Project>
