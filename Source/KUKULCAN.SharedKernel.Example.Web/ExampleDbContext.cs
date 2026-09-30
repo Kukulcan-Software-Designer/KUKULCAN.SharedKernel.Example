@@ -17,13 +17,6 @@ public class ExampleDbContext(
     KukulcanDbContextBase(options, tenantContext, clock, domainEventDispatcher)
 {
     public DbSet<ExampleEntity> Entities => Set<ExampleEntity>();
-
-    protected override void ConfigureProvider(DbContextOptionsBuilder optionsBuilder)
-    {
-        // The Example intentionally leaves the concrete provider to the consuming host.
-        // Integration tests provide EF Core InMemory explicitly.
-    }
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
