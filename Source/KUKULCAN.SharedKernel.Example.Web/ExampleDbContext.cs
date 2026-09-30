@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace KUKULCAN.SharedKernel.Example.Web;
 
-public sealed class ExampleDbContext(
+public class ExampleDbContext(
     IOptions<KukulcanDatabaseOptions> options,
     ITenantContext tenantContext,
     IClock clock,
