@@ -123,6 +123,31 @@ public sealed class DatabasePersistenceEndpointTests
         patchResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    [Test]
+    public async Task PatchEntity_WhenNameIsBlank_ReturnsBadRequest()
+    {
+        var createResponse = await _client.PostAsJsonAsync(
+            "/api/database/entities",
+            new CreateEntityRequest("Example entity"));
+
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var created = await createResponse.Content.ReadFromJsonAsync<EntityResponse>();
+
+        created.Should().NotBeNull();
+
+        using var patchRequest = new HttpRequestMessage(
+            HttpMethod.Patch,
+            $"/api/database/entities/{created!.Id}")
+        {
+            Content = JsonContent.Create(new UpdateEntityRequest("   "))
+        };
+
+        var patchResponse = await _client.SendAsync(patchRequest);
+
+        patchResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     private sealed record CreateEntityRequest(string Name);
 
     private sealed record UpdateEntityRequest(string Name);
