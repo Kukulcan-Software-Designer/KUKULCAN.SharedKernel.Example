@@ -1,4 +1,5 @@
 using KUKULCAN.SharedKernel.Auth.Authentication.Local;
+using KUKULCAN.SharedKernel.Example.Web;
 
 var builder = WebApplication.CreateBuilder(args);
 
