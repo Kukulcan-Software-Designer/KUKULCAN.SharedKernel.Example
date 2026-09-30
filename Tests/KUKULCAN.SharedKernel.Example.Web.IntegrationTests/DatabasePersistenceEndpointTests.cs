@@ -2,6 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NUnit.Framework;
 
 namespace KUKULCAN.SharedKernel.Example.Web.IntegrationTests;
@@ -15,7 +19,18 @@ public sealed class DatabasePersistenceEndpointTests
     [SetUp]
     public void SetUp()
     {
-        _factory = new WebApplicationFactory<Program>();
+        _factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.ConfigureTestServices(services =>
+                {
+                    services.RemoveAll<DbContextOptions<ExampleDbContext>>();
+                    services.RemoveAll<ExampleDbContext>();
+
+                    services.AddDbContext<ExampleDbContext>(options =>
+                        options.UseInMemoryDatabase("ExampleDatabase"));
+                });
+            });
         _client = _factory.CreateClient();
     }
 
