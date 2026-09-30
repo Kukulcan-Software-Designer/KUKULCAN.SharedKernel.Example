@@ -73,7 +73,44 @@ public sealed class DatabasePersistenceEndpointTests
         retrieved.Name.Should().Be("Example entity");
     }
 
+    [Test]
+    public async Task PostPatchAndGetEntity_PersistsAndReturnsTheUpdatedEntity()
+    {
+        var createResponse = await _client.PostAsJsonAsync(
+            "/api/database/entities",
+            new CreateEntityRequest("Example entity"));
+
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var created = await createResponse.Content.ReadFromJsonAsync<EntityResponse>();
+
+        created.Should().NotBeNull();
+
+        using var patchRequest = new HttpRequestMessage(
+            HttpMethod.Patch,
+            $"/api/database/entities/{created!.Id}")
+        {
+            Content = JsonContent.Create(new UpdateEntityRequest("Updated entity"))
+        };
+
+        var patchResponse = await _client.SendAsync(patchRequest);
+
+        patchResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var getResponse = await _client.GetAsync($"/api/database/entities/{created.Id}");
+
+        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var retrieved = await getResponse.Content.ReadFromJsonAsync<EntityResponse>();
+
+        retrieved.Should().NotBeNull();
+        retrieved!.Id.Should().Be(created.Id);
+        retrieved.Name.Should().Be("Updated entity");
+    }
+
     private sealed record CreateEntityRequest(string Name);
+
+    private sealed record UpdateEntityRequest(string Name);
 
     private sealed record EntityResponse(Guid Id, string Name);
 
