@@ -51,11 +51,21 @@ public sealed class LocalAuthenticationTests
     }
 
     [Test]
-    public async Task PostLocalAuthentication_ReturnsUnauthorizedForInvalidCredentials()
+    public async Task PostLocalAuthentication_ReturnsUnauthorizedForInvalidPassword()
     {
         var response = await _client.PostAsJsonAsync(
             "/api/auth/local/authenticate",
             new LocalAuthenticationRequest("user@example.com", "WrongPassword!"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Test]
+    public async Task PostLocalAuthentication_ReturnsUnauthorizedForUnknownEmail()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/local/authenticate",
+            new LocalAuthenticationRequest("unknown@example.com", "P@ssw0rd!"));
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
