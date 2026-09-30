@@ -23,4 +23,22 @@ public sealed class ExampleDatabaseService(
         => context.Entities.SingleOrDefaultAsync(
             entity => entity.Id == id,
             cancellationToken);
+
+    public async Task<ExampleEntity?> UpdateAsync(
+        Guid id,
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        var entity = await context.Entities.SingleOrDefaultAsync(
+            item => item.Id == id,
+            cancellationToken);
+
+        if (entity is null)
+            return null;
+
+        entity.UpdateName(name);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return entity;
+    }
 }
