@@ -90,7 +90,7 @@ docker run --detach \
   --name kukulcan-i18n-postgres \
   --network kukulcan-local \
   --env POSTGRES_DB=kukulcan_i18n \
-  --env POSTGRES_USER=kulculcan \
+  --env POSTGRES_USER=kukulcan \
   --env POSTGRES_PASSWORD=kulculcan_pass \
   postgres:16
 ```
@@ -111,7 +111,7 @@ docker run --detach \
   --network kukulcan-local \
   --publish 8080:8080 \
   --env ASPNETCORE_HTTP_PORTS=8080 \
-  --env Kukulcan__Database__ConnectionString='Host=kukulcan-i18n-postgres;Port=5432;Database=kukulcan_i18n;Username=kulculcan;Password=kulculcan_pass' \
+  --env Kukulcan__Database__ConnectionString='Host=kukulcan-i18n-postgres;Port=5432;Database=kukulcan_i18n;Username=kukulcan;Password=kulculcan_pass' \
   --env Kukulcan__Database__Migration__AutoMigrateOnStartup=true \
   --env Kukulcan__Database__SeedDataOnStartup=true \
   --env ConnectionStrings__Redis='' \
