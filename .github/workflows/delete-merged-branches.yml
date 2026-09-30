@@ -20,12 +20,12 @@ jobs:
 
       - name: Determine branch name
         id: vars
-        run: echo "branch=\${GITHUB_HEAD_REF}" >> "\${GITHUB_OUTPUT}"
+        run: echo "branch=${GITHUB_HEAD_REF}" >> "${GITHUB_OUTPUT}"
 
       - name: Delete branch if allowed
         if: |
           steps.vars.outputs.branch != 'main' &&
           steps.vars.outputs.branch != 'develop'
         run: |
-          echo "Deleting branch: \${GITHUB_HEAD_REF}"
-          git push origin --delete "\${GITHUB_HEAD_REF}"
+          echo "Deleting branch: ${GITHUB_HEAD_REF}"
+          git push origin --delete "${GITHUB_HEAD_REF}"
