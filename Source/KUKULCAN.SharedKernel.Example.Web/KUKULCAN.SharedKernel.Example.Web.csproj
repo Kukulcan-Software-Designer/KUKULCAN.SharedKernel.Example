@@ -10,5 +10,6 @@
     <PackageReference Include="KUKULCAN.SharedKernel" Version="1.0.0" />
     <PackageReference Include="KUKULCAN.SharedKernel.Auth" Version="1.0.0" />
     <PackageReference Include="KUKULCAN.SharedKernel.Database" Version="1.0.2" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.23.0" />
   </ItemGroup>
 </Project>
