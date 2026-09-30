@@ -24,7 +24,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore
-        run: dotnet restore KUKULCAN.SharedKernel.Example.sln
+        run: dotnet restore KUKULCAN.SharedKernel.Example.slnx
 
       - name: Build
-        run: dotnet build KUKULCAN.SharedKernel.Example.sln --configuration Release --no-restore
+        run: dotnet build KUKULCAN.SharedKernel.Example.slnx --configuration Release --no-restore
