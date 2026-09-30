@@ -89,7 +89,7 @@ Start PostgreSQL:
 docker run --detach \
   --name kukulcan-i18n-postgres \
   --network kukulcan-local \
-  --env POSTGRES_DB=kulculcan_i18n \
+  --env POSTGRES_DB=kukulcan_i18n \
   --env POSTGRES_USER=kulculcan \
   --env POSTGRES_PASSWORD=kulculcan_pass \
   postgres:16
@@ -111,7 +111,7 @@ docker run --detach \
   --network kukulcan-local \
   --publish 8080:8080 \
   --env ASPNETCORE_HTTP_PORTS=8080 \
-  --env Kukulcan__Database__ConnectionString='Host=kukulcan-i18n-postgres;Port=5432;Database=kulculcan_i18n;Username=kulculcan;Password=kulculcan_pass' \
+  --env Kukulcan__Database__ConnectionString='Host=kukulcan-i18n-postgres;Port=5432;Database=kukulcan_i18n;Username=kulculcan;Password=kulculcan_pass' \
   --env Kukulcan__Database__Migration__AutoMigrateOnStartup=true \
   --env Kukulcan__Database__SeedDataOnStartup=true \
   --env ConnectionStrings__Redis='' \
@@ -242,7 +242,7 @@ The persistence path uses `KukulcanDbContextBase` and `IUnitOfWork` rather than 
 
 ### JsonEngine
 
-The JsonEngine integration follows the same rule as the other reusable libraries: the Example consumes its published NuGet package and exposes a small HTTP behavior proving the package is actually used.
+The JsonEngine integration follows the same rule as the other reusable libraries: the Example consumes its published NuGet package. Its functional HTTP behavior will be added in the dedicated JsonEngine TDD cycle.
 
 JsonEngine is therefore not coupled to the I18n Docker container. They are independent components.
 
