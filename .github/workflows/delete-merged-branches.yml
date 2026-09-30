@@ -1,4 +1,4 @@
-name: Delete merged branches (except main/develop)
+name: Delete merged branches (except main/Develop)
 
 on:
   pull_request:
@@ -25,7 +25,7 @@ jobs:
       - name: Delete branch if allowed
         if: |
           steps.vars.outputs.branch != 'main' &&
-          steps.vars.outputs.branch != 'develop'
+          steps.vars.outputs.branch != 'Develop'
         run: |
           echo "Deleting branch: ${GITHUB_HEAD_REF}"
           git push origin --delete "${GITHUB_HEAD_REF}"
