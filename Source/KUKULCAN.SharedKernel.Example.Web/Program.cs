@@ -14,7 +14,6 @@ app.MapPost("/api/auth/password/verify", (PasswordVerificationRequest request) =
     return Results.Ok(new { Verified = verified });
 });
 
-public sealed record PasswordVerificationRequest(string Password);
 
 app.Run();
 
