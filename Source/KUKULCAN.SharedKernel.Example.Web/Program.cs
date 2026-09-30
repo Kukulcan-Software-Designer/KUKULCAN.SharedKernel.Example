@@ -70,15 +70,22 @@ app.MapMethods(
     ["PATCH"],
     async (Guid id, UpdateExampleEntityRequest request, ExampleDatabaseService databaseService, CancellationToken cancellationToken) =>
     {
-        var entity = await databaseService.UpdateAsync(id, request.Name, cancellationToken);
+        try
+        {
+            var entity = await databaseService.UpdateAsync(id, request.Name, cancellationToken);
 
-        return entity is null
-            ? Results.NotFound()
-            : Results.Ok(new
-            {
-                entity.Id,
-                entity.Name
-            });
+            return entity is null
+                ? Results.NotFound()
+                : Results.Ok(new
+                {
+                    entity.Id,
+                    entity.Name
+                });
+        }
+        catch (ArgumentException)
+        {
+            return Results.BadRequest();
+        }
     });
 
 app.MapPost(
