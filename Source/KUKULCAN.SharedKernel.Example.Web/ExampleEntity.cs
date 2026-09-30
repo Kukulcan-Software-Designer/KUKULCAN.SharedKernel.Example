@@ -16,4 +16,11 @@ public sealed class ExampleEntity
             ? throw new ArgumentException("Name is required.", nameof(name))
             : name;
     }
+
+    public void UpdateName(string name)
+    {
+        Name = string.IsNullOrWhiteSpace(name)
+            ? throw new ArgumentException("Name is required.", nameof(name))
+            : name;
+    }
 }

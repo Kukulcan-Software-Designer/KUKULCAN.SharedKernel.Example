@@ -65,6 +65,29 @@ app.MapGet(
             });
     });
 
+app.MapMethods(
+    "/api/database/entities/{id:guid}",
+    ["PATCH"],
+    async (Guid id, UpdateExampleEntityRequest request, ExampleDatabaseService databaseService, CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            var entity = await databaseService.UpdateAsync(id, request.Name, cancellationToken);
+
+            return entity is null
+                ? Results.NotFound()
+                : Results.Ok(new
+                {
+                    entity.Id,
+                    entity.Name
+                });
+        }
+        catch (ArgumentException)
+        {
+            return Results.BadRequest();
+        }
+    });
+
 app.MapPost(
     "/api/auth/local/authenticate",
     async (LocalAuthenticationRequest request, LocalAuthenticationService authenticationService, CancellationToken cancellationToken) =>
@@ -85,5 +108,7 @@ app.MapPost(
 app.Run();
 
 public sealed record CreateExampleEntityRequest(string Name);
+
+public sealed record UpdateExampleEntityRequest(string Name);
 
 public partial class Program;
