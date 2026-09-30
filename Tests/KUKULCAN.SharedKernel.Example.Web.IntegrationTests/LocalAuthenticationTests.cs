@@ -50,6 +50,16 @@ public sealed class LocalAuthenticationTests
             .Which.Should().Be(ExpectedTenantId);
     }
 
+    [Test]
+    public async Task PostLocalAuthentication_ReturnsUnauthorizedForInvalidCredentials()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/local/authenticate",
+            new LocalAuthenticationRequest("user@example.com", "WrongPassword!"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
     private sealed record LocalAuthenticationRequest(string Email, string Password);
 
     private sealed record LocalAuthenticationResponse(
