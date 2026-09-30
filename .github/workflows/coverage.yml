@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - FEATURES/DATABASE-PERSISTENCE
   pull_request:
     branches:
       - main
