@@ -1,4 +1,5 @@
 using KUKULCAN.SharedKernel.Auth.Authentication.Local;
+using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Example.Web;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +15,14 @@ builder.Services.AddSingleton<IPasswordHasher>(passwordHasher);
 builder.Services.AddSingleton<ILocalUserStore>(new ExampleLocalUserStore(demoUser));
 builder.Services.AddSingleton<LocalAuthenticationService>();
 
+builder.Services.AddOptions<KUKULCAN.SharedKernel.Database.Configuration.KukulcanDatabaseOptions>();
+builder.Services.AddSingleton<KUKULCAN.SharedKernel.Database.Abstractions.ITenantContext, ExampleTenantContext>();
+builder.Services.AddSingleton<KUKULCAN.SharedKernel.Abstractions.IClock, ExampleClock>();
+builder.Services.AddSingleton<KUKULCAN.SharedKernel.DomainEvents.Abstractions.IDomainEventDispatcher, ExampleDomainEventDispatcher>();
+builder.Services.AddDbContext<ExampleDbContext>();
+builder.Services.AddScoped<IUnitOfWork, KUKULCAN.SharedKernel.Database.UnitOfWork.UnitOfWork<ExampleDbContext>>();
+builder.Services.AddScoped<ExampleDatabaseService>();
+
 var app = builder.Build();
 
 app.MapGet("/api/health", () => Results.Ok(new { Status = "Healthy" }));
@@ -27,6 +36,34 @@ app.MapPost("/api/auth/password/verify", (PasswordVerificationRequest request) =
 
     return Results.Ok(new { Verified = verified });
 });
+
+app.MapPost(
+    "/api/database/entities",
+    async (CreateExampleEntityRequest request, ExampleDatabaseService databaseService, CancellationToken cancellationToken) =>
+    {
+        var entity = await databaseService.CreateAsync(request.Name, cancellationToken);
+
+        return Results.Created($"/api/database/entities/{entity.Id}", new
+        {
+            entity.Id,
+            entity.Name
+        });
+    });
+
+app.MapGet(
+    "/api/database/entities/{id:guid}",
+    async (Guid id, ExampleDatabaseService databaseService, CancellationToken cancellationToken) =>
+    {
+        var entity = await databaseService.GetAsync(id, cancellationToken);
+
+        return entity is null
+            ? Results.NotFound()
+            : Results.Ok(new
+            {
+                entity.Id,
+                entity.Name
+            });
+    });
 
 app.MapPost(
     "/api/auth/local/authenticate",
@@ -46,5 +83,7 @@ app.MapPost(
     });
 
 app.Run();
+
+public sealed record CreateExampleEntityRequest(string Name);
 
 public partial class Program;
