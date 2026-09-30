@@ -3,9 +3,14 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using KUKULCAN.SharedKernel.Abstractions;
+using KUKULCAN.SharedKernel.Database.Abstractions;
+using KUKULCAN.SharedKernel.Database.Configuration;
+using KUKULCAN.SharedKernel.DomainEvents.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using NUnit.Framework;
 
 namespace KUKULCAN.SharedKernel.Example.Web.IntegrationTests;
@@ -24,11 +29,13 @@ public sealed class DatabasePersistenceEndpointTests
             {
                 builder.ConfigureTestServices(services =>
                 {
-                    services.RemoveAll<DbContextOptions<ExampleDbContext>>();
                     services.RemoveAll<ExampleDbContext>();
+                    services.RemoveAll<IUnitOfWork>();
 
-                    services.AddDbContext<ExampleDbContext>(options =>
-                        options.UseInMemoryDatabase("ExampleDatabase"));
+                    services.AddDbContext<TestExampleDbContext>();
+                    services.AddScoped<ExampleDbContext>(sp =>
+                        sp.GetRequiredService<TestExampleDbContext>());
+                    services.AddScoped<IUnitOfWork, KUKULCAN.SharedKernel.Database.UnitOfWork.UnitOfWork<ExampleDbContext>>();
                 });
             });
         _client = _factory.CreateClient();
@@ -69,4 +76,15 @@ public sealed class DatabasePersistenceEndpointTests
     private sealed record CreateEntityRequest(string Name);
 
     private sealed record EntityResponse(Guid Id, string Name);
+
+    private sealed class TestExampleDbContext(
+        IOptions<KukulcanDatabaseOptions> options,
+        ITenantContext tenantContext,
+        IClock clock,
+        IDomainEventDispatcher domainEventDispatcher)
+        : ExampleDbContext(options, tenantContext, clock, domainEventDispatcher)
+    {
+        protected override void ConfigureProvider(DbContextOptionsBuilder optionsBuilder)
+            => optionsBuilder.UseInMemoryDatabase("ExampleDatabase");
+    }
 }
