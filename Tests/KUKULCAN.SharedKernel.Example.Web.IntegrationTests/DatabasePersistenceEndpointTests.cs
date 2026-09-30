@@ -108,6 +108,21 @@ public sealed class DatabasePersistenceEndpointTests
         retrieved.Name.Should().Be("Updated entity");
     }
 
+    [Test]
+    public async Task PatchEntity_WhenEntityDoesNotExist_ReturnsNotFound()
+    {
+        using var patchRequest = new HttpRequestMessage(
+            HttpMethod.Patch,
+            $"/api/database/entities/{Guid.NewGuid()}")
+        {
+            Content = JsonContent.Create(new UpdateEntityRequest("Updated entity"))
+        };
+
+        var patchResponse = await _client.SendAsync(patchRequest);
+
+        patchResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     private sealed record CreateEntityRequest(string Name);
 
     private sealed record UpdateEntityRequest(string Name);
