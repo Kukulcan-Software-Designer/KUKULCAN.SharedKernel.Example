@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - FEATURES/Auth-NuGet-Password-Verification
   pull_request:
     branches:
       - main
