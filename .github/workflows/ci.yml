@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -28,3 +28,6 @@ jobs:
 
       - name: Build
         run: dotnet build KUKULCAN.SharedKernel.Example.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test KUKULCAN.SharedKernel.Example.slnx --configuration Release --no-build --verbosity normal
