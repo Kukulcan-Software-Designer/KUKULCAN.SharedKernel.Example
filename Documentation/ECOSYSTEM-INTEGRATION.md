@@ -53,7 +53,7 @@ Before starting the Example Web API, the local infrastructure required by the i1
                   │
                   ▼
         ┌──────────────────────┐
-        │ KUKULCAN_I18n        │
+        │ kukulcan-i18n        │
         │ Docker container     │
         │ host port 8080       │
         └──────────┬───────────┘
@@ -84,7 +84,7 @@ The expected local infrastructure is:
 | PostgreSQL container | \`mypostgres\` |
 | Database | \`Atlas\` |
 | Database user | \`postgres\` |
-| i18n container | \`KUKULCAN_I18n\` |
+| i18n container | \`kukulcan-i18n\` |
 | i18n container port | \`8080\` |
 | i18n host port | \`8080\` |
 | Docker network | \`kukulcan-local\` |
@@ -151,18 +151,18 @@ cd KUKULCAN.SharedKernel.i18n
 Build its root Dockerfile:
 
 \`\`\`bash
-docker build --tag kukulcan-sharedkernel-i18n:local .
+docker build --tag kukulcan-i18n:local .
 \`\`\`
 
 The current Dockerfile uses the .NET 10 SDK for the build stage, the ASP.NET 10 runtime for execution, and exposes container port \`8080\`.
 
-## 6. Create the KUKULCAN_I18n Docker container
+## 6. Create the kukulcan-i18n Docker container
 
 The service must use the same network as PostgreSQL:
 
 \`\`\`bash
 docker run --detach \\
-  --name KUKULCAN_I18n \\
+  --name kukulcan-i18n \\
   --network kukulcan-local \\
   --publish 8080:8080 \\
   --env ASPNETCORE_HTTP_PORTS=8080 \\
@@ -172,9 +172,9 @@ docker run --detach \\
   --env KUKULCAN__Database__Migration__SeedDataOnStartup=true \\
   --env ConnectionStrings__Redis='' \\
   --env Jwt__SecretKey='<LOCAL_I18N_JWT_SECRET_MINIMUM_32_CHARACTERS>' \\
-  --env Jwt__Issuer='ITZAMNA' \\
-  --env Jwt__Audience='ITZAMNA.i18n' \\
-  kukulcan-sharedkernel-i18n:local
+  --env Jwt__Issuer='ATLAS' \\
+  --env Jwt__Audience='ATLAS.i18n' \\
+  kukulcan-i18n:local
 \`\`\`
 
 Inside the Docker network the database host is **\`mypostgres\`**, not \`localhost\`.
@@ -183,7 +183,7 @@ Verify:
 
 \`\`\`bash
 docker ps
-docker logs KUKULCAN_I18n
+docker logs kukulcan-i18n
 curl --fail http://127.0.0.1:8080/health/live
 \`\`\`
 
@@ -228,12 +228,12 @@ The Example points to the local i18n service:
 \`\`\`json
 "I18n": {
   "BaseUrl": "http://localhost:8080/",
-  "Issuer": "ITZAMNA",
-  "Audience": "ITZAMNA.i18n"
+  "Issuer": "ATLAS",
+  "Audience": "ATLAS.i18n"
 }
 \`\`\`
 
-The JWT secret must be the same secret configured for \`KUKULCAN_I18n\`:
+The JWT secret must be the same secret configured for \`kukulcan-i18n\`:
 
 \`\`\`bash
 export I18n__JwtSecretKey='<LOCAL_I18N_JWT_SECRET_MINIMUM_32_CHARACTERS>'
@@ -250,7 +250,7 @@ Required startup order:
 \`\`\`text
 1. mypostgres
        ↓
-2. KUKULCAN_I18n
+2. kukulcan-i18n
        ↓
 3. KUKULCAN.SharedKernel.Example.Web
 \`\`\`
@@ -299,11 +299,11 @@ The service-to-service request sends a short-lived JWT Bearer token.
 
 The relevant settings must match:
 
-| Setting | Example | KUKULCAN_I18n |
+| Setting | Example | kukulcan-i18n |
 |---|---|---|
 | Secret | \`I18n__JwtSecretKey\` | \`Jwt__SecretKey\` |
-| Issuer | \`ITZAMNA\` | \`Jwt__Issuer\` |
-| Audience | \`ITZAMNA.i18n\` | \`Jwt__Audience\` |
+| Issuer | \`ATLAS\` | \`Jwt__Issuer\` |
+| Audience | \`ATLAS.i18n\` | \`Jwt__Audience\` |
 
 ## 11. Existing Example integrations
 
@@ -366,10 +366,10 @@ docker run --detach \\
 From the i18n repository:
 
 \`\`\`bash
-docker build --tag kukulcan-sharedkernel-i18n:local .
+docker build --tag kukulcan-i18n:local .
 
 docker run --detach \\
-  --name KUKULCAN_I18n \\
+  --name kukulcan-i18n \\
   --network kukulcan-local \\
   --publish 8080:8080 \\
   --env ASPNETCORE_HTTP_PORTS=8080 \\
@@ -379,9 +379,9 @@ docker run --detach \\
   --env KUKULCAN__Database__Migration__SeedDataOnStartup=true \\
   --env ConnectionStrings__Redis='' \\
   --env Jwt__SecretKey='<LOCAL_I18N_JWT_SECRET_MINIMUM_32_CHARACTERS>' \\
-  --env Jwt__Issuer='ITZAMNA' \\
-  --env Jwt__Audience='ITZAMNA.i18n' \\
-  kukulcan-sharedkernel-i18n:local
+  --env Jwt__Issuer='ATLAS' \\
+  --env Jwt__Audience='ATLAS.i18n' \\
+  kukulcan-i18n:local
 \`\`\`
 
 ### Example
@@ -401,7 +401,7 @@ Check:
 docker ps
 docker network inspect kukulcan-local
 docker exec mypostgres pg_isready --username postgres --dbname Atlas
-docker logs KUKULCAN_I18n
+docker logs kukulcan-i18n
 \`\`\`
 
 The i18n connection string must use \`Host=mypostgres\`.
@@ -437,7 +437,7 @@ docker start mypostgres
 Stop:
 
 \`\`\`bash
-docker stop KUKULCAN_I18n
+docker stop kukulcan-i18n
 docker stop mypostgres
 \`\`\`
 
@@ -445,13 +445,13 @@ Restart:
 
 \`\`\`bash
 docker start mypostgres
-docker start KUKULCAN_I18n
+docker start kukulcan-i18n
 \`\`\`
 
 Remove the local containers when the environment is no longer required:
 
 \`\`\`bash
-docker rm KUKULCAN_I18n mypostgres
+docker rm kukulcan-i18n mypostgres
 docker network rm kukulcan-local
 \`\`\`
 
