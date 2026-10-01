@@ -35,26 +35,23 @@ public sealed class LocalAuthenticationTests
     [Test]
     public async Task PostLocalAuthentication_ReturnsAuthenticatedUserWithAllTenantMemberships()
     {
-        var response = await _client.PostAsJsonAsync(
-            "/api/auth/local/authenticate",
+        var response = await _client.PostAsJsonAsync("/api/auth/local/authenticate",
             new LocalAuthenticationRequest("  USER@Example.COM  ", "P@ssw0rd!"));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-
+        
         var payload = await response.Content.ReadFromJsonAsync<LocalAuthenticationResponse>();
 
         payload.Should().NotBeNull();
-        payload!.UserId.Should().Be(ExpectedUserId);
+        payload.UserId.Should().Be(ExpectedUserId);
         payload.Email.Should().Be("user@example.com");
-        payload.Tenants.Should().ContainSingle()
-            .Which.Should().Be(ExpectedTenantId);
+        payload.Tenants.Should().ContainSingle().Which.Should().Be(ExpectedTenantId);
     }
 
     [Test]
     public async Task PostLocalAuthentication_ReturnsUnauthorizedForInvalidPassword()
     {
-        var response = await _client.PostAsJsonAsync(
-            "/api/auth/local/authenticate",
+        var response = await _client.PostAsJsonAsync("/api/auth/local/authenticate",
             new LocalAuthenticationRequest("user@example.com", "WrongPassword!"));
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -72,8 +69,5 @@ public sealed class LocalAuthenticationTests
 
     private sealed record LocalAuthenticationRequest(string Email, string Password);
 
-    private sealed record LocalAuthenticationResponse(
-        Guid UserId,
-        string Email,
-        IReadOnlyCollection<Guid> Tenants);
+    private sealed record LocalAuthenticationResponse(Guid UserId, string Email, IReadOnlyCollection<Guid> Tenants);
 }

@@ -1,15 +1,17 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 
 namespace KUKULCAN.SharedKernel.Example.Web.IntegrationTests;
 
 [TestFixture]
-public sealed class I18nConsumptionTests
+public sealed class I18NConsumptionTests
 {
     private WebApplicationFactory<Program> _factory = null!;
     private HttpClient _client = null!;
@@ -34,7 +36,7 @@ public sealed class I18nConsumptionTests
                 builder.ConfigureTestServices(services =>
                 {
                     services.AddHttpClient("KUKULCAN.SharedKernel.I18n")
-                        .ConfigurePrimaryHttpMessageHandler(() => new StubI18nHandler());
+                        .ConfigurePrimaryHttpMessageHandler(() => new StubI18NHandler());
                 });
             });
 
@@ -58,24 +60,22 @@ public sealed class I18nConsumptionTests
         var result = await response.Content.ReadFromJsonAsync<CultureResponse>();
 
         result.Should().NotBeNull();
-        result!.Culture.Should().Be("es-ES");
+        result.Culture.Should().Be("es-ES");
     }
 
     private sealed record CultureResponse(string Culture);
 
-    private sealed class StubI18nHandler : HttpMessageHandler
+    private sealed class StubI18NHandler : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            const string json = """{"id":"11111111-1111-1111-1111-111111111111","code":"es-ES","name":"Spanish","nativeName":"Español","isDefault":false,"isActive":true,"createdOn":"2026-01-01T00:00:00+00:00","modifiedOn":null}""";
+            
             request.RequestUri!.AbsolutePath.Should().Be("/api/v1/languages/es-ES");
             request.Headers.Authorization.Should().NotBeNull();
             request.Headers.Authorization!.Scheme.Should().Be("Bearer");
             request.Headers.Authorization.Parameter.Should().NotBeNullOrWhiteSpace();
-
-            var json = """{"id":"11111111-1111-1111-1111-111111111111","code":"es-ES","name":"Spanish","nativeName":"Español","isDefault":false,"isActive":true,"createdOn":"2026-01-01T00:00:00+00:00","modifiedOn":null}""";
-
+            
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")

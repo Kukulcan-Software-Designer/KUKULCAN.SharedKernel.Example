@@ -14,14 +14,14 @@ The important architectural distinction is that **I18n is not a NuGet library co
 
 ## 1. Repository roles
 
-| Repository | Runtime role in the Example |
-|---|---|
-| `KUKULCAN.SharedKernel` | Common domain/result abstractions consumed as a NuGet package |
-| `KUKULCAN.SharedKernel.Auth` | Authentication services and password/local-auth behavior consumed as a NuGet package |
-| `KUKULCAN.SharedKernel.Database` | Database abstractions, DbContext base and Unit of Work consumed as a NuGet package |
-| `KUKULCAN.SharedKernel.JsonEngine` | JSON processing capability consumed as a NuGet package |
-| `KUKULCAN.SharedKernel.i18n` | Independent internationalization HTTP service, normally executed locally in Docker |
-| `KUKULCAN.SharedKernel.Example` | Reference Web application that composes the previous components |
+| Repository                         | Runtime role in the Example                                                          |
+|------------------------------------|--------------------------------------------------------------------------------------|
+| `KUKULCAN.SharedKernel`            | Common domain/result abstractions consumed as a NuGet package                        |
+| `KUKULCAN.SharedKernel.Auth`       | Authentication services and password/local-auth behavior consumed as a NuGet package |
+| `KUKULCAN.SharedKernel.Database`   | Database abstractions, DbContext base and Unit of Work consumed as a NuGet package   |
+| `KUKULCAN.SharedKernel.JsonEngine` | JSON processing capability consumed as a NuGet package                               |
+| `KUKULCAN.SharedKernel.i18n`       | Independent internationalization HTTP service, normally executed locally in Docker   |
+| `KUKULCAN.SharedKernel.Example`    | Reference Web application that composes the previous components                      |
 
 The Example application must not introduce `ProjectReference` links to the SharedKernel libraries. The reusable libraries are consumed through their published NuGet packages. I18n is consumed through HTTP.
 
@@ -37,9 +37,9 @@ A simple local setup is:
 │                                             │
 │  ├── SharedKernel       ── NuGet            │
 │  ├── Auth               ── NuGet            │
-│  ├── Database            ── NuGet            │
-│  ├── JsonEngine          ── NuGet            │
-│  └── I18nServiceClient   ── HTTP ───────┐   │
+│  ├── Database           ── NuGet            │
+│  ├── JsonEngine         ── NuGet            │
+│  └── I18nServiceClient  ── HTTP ─────────┐  │
 └──────────────────────────────────────────│──┘
                                            │
                                            ▼
@@ -52,8 +52,8 @@ A simple local setup is:
                                            │
                                            ▼
                               ┌─────────────────────────┐
-                              │ PostgreSQL               │
-                              │ local Docker container   │
+                              │ PostgreSQL              │
+                              │ local Docker container  │
                               └─────────────────────────┘
 ```
 

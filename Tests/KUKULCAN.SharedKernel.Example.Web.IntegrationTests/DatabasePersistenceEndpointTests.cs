@@ -35,7 +35,7 @@ public sealed class DatabasePersistenceEndpointTests
                     services.AddDbContext<TestExampleDbContext>();
                     services.AddScoped<ExampleDbContext>(sp =>
                         sp.GetRequiredService<TestExampleDbContext>());
-                    services.AddScoped<IUnitOfWork, KUKULCAN.SharedKernel.Database.UnitOfWork.UnitOfWork<ExampleDbContext>>();
+                    services.AddScoped<IUnitOfWork, Database.UnitOfWork.UnitOfWork<ExampleDbContext>>();
                 });
             });
         _client = _factory.CreateClient();
@@ -60,7 +60,7 @@ public sealed class DatabasePersistenceEndpointTests
         var created = await createResponse.Content.ReadFromJsonAsync<EntityResponse>();
 
         created.Should().NotBeNull();
-        created!.Name.Should().Be("Example entity");
+        created.Name.Should().Be("Example entity");
 
         var getResponse = await _client.GetAsync($"/api/database/entities/{created.Id}");
 
@@ -69,7 +69,7 @@ public sealed class DatabasePersistenceEndpointTests
         var retrieved = await getResponse.Content.ReadFromJsonAsync<EntityResponse>();
 
         retrieved.Should().NotBeNull();
-        retrieved!.Id.Should().Be(created.Id);
+        retrieved.Id.Should().Be(created.Id);
         retrieved.Name.Should().Be("Example entity");
     }
 
@@ -85,13 +85,8 @@ public sealed class DatabasePersistenceEndpointTests
         var created = await createResponse.Content.ReadFromJsonAsync<EntityResponse>();
 
         created.Should().NotBeNull();
-
-        using var patchRequest = new HttpRequestMessage(
-            HttpMethod.Patch,
-            $"/api/database/entities/{created!.Id}")
-        {
-            Content = JsonContent.Create(new UpdateEntityRequest("Updated entity"))
-        };
+        using var patchRequest = new HttpRequestMessage(HttpMethod.Patch, $"/api/database/entities/{created.Id}");
+        patchRequest.Content = JsonContent.Create(new UpdateEntityRequest("Updated entity"));
 
         var patchResponse = await _client.SendAsync(patchRequest);
 
@@ -104,7 +99,7 @@ public sealed class DatabasePersistenceEndpointTests
         var retrieved = await getResponse.Content.ReadFromJsonAsync<EntityResponse>();
 
         retrieved.Should().NotBeNull();
-        retrieved!.Id.Should().Be(created.Id);
+        retrieved.Id.Should().Be(created.Id);
         retrieved.Name.Should().Be("Updated entity");
     }
 
@@ -113,10 +108,8 @@ public sealed class DatabasePersistenceEndpointTests
     {
         using var patchRequest = new HttpRequestMessage(
             HttpMethod.Patch,
-            $"/api/database/entities/{Guid.NewGuid()}")
-        {
-            Content = JsonContent.Create(new UpdateEntityRequest("Updated entity"))
-        };
+            $"/api/database/entities/{Guid.NewGuid()}");
+        patchRequest.Content = JsonContent.Create(new UpdateEntityRequest("Updated entity"));
 
         var patchResponse = await _client.SendAsync(patchRequest);
 
@@ -126,8 +119,7 @@ public sealed class DatabasePersistenceEndpointTests
     [Test]
     public async Task PatchEntity_WhenNameIsBlank_ReturnsBadRequest()
     {
-        var createResponse = await _client.PostAsJsonAsync(
-            "/api/database/entities",
+        var createResponse = await _client.PostAsJsonAsync("/api/database/entities",
             new CreateEntityRequest("Example entity"));
 
         createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
@@ -136,15 +128,10 @@ public sealed class DatabasePersistenceEndpointTests
 
         created.Should().NotBeNull();
 
-        using var patchRequest = new HttpRequestMessage(
-            HttpMethod.Patch,
-            $"/api/database/entities/{created!.Id}")
-        {
-            Content = JsonContent.Create(new UpdateEntityRequest("   "))
-        };
+        using var patchRequest = new HttpRequestMessage(HttpMethod.Patch, $"/api/database/entities/{created.Id}");
+        patchRequest.Content = JsonContent.Create(new UpdateEntityRequest("   "));
 
         var patchResponse = await _client.SendAsync(patchRequest);
-
         patchResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -154,12 +141,8 @@ public sealed class DatabasePersistenceEndpointTests
 
     private sealed record EntityResponse(Guid Id, string Name);
 
-    private sealed class TestExampleDbContext(
-        IOptions<KukulcanDatabaseOptions> options,
-        ITenantContext tenantContext,
-        IClock clock,
-        IDomainEventDispatcher domainEventDispatcher)
-        : ExampleDbContext(options, tenantContext, clock, domainEventDispatcher)
+    private sealed class TestExampleDbContext(IOptions<KukulcanDatabaseOptions> options, ITenantContext tenantContext,
+        IClock clock, IDomainEventDispatcher domainEventDispatcher) : ExampleDbContext(options, tenantContext, clock, domainEventDispatcher)
     {
         protected override void ConfigureProvider(DbContextOptionsBuilder optionsBuilder)
             => optionsBuilder.UseInMemoryDatabase("ExampleDatabase");
