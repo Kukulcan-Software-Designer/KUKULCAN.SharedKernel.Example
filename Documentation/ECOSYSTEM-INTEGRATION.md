@@ -1,348 +1,479 @@
 # KUKULCAN SharedKernel Ecosystem — Local Integration Guide
 
-This repository is the executable reference client for the KUKULCAN SharedKernel ecosystem.
+This repository is the executable reference application for the reusable KUKULCAN platform components.
 
-It demonstrates how one ASP.NET Core application can consume:
+The organization is building applications such as **ATLAS**, composed of independent Web API modules (\`ATLAS.CRM\`, \`ATLAS.Inventory\`, \`ATLAS.Billing\`, etc.). Each module consumes only the KUKULCAN components required by its own responsibilities.
 
-- `KUKULCAN.SharedKernel` through NuGet.
-- `KUKULCAN.SharedKernel.Auth` through NuGet.
-- `KUKULCAN.SharedKernel.Database` through NuGet.
-- `KUKULCAN.SharedKernel.JsonEngine` through NuGet.
-- `KUKULCAN.SharedKernel.i18n` as a local HTTP service running in Docker.
+## 1. KUKULCAN ecosystem
 
-The important architectural distinction is that **I18n is not a NuGet library consumed in-process**. It is a standalone ASP.NET Core service. The Example application communicates with it over HTTP.
+| Component | Type | Consumption |
+|---|---|---|
+| \`KUKULCAN.SharedKernel\` | Class library | NuGet package |
+| \`KUKULCAN.SharedKernel.Auth\` | Class library | NuGet package |
+| \`KUKULCAN.SharedKernel.Database\` | Class library | NuGet package |
+| \`KUKULCAN.SharedKernel.JsonEngine\` | Class library | NuGet package |
+| \`KUKULCAN.SharedKernel.i18n\` | Web API service | HTTP |
+| \`KUKULCAN.SharedKernel.Example\` | Reference Web API | Consumes the components above |
 
-## 1. Repository roles
+The four class libraries are generic KUKULCAN organization components and are consumed as **NuGet packages**. They are not coupled to ATLAS.
 
-| Repository                         | Runtime role in the Example                                                          |
-|------------------------------------|--------------------------------------------------------------------------------------|
-| `KUKULCAN.SharedKernel`            | Common domain/result abstractions consumed as a NuGet package                        |
-| `KUKULCAN.SharedKernel.Auth`       | Authentication services and password/local-auth behavior consumed as a NuGet package |
-| `KUKULCAN.SharedKernel.Database`   | Database abstractions, DbContext base and Unit of Work consumed as a NuGet package   |
-| `KUKULCAN.SharedKernel.JsonEngine` | JSON processing capability consumed as a NuGet package                               |
-| `KUKULCAN.SharedKernel.i18n`       | Independent internationalization HTTP service, normally executed locally in Docker   |
-| `KUKULCAN.SharedKernel.Example`    | Reference Web application that composes the previous components                      |
+\`KUKULCAN.SharedKernel.i18n\` is also generic, but is deployed as an independent Web API service with its own runtime and database boundary. Consumers access it through HTTP.
 
-The Example application must not introduce `ProjectReference` links to the SharedKernel libraries. The reusable libraries are consumed through their published NuGet packages. I18n is consumed through HTTP.
+A future module such as \`ATLAS.CRM\` follows this model:
 
-## 2. Local topology
+\`\`\`text
+ATLAS.CRM
+   ├── NuGet → KUKULCAN.SharedKernel
+   ├── NuGet → KUKULCAN.SharedKernel.Auth
+   ├── NuGet → KUKULCAN.SharedKernel.Database
+   ├── NuGet → KUKULCAN.SharedKernel.JsonEngine
+   │
+   └── HTTP  → KUKULCAN.SharedKernel.i18n
+                         │
+                         ▼
+                    PostgreSQL / Atlas
+\`\`\`
 
-A simple local setup is:
+## 2. Local runtime topology
 
-```text
-                         HTTP
-┌─────────────────────────────────────────────┐
-│ KUKULCAN.SharedKernel.Example.Web           │
-│ http://localhost:5000                       │
-│                                             │
-│  ├── SharedKernel       ── NuGet            │
-│  ├── Auth               ── NuGet            │
-│  ├── Database           ── NuGet            │
-│  ├── JsonEngine         ── NuGet            │
-│  └── I18nServiceClient  ── HTTP ─────────┐  │
-└──────────────────────────────────────────│──┘
-                                           │
-                                           ▼
-                              ┌─────────────────────────┐
-                              │ KUKULCAN.SharedKernel   │
-                              │ .i18n                   │
-                              │ Docker                  │
-                              │ http://localhost:8080   │
-                              └────────────┬────────────┘
-                                           │
-                                           ▼
-                              ┌─────────────────────────┐
-                              │ PostgreSQL              │
-                              │ local Docker container  │
-                              └─────────────────────────┘
-```
+Before starting the Example Web API, the local infrastructure required by the i18n integration must already be running.
 
-Redis is optional for the local I18n service; the service can operate with its in-memory cache when Redis is not configured.
+\`\`\`text
+┌──────────────────────────────────────────────┐
+│ KUKULCAN.SharedKernel.Example.Web            │
+│ ASP.NET Core Web API                         │
+│                                              │
+│  SharedKernel       ← NuGet                  │
+│  Auth               ← NuGet                  │
+│  Database           ← NuGet                  │
+│  JsonEngine         ← NuGet                  │
+│                                              │
+│              HTTP                            │
+└─────────────────┬────────────────────────────┘
+                  │
+                  ▼
+        ┌──────────────────────┐
+        │ KUKULCAN_I18n        │
+        │ Docker container     │
+        │ host port 8080       │
+        └──────────┬───────────┘
+                   │
+                   ▼
+        ┌──────────────────────┐
+        │ mypostgres           │
+        │ PostgreSQL 16        │
+        │ database: Atlas      │
+        └──────────────────────┘
+\`\`\`
 
-## 3. Start the I18n service locally
+The containers must share the Docker network \`kukulcan-local\`. The Example normally runs on the host and reaches i18n through \`http://localhost:8080/\`.
 
-Clone the I18n repository beside the Example repository:
+## 3. Prerequisites
 
-```bash
-mkdir -p ~/Proyectos/KUKULCAN
-cd ~/Proyectos/KUKULCAN
+Install:
 
-git clone https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.i18n.git
-git clone https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Example.git
-```
+- .NET SDK 10.0.
+- Docker Engine.
+- Git.
 
-Enter the I18n repository:
+The expected local infrastructure is:
 
-```bash
-cd KUKULCAN.SharedKernel.i18n
-```
+| Resource | Value |
+|---|---|
+| PostgreSQL image | \`postgres:16\` |
+| PostgreSQL container | \`mypostgres\` |
+| Database | \`Atlas\` |
+| Database user | \`postgres\` |
+| i18n container | \`KUKULCAN_I18n\` |
+| i18n container port | \`8080\` |
+| i18n host port | \`8080\` |
+| Docker network | \`kukulcan-local\` |
 
-Create a dedicated Docker network:
+The PostgreSQL password and JWT secret are local secrets. **Never commit the real values to this repository.**
 
-```bash
+## 4. Create the PostgreSQL Docker container
+
+Create the network once:
+
+\`\`\`bash
 docker network create kukulcan-local
-```
+\`\`\`
 
-Start PostgreSQL:
+If it already exists, continue.
 
-```bash
-docker run --detach \
-  --name kukulcan-i18n-postgres \
-  --network kukulcan-local \
-  --env POSTGRES_DB=kukulcan_i18n \
-  --env POSTGRES_USER=kukulcan \
-  --env POSTGRES_PASSWORD=kulculcan_pass \
+Create PostgreSQL with the required database:
+
+\`\`\`bash
+docker run --detach \\
+  --name mypostgres \\
+  --network kukulcan-local \\
+  --env POSTGRES_DB=Atlas \\
+  --env POSTGRES_USER=postgres \\
+  --env POSTGRES_PASSWORD='<LOCAL_POSTGRES_PASSWORD>' \\
+  --publish 5432:5432 \\
   postgres:16
-```
+\`\`\`
 
-> If the container already exists, do not create it again. Use `docker start kukulcan-i18n-postgres`.
+Replace \`<LOCAL_POSTGRES_PASSWORD>\` with the local PostgreSQL password.
 
-Build the I18n service image:
+Verify:
 
-```bash
-docker build --tag kukulcan-sharedkernel-i18n:local .
-```
-
-Run the service:
-
-```bash
-docker run --detach \
-  --name kukulcan-sharedkernel-i18n \
-  --network kukulcan-local \
-  --publish 8080:8080 \
-  --env ASPNETCORE_HTTP_PORTS=8080 \
-  --env Kukulcan__Database__ConnectionString='Host=kukulcan-i18n-postgres;Port=5432;Database=kukulcan_i18n;Username=kukulcan;Password=kulculcan_pass' \
-  --env Kukulcan__Database__Migration__AutoMigrateOnStartup=true \
-  --env Kukulcan__Database__SeedDataOnStartup=true \
-  --env ConnectionStrings__Redis='' \
-  --env Jwt__SecretKey='local-i18n-secret-key-with-at-least-32-characters' \
-  --env Jwt__Issuer='ITZAMNA' \
-  --env Jwt__Audience='ITZAMNA.i18n' \
-  kukulcan-sharedkernel-i18n:local
-```
-
-Check the container:
-
-```bash
+\`\`\`bash
 docker ps
-docker logs kukulcan-sharedkernel-i18n
-```
+docker exec mypostgres pg_isready --username postgres --dbname Atlas
+\`\`\`
 
-Check liveness:
+If \`mypostgres\` already exists, do not create another container:
 
-```bash
+\`\`\`bash
+docker ps -a --filter name=mypostgres
+docker start mypostgres
+\`\`\`
+
+Check the PostgreSQL version:
+
+\`\`\`bash
+docker exec mypostgres psql \\
+  --username postgres \\
+  --dbname Atlas \\
+  --command "SHOW server_version;"
+\`\`\`
+
+## 5. Build KUKULCAN.SharedKernel.i18n
+
+Clone the service repository:
+
+\`\`\`bash
+git clone https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.i18n.git
+cd KUKULCAN.SharedKernel.i18n
+\`\`\`
+
+Build its root Dockerfile:
+
+\`\`\`bash
+docker build --tag kukulcan-sharedkernel-i18n:local .
+\`\`\`
+
+The current Dockerfile uses the .NET 10 SDK for the build stage, the ASP.NET 10 runtime for execution, and exposes container port \`8080\`.
+
+## 6. Create the KUKULCAN_I18n Docker container
+
+The service must use the same network as PostgreSQL:
+
+\`\`\`bash
+docker run --detach \\
+  --name KUKULCAN_I18n \\
+  --network kukulcan-local \\
+  --publish 8080:8080 \\
+  --env ASPNETCORE_HTTP_PORTS=8080 \\
+  --env KUKULCAN__Database__Provider=PostgresSql \\
+  --env KUKULCAN__Database__ConnectionString='Host=mypostgres;Port=5432;Database=Atlas;Username=postgres;Password=<LOCAL_POSTGRES_PASSWORD>' \\
+  --env KUKULCAN__Database__Migration__AutoMigrateOnStartup=true \\
+  --env KUKULCAN__Database__Migration__SeedDataOnStartup=true \\
+  --env ConnectionStrings__Redis='' \\
+  --env Jwt__SecretKey='<LOCAL_I18N_JWT_SECRET_MINIMUM_32_CHARACTERS>' \\
+  --env Jwt__Issuer='ITZAMNA' \\
+  --env Jwt__Audience='ITZAMNA.i18n' \\
+  kukulcan-sharedkernel-i18n:local
+\`\`\`
+
+Inside the Docker network the database host is **\`mypostgres\`**, not \`localhost\`.
+
+Verify:
+
+\`\`\`bash
+docker ps
+docker logs KUKULCAN_I18n
 curl --fail http://127.0.0.1:8080/health/live
-```
+\`\`\`
 
-The I18n API is now reachable by the host at:
+The service is then available from the host at:
 
-```text
-http://localhost:8080
-```
+\`\`\`text
+http://localhost:8080/
+\`\`\`
 
-Its API documentation is exposed by the I18n application in Development mode.
+## 7. Atlas database and i18n schema
 
-## 4. Configure the Example application
+The i18n service uses the PostgreSQL database:
 
-The Example application uses the following configuration:
+\`\`\`text
+Atlas
+\`\`\`
 
-```json
+The current i18n tables belong to schema \`i18n\`:
+
+- \`i18n.CurrencyFormat\`
+- \`i18n.Languages\`
+- \`i18n.LocaleConfigurations\`
+- \`i18n.Translations\`
+
+The Example does **not** access these tables directly. The i18n service owns this persistence boundary and exposes its API to consumers.
+
+Check the schema:
+
+\`\`\`bash
+docker exec mypostgres psql \\
+  --username postgres \\
+  --dbname Atlas \\
+  --command "\\\\dt i18n.*"
+\`\`\`
+
+With \`KUKULCAN__Database__Migration__AutoMigrateOnStartup=true\`, the i18n service applies its configured migrations at startup. With \`...SeedDataOnStartup=true\`, configured seed data is initialized.
+
+## 8. Configure and run the Example
+
+The Example points to the local i18n service:
+
+\`\`\`json
 "I18n": {
   "BaseUrl": "http://localhost:8080/",
-  "Issuer": "ATLAS",
-  "Audience": "ATLAS.i18n"
+  "Issuer": "ITZAMNA",
+  "Audience": "ITZAMNA.i18n"
 }
-```
+\`\`\`
 
-The signing key must not be committed to source control. Supply it as an environment variable:
+The JWT secret must be the same secret configured for \`KUKULCAN_I18n\`:
 
-```bash
-export I18n__JwtSecretKey='local-i18n-secret-key-with-at-least-32-characters'
-```
+\`\`\`bash
+export I18n__JwtSecretKey='<LOCAL_I18N_JWT_SECRET_MINIMUM_32_CHARACTERS>'
+\`\`\`
 
-Run the Example:
+Run the application:
 
-```bash
-cd ../KUKULCAN.SharedKernel.Example
+\`\`\`bash
 dotnet run --project Source/KUKULCAN.SharedKernel.Example.Web
-```
+\`\`\`
 
-The Example's I18n client generates a short-lived JWT signed with the same local development key and sends it as a Bearer token to the I18n service.
+Required startup order:
 
-This is deliberately a service-to-service authentication example. It does not make the I18n service an in-process dependency.
+\`\`\`text
+1. mypostgres
+       ↓
+2. KUKULCAN_I18n
+       ↓
+3. KUKULCAN.SharedKernel.Example.Web
+\`\`\`
 
-## 5. I18n consumption flow
+## 9. NuGet package consumption
 
-The Example exposes:
+The Example consumes these reusable class libraries as NuGet packages:
 
-```text
+\`\`\`text
+KUKULCAN.SharedKernel
+KUKULCAN.SharedKernel.Auth
+KUKULCAN.SharedKernel.Database
+KUKULCAN.SharedKernel.JsonEngine
+\`\`\`
+
+A future ATLAS module uses the same model:
+
+\`\`\`xml
+<PackageReference Include="KUKULCAN.SharedKernel" Version="..." />
+<PackageReference Include="KUKULCAN.SharedKernel.Auth" Version="..." />
+<PackageReference Include="KUKULCAN.SharedKernel.Database" Version="..." />
+<PackageReference Include="KUKULCAN.SharedKernel.JsonEngine" Version="..." />
+\`\`\`
+
+The exact package versions are determined by the released versions required by each application.
+
+The consuming application should not replace these package dependencies with \`ProjectReference\` links to KUKULCAN source repositories.
+
+## 10. HTTP consumption of KUKULCAN.SharedKernel.i18n
+
+i18n is **not a NuGet dependency**. It is a separate Web API process.
+
+The Example currently exposes:
+
+\`\`\`text
 GET /api/i18n/culture?culture=<language-code>
-```
+\`\`\`
 
-The request flow is:
+The Example client calls the i18n API:
 
-```text
-Client
-  │
-  │ GET /api/i18n/culture?culture=...
-  ▼
-Example.Web
-  │
-  │ creates short-lived JWT
-  │ Authorization: Bearer <token>
-  │
-  │ GET /api/v1/languages/<culture>
-  ▼
-KUKULCAN.SharedKernel.i18n
-  │
-  │ JWT validation
-  │ language lookup
-  ▼
-Example.Web
-  │
-  │ maps the service response
-  ▼
-HTTP 200 / 404
-```
+\`\`\`text
+GET /api/v1/languages/<culture>
+\`\`\`
 
-The Example therefore demonstrates the real architectural boundary: SharedKernel libraries are local NuGet dependencies, while I18n is a network dependency.
+The service-to-service request sends a short-lived JWT Bearer token.
 
-## 6. Other SharedKernel integrations
+The relevant settings must match:
+
+| Setting | Example | KUKULCAN_I18n |
+|---|---|---|
+| Secret | \`I18n__JwtSecretKey\` | \`Jwt__SecretKey\` |
+| Issuer | \`ITZAMNA\` | \`Jwt__Issuer\` |
+| Audience | \`ITZAMNA.i18n\` | \`Jwt__Audience\` |
+
+## 11. Existing Example integrations
 
 ### SharedKernel
 
-The Example consumes the published `KUKULCAN.SharedKernel` package and demonstrates its `Result` abstraction through:
+Consumed as a NuGet package. Demonstrated through:
 
-```text
+\`\`\`text
 GET /api/result
-```
+\`\`\`
 
 ### Auth
 
-The Example consumes `KUKULCAN.SharedKernel.Auth` and demonstrates:
+Consumed as a NuGet package. Demonstrated through:
 
-```text
+\`\`\`text
 POST /api/auth/password/verify
 POST /api/auth/local/authenticate
-```
-
-The local authentication example also demonstrates tenant membership behavior.
+\`\`\`
 
 ### Database
 
-The Example consumes `KUKULCAN.SharedKernel.Database` and demonstrates persistence through:
+Consumed as a NuGet package. Demonstrated through:
 
-```text
+\`\`\`text
 POST  /api/database/entities
 GET   /api/database/entities/{id}
 PATCH /api/database/entities/{id}
-```
+\`\`\`
 
-The persistence path uses `KukulcanDbContextBase` and `IUnitOfWork` rather than introducing a production database provider into the Example itself.
+The Example demonstrates the KUKULCAN database abstractions without introducing a production database provider into the application.
 
 ### JsonEngine
 
-The JsonEngine integration follows the same rule as the other reusable libraries: the Example consumes its published NuGet package. Its functional HTTP behavior will be added in the dedicated JsonEngine TDD cycle.
+Consumed as a NuGet package. Its functional integration is independent from the i18n service.
 
-JsonEngine is therefore not coupled to the I18n Docker container. They are independent components.
+### i18n
 
-## 7. Local lifecycle
+Consumed through HTTP. This demonstrates the architectural boundary between reusable in-process libraries and a reusable platform service.
 
-Start the dependencies:
+## 12. Complete local startup
 
-```bash
-docker start kukulcan-i18n-postgres
-docker start kukulcan-sharedkernel-i18n
-```
+### PostgreSQL
 
-Run the Example:
+\`\`\`bash
+docker network create kukulcan-local
 
-```bash
+docker run --detach \\
+  --name mypostgres \\
+  --network kukulcan-local \\
+  --env POSTGRES_DB=Atlas \\
+  --env POSTGRES_USER=postgres \\
+  --env POSTGRES_PASSWORD='<LOCAL_POSTGRES_PASSWORD>' \\
+  --publish 5432:5432 \\
+  postgres:16
+\`\`\`
+
+### i18n
+
+From the i18n repository:
+
+\`\`\`bash
+docker build --tag kukulcan-sharedkernel-i18n:local .
+
+docker run --detach \\
+  --name KUKULCAN_I18n \\
+  --network kukulcan-local \\
+  --publish 8080:8080 \\
+  --env ASPNETCORE_HTTP_PORTS=8080 \\
+  --env KUKULCAN__Database__Provider=PostgresSql \\
+  --env KUKULCAN__Database__ConnectionString='Host=mypostgres;Port=5432;Database=Atlas;Username=postgres;Password=<LOCAL_POSTGRES_PASSWORD>' \\
+  --env KUKULCAN__Database__Migration__AutoMigrateOnStartup=true \\
+  --env KUKULCAN__Database__Migration__SeedDataOnStartup=true \\
+  --env ConnectionStrings__Redis='' \\
+  --env Jwt__SecretKey='<LOCAL_I18N_JWT_SECRET_MINIMUM_32_CHARACTERS>' \\
+  --env Jwt__Issuer='ITZAMNA' \\
+  --env Jwt__Audience='ITZAMNA.i18n' \\
+  kukulcan-sharedkernel-i18n:local
+\`\`\`
+
+### Example
+
+\`\`\`bash
+export I18n__JwtSecretKey='<LOCAL_I18N_JWT_SECRET_MINIMUM_32_CHARACTERS>'
 dotnet run --project Source/KUKULCAN.SharedKernel.Example.Web
-```
+\`\`\`
 
-Stop the Example with `Ctrl+C`.
+## 13. Troubleshooting
 
-Stop the I18n service when finished:
+### i18n cannot connect to PostgreSQL
 
-```bash
-docker stop kukulcan-sharedkernel-i18n
-docker stop kukulcan-i18n-postgres
-```
+Check:
 
-Remove the containers when the local environment is no longer required:
-
-```bash
-docker rm kukulcan-sharedkernel-i18n kukulcan-i18n-postgres
-docker network rm kukulcan-local
-```
-
-## 8. Troubleshooting
-
-### I18n returns 401
-
-Check that the Example and I18n service use exactly the same:
-
-- JWT secret.
-- Issuer.
-- Audience.
-
-The local secret must contain at least 32 characters.
-
-### I18n does not start
-
-Inspect the logs:
-
-```bash
-docker logs kukulcan-sharedkernel-i18n
-```
-
-The most common local dependency is PostgreSQL. Check:
-
-```bash
+\`\`\`bash
 docker ps
-docker logs kukulcan-i18n-postgres
-```
+docker network inspect kukulcan-local
+docker exec mypostgres pg_isready --username postgres --dbname Atlas
+docker logs KUKULCAN_I18n
+\`\`\`
 
-### The database is not ready
+The i18n connection string must use \`Host=mypostgres\`.
 
-The I18n service applies migrations only when:
+### i18n returns 401
 
-```text
-Kukulcan__Database__Migration__AutoMigrateOnStartup=true
-```
-
-is supplied.
+The Example and i18n service must use the same JWT secret, issuer and audience. The secret must contain at least 32 characters.
 
 ### Port 8080 is already in use
 
-Change the host-side port, for example:
+Publish another host port while keeping container port 8080:
 
-```bash
+\`\`\`bash
 --publish 18080:8080
-```
+\`\`\`
 
-and configure the Example with:
+Then configure:
 
-```text
+\`\`\`text
 I18n:BaseUrl=http://localhost:18080/
-```
+\`\`\`
 
-The container continues to listen on port 8080.
+### \`mypostgres\` already exists
 
-## 9. Design rule
+Do not run another \`docker run --name mypostgres ...\`. Start the existing container:
 
-The Example repository is intentionally a **reference client**, not a monolithic composition of all KUKULCAN repositories.
+\`\`\`bash
+docker start mypostgres
+\`\`\`
 
-The intended dependency model is:
+## 14. Local lifecycle
 
-```text
-Example
-  ├── NuGet → SharedKernel
-  ├── NuGet → Auth
-  ├── NuGet → Database
-  ├── NuGet → JsonEngine
-  └── HTTP   → I18n Docker service
-```
+Stop:
 
-This distinction should be preserved as additional functional behaviors are added.
+\`\`\`bash
+docker stop KUKULCAN_I18n
+docker stop mypostgres
+\`\`\`
+
+Restart:
+
+\`\`\`bash
+docker start mypostgres
+docker start KUKULCAN_I18n
+\`\`\`
+
+Remove the local containers when the environment is no longer required:
+
+\`\`\`bash
+docker rm KUKULCAN_I18n mypostgres
+docker network rm kukulcan-local
+\`\`\`
+
+Removing the PostgreSQL container removes its container-local database storage unless a persistent Docker volume is configured.
+
+## 15. Design rules for future ATLAS modules
+
+Every ATLAS Web API module should preserve this dependency model:
+
+\`\`\`text
+ATLAS.<MODULE>
+   │
+   ├── NuGet → KUKULCAN.SharedKernel
+   ├── NuGet → KUKULCAN.SharedKernel.Auth
+   ├── NuGet → KUKULCAN.SharedKernel.Database
+   ├── NuGet → KUKULCAN.SharedKernel.JsonEngine
+   │
+   └── HTTP  → KUKULCAN.SharedKernel.i18n
+\`\`\`
+
+The class libraries are reusable code dependencies.
+
+The i18n component is a reusable platform service with its own process, API and database boundary.
+
+The Example repository is the reference client demonstrating both consumption models.
