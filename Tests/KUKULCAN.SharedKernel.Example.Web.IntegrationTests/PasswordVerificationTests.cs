@@ -29,16 +29,14 @@ public sealed class PasswordVerificationTests
     [Test]
     public async Task PostPasswordVerification_ReturnsVerifiedForMatchingPassword()
     {
-        var response = await _client.PostAsJsonAsync(
-            "/api/auth/password/verify",
-            new PasswordVerificationRequest("P@ssw0rd!"));
+        var response = await _client.PostAsJsonAsync("/api/auth/password/verify", new PasswordVerificationRequest("P@ssw0rd!"));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var payload = await response.Content.ReadFromJsonAsync<PasswordVerificationResponse>();
 
         payload.Should().NotBeNull();
-        payload!.Verified.Should().BeTrue();
+        payload.Verified.Should().BeTrue();
     }
 
     private sealed record PasswordVerificationRequest(string Password);

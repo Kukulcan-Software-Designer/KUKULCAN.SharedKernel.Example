@@ -36,7 +36,7 @@ public sealed class SharedKernelConsumptionTests
         var payload = await response.Content.ReadFromJsonAsync<ResultResponse>();
 
         payload.Should().NotBeNull();
-        payload!.Status.Should().Be("Success");
+        payload.Status.Should().Be("Success");
     }
 
     private sealed record ResultResponse(string Status);

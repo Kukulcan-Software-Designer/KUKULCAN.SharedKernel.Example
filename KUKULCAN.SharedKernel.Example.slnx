@@ -1,5 +1,8 @@
 <Solution>
-  <Folder Name="/Documentation/" />
+  <Folder Name="/Documentation/">
+    <File Path="Documentation\ECOSYSTEM-INTEGRATION.md" />
+    <File Path="Documentation\README.md" />
+  </Folder>
   <Folder Name="/Solution Item/">
     <File Path=".gitignore" />
     <File Path="Directory.Build.props" />

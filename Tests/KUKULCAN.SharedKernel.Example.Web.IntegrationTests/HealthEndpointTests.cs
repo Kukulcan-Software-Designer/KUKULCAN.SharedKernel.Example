@@ -36,7 +36,7 @@ public sealed class HealthEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<HealthResponse>();
 
         payload.Should().NotBeNull();
-        payload!.Status.Should().Be("Healthy");
+        payload.Status.Should().Be("Healthy");
     }
 
     private sealed record HealthResponse(string Status);

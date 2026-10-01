@@ -1,8 +1,17 @@
 using KUKULCAN.SharedKernel.Auth.Authentication.Local;
 using KUKULCAN.SharedKernel.Database.Abstractions;
+using KUKULCAN.SharedKernel.Example.Web.I18n;
 using KUKULCAN.SharedKernel.Example.Web;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddOptions<I18nOptions>()
+    .Bind(builder.Configuration.GetSection("I18n"));
+builder.Services.AddHttpClient("KUKULCAN.SharedKernel.I18n", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["I18n:BaseUrl"] ?? "http://localhost:8080/");
+});
+builder.Services.AddSingleton<II18nServiceClient, I18nServiceClient>();
 
 var passwordHasher = new PasswordHasher();
 var demoUser = new LocalUser(
@@ -27,6 +36,15 @@ var app = builder.Build();
 
 app.MapGet("/api/health", () => Results.Ok(new { Status = "Healthy" }));
 app.MapGet("/api/result", () => Results.Ok(new { Status = KUKULCAN.SharedKernel.Results.Result.Success().ToString() }));
+
+app.MapGet("/api/i18n/culture", async (string culture, II18nServiceClient i18nServiceClient, CancellationToken cancellationToken) =>
+{
+    var resolvedCulture = await i18nServiceClient.GetCultureAsync(culture, cancellationToken);
+
+    return resolvedCulture is null
+        ? Results.NotFound()
+        : Results.Ok(new { Culture = resolvedCulture });
+});
 
 app.MapPost("/api/auth/password/verify", (PasswordVerificationRequest request) =>
 {
