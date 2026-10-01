@@ -149,8 +149,8 @@ The Example application uses the following configuration:
 ```json
 "I18n": {
   "BaseUrl": "http://localhost:8080/",
-  "Issuer": "ITZAMNA",
-  "Audience": "ITZAMNA.i18n"
+  "Issuer": "ATLAS",
+  "Audience": "ATLAS.i18n"
 }
 ```
 
