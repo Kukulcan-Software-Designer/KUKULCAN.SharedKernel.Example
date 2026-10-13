@@ -24,27 +24,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Detect Web API project
+        id: webapi
+        shell: bash
+        run: |
+          if [ -f "Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup .NET
-        if: hashFiles('Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj') != ''
+        if: steps.webapi.outputs.present == 'true'
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
       - name: Restore Web API
-        if: hashFiles('Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj') != ''
+        if: steps.webapi.outputs.present == 'true'
         run: dotnet restore Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj
 
       - name: Build Web API
-        if: hashFiles('Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj') != ''
+        if: steps.webapi.outputs.present == 'true'
         run: dotnet build Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj --no-restore --configuration Release
 
       - name: Report Web API project not implemented yet
-        if: hashFiles('Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj') == ''
+        if: steps.webapi.outputs.present == 'false'
         shell: bash
         run: |
           echo "::notice::Web API build skipped: the project at the architecture-defined path has not been created yet (Issue #1)."
           echo "## Reference Client" >> "$GITHUB_STEP_SUMMARY"
-          echo "Web API build skipped because the project is not implemented yet: `Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj` (Issue #1)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Web API build skipped because the project is not implemented yet: Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj (Issue #1)." >> "$GITHUB_STEP_SUMMARY"
 
   build-angular:
     name: Build Angular client when present
@@ -54,23 +64,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Detect Angular client
+        id: angular
+        shell: bash
+        run: |
+          if [ -f "Source/KUKULCAN.SharedKernel.Example.Angular/package.json" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Node.js
-        if: hashFiles('Source/KUKULCAN.SharedKernel.Example.Angular/package.json') != ''
+        if: steps.angular.outputs.present == 'true'
         uses: actions/setup-node@v5
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: Source/KUKULCAN.SharedKernel.Example.Angular/package-lock.json
 
       - name: Install and build Angular client
-        if: hashFiles('Source/KUKULCAN.SharedKernel.Example.Angular/package.json') != ''
+        if: steps.angular.outputs.present == 'true'
         working-directory: Source/KUKULCAN.SharedKernel.Example.Angular
         run: |
           npm ci
           npm run build
 
       - name: Report Angular client not implemented yet
-        if: hashFiles('Source/KUKULCAN.SharedKernel.Example.Angular/package.json') == ''
+        if: steps.angular.outputs.present == 'false'
         run: echo "Angular build skipped: package.json does not exist yet."
 
   build-react:
@@ -81,21 +99,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Detect React client
+        id: react
+        shell: bash
+        run: |
+          if [ -f "Source/KUKULCAN.SharedKernel.Example.React/package.json" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Node.js
-        if: hashFiles('Source/KUKULCAN.SharedKernel.Example.React/package.json') != ''
+        if: steps.react.outputs.present == 'true'
         uses: actions/setup-node@v5
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: Source/KUKULCAN.SharedKernel.Example.React/package-lock.json
 
       - name: Install and build React client
-        if: hashFiles('Source/KUKULCAN.SharedKernel.Example.React/package.json') != ''
+        if: steps.react.outputs.present == 'true'
         working-directory: Source/KUKULCAN.SharedKernel.Example.React
         run: |
           npm ci
           npm run build
 
       - name: Report React client not implemented yet
-        if: hashFiles('Source/KUKULCAN.SharedKernel.Example.React/package.json') == ''
+        if: steps.react.outputs.present == 'false'
         run: echo "React build skipped: package.json does not exist yet."
