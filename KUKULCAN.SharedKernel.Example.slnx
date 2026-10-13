@@ -1,5 +1,8 @@
 <Solution>
   <Folder Name="/Documentation/" />
+  <Folder Name="/Documentation/Architecture/">
+    <File Path="Documentation\Architecture\ARCHITECTURE.md" />
+  </Folder>
   <Folder Name="/Documentation/Scripts/">
     <File Path="Documentation\Scripts\setup-example-milestones.sh" />
   </Folder>
