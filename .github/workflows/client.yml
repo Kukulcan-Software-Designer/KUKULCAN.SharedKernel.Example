@@ -16,22 +16,86 @@ permissions:
   contents: read
 
 jobs:
-  build-client:
-    name: Build KUKULCAN.SharedKernel.Example.Web
+  build-webapi:
+    name: Build Example Web API
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
       - name: Setup .NET
+        if: hashFiles('Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj') != ''
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
       - name: Restore Web API
-        run: dotnet restore Source/KUKULCAN.SharedKernel.Example.Web/KUKULCAN.SharedKernel.Example.Web.csproj
+        if: hashFiles('Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj') != ''
+        run: dotnet restore Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj
 
       - name: Build Web API
-        run: dotnet build Source/KUKULCAN.SharedKernel.Example.Web/KUKULCAN.SharedKernel.Example.Web.csproj --no-restore --configuration Release
+        if: hashFiles('Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj') != ''
+        run: dotnet build Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj --no-restore --configuration Release
+
+      - name: Report Web API project not implemented yet
+        if: hashFiles('Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj') == ''
+        shell: bash
+        run: |
+          echo "::notice::Web API build skipped: the project at the architecture-defined path has not been created yet (Issue #1)."
+          echo "## Reference Client" >> "$GITHUB_STEP_SUMMARY"
+          echo "Web API build skipped because the project is not implemented yet: `Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj` (Issue #1)." >> "$GITHUB_STEP_SUMMARY"
+
+  build-angular:
+    name: Build Angular client when present
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        if: hashFiles('Source/KUKULCAN.SharedKernel.Example.Angular/package.json') != ''
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: Source/KUKULCAN.SharedKernel.Example.Angular/package-lock.json
+
+      - name: Install and build Angular client
+        if: hashFiles('Source/KUKULCAN.SharedKernel.Example.Angular/package.json') != ''
+        working-directory: Source/KUKULCAN.SharedKernel.Example.Angular
+        run: |
+          npm ci
+          npm run build
+
+      - name: Report Angular client not implemented yet
+        if: hashFiles('Source/KUKULCAN.SharedKernel.Example.Angular/package.json') == ''
+        run: echo "Angular build skipped: package.json does not exist yet."
+
+  build-react:
+    name: Build React client when present
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        if: hashFiles('Source/KUKULCAN.SharedKernel.Example.React/package.json') != ''
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: Source/KUKULCAN.SharedKernel.Example.React/package-lock.json
+
+      - name: Install and build React client
+        if: hashFiles('Source/KUKULCAN.SharedKernel.Example.React/package.json') != ''
+        working-directory: Source/KUKULCAN.SharedKernel.Example.React
+        run: |
+          npm ci
+          npm run build
+
+      - name: Report React client not implemented yet
+        if: hashFiles('Source/KUKULCAN.SharedKernel.Example.React/package.json') == ''
+        run: echo "React build skipped: package.json does not exist yet."
