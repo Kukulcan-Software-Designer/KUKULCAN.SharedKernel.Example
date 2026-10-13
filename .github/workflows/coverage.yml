@@ -38,7 +38,7 @@ jobs:
                 <DataCollector friendlyName="XPlat Code Coverage">
                   <Configuration>
                     <Format>cobertura</Format>
-                    <Include>[KUKULCAN.SharedKernel.Example.Web]*</Include>
+                    <Include>[KUKULCAN.SharedKernel.Example.*]*</Include>
                     <ExcludeByAttribute>CompilerGeneratedAttribute</ExcludeByAttribute>
                     <SingleHit>false</SingleHit>
                     <UseSourceLink>true</UseSourceLink>
@@ -67,9 +67,11 @@ jobs:
           --results-directory ./TestResults
 
       - name: Install ReportGenerator
+        if: hashFiles('TestResults/**/coverage.cobertura.xml') != ''
         run: dotnet tool install dotnet-reportgenerator-globaltool --tool-path ./tools
 
       - name: Generate coverage report
+        if: hashFiles('TestResults/**/coverage.cobertura.xml') != ''
         run: >
           ./tools/reportgenerator
           "-reports:TestResults/**/coverage.cobertura.xml"
@@ -88,7 +90,10 @@ jobs:
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "Coverage summary was not generated." >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "## Example Code Coverage"
+              echo "No Cobertura coverage file was produced. Coverage has not been measured for this run."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload coverage reports
@@ -101,4 +106,3 @@ jobs:
             TestResults/**/coverage.cobertura.xml
           if-no-files-found: warn
           retention-days: 14
-          

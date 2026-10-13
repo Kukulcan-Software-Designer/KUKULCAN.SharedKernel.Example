@@ -16,11 +16,10 @@ permissions:
   contents: read
 
 jobs:
-  build-client:
-    name: Build KUKULCAN.SharedKernel.Example.Web
+  build-webapi:
+    name: Build Example Web API
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -30,8 +29,65 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore Web API
-        run: dotnet restore Source/KUKULCAN.SharedKernel.Example.Web/KUKULCAN.SharedKernel.Example.Web.csproj
+      - name: Restore and build Web API when present
+        shell: bash
+        run: |
+          project="Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj"
+          if [ -f "$project" ]; then
+            dotnet restore "$project"
+            dotnet build "$project" --no-restore --configuration Release
+          else
+            echo "::notice::Web API build skipped: project not created yet (Issue #1)."
+            {
+              echo "## Reference Client"
+              echo "Web API build skipped because the architecture-defined project does not exist yet: `$project` (Issue #1)."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-      - name: Build Web API
-        run: dotnet build Source/KUKULCAN.SharedKernel.Example.Web/KUKULCAN.SharedKernel.Example.Web.csproj --no-restore --configuration Release
+  build-angular:
+    name: Build Angular client when present
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Install and build Angular client when present
+        shell: bash
+        run: |
+          project_dir="Source/KUKULCAN.SharedKernel.Example.Angular"
+          if [ -f "$project_dir/package.json" ]; then
+            npm --prefix "$project_dir" ci
+            npm --prefix "$project_dir" run build
+          else
+            echo "Angular build skipped: $project_dir/package.json does not exist yet."
+          fi
+
+  build-react:
+    name: Build React client when present
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Install and build React client when present
+        shell: bash
+        run: |
+          project_dir="Source/KUKULCAN.SharedKernel.Example.React"
+          if [ -f "$project_dir/package.json" ]; then
+            npm --prefix "$project_dir" ci
+            npm --prefix "$project_dir" run build
+          else
+            echo "React build skipped: $project_dir/package.json does not exist yet."
+          fi
