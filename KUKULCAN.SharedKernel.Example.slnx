@@ -43,6 +43,7 @@
     <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\_Sidebar.md" />
   </Folder>
   <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
     <File Path=".gitignore" />
     <File Path="CODE_OF_CONDUCT.md" />
     <File Path="CONTRIBUTING.md" />
