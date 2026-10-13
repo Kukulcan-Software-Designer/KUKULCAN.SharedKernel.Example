@@ -33,6 +33,7 @@ jobs:
           steps.vars.outputs.branch != 'main' &&
           steps.vars.outputs.branch != 'Develop'
         env:
+          GH_TOKEN: ${{ github.token }}
           BRANCH_NAME: ${{ steps.vars.outputs.branch }}
         shell: bash
         run: |
@@ -40,9 +41,6 @@ jobs:
           gh api \
             --method DELETE \
             "repos/${GITHUB_REPOSITORY}/git/refs/heads/${BRANCH_NAME}"
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH_NAME: ${{ steps.vars.outputs.branch }}
 
       - name: Report skipped deletion
         if: |
