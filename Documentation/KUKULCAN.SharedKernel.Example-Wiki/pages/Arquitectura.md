@@ -2,6 +2,8 @@
 
 **Idioma:** [Inglés](Architecture)
 
+> La descripción detallada de la arquitectura, la estructura propuesta de proyectos, las reglas de dependencias, las decisiones de autenticación/sesión, los límites de seguridad y la estrategia de verificación se mantienen en el [documento de arquitectura de la aplicación Example](../../Architecture/ARCHITECTURE.md). Describe el diseño objetivo; no implica que los proyectos ejecutables ya existan.
+
 ## Objetivo arquitectónico
 
 El Example debe ilustrar la integración y el comportamiento de una aplicación sin reimplementar capacidades que pertenecen a las bibliotecas KUKULCAN. La arquitectura descrita aquí es la **arquitectura objetivo**; no implica que todas sus capas existan ya en el código fuente.
@@ -52,17 +54,9 @@ El Example debe utilizar la API pública de `KUKULCAN.SharedKernel.Database`, in
 - Los servicios externos se invocan mediante clientes HTTP configurados, con límites de tiempo y gestión explícita de fallos.
 - Cuando sea posible, las pruebas sustituyen los límites externos; los comportamientos dependientes del motor de base de datos se validan también con pruebas de integración reales.
 
-## Decisiones arquitectónicas pendientes
+## Decisiones arquitectónicas
 
-Estas decisiones deben documentarse durante la implementación y no darse por supuestas:
-
-- Estructura definitiva de proyectos y separación entre capas.
-- DTO de la API, formato de respuesta y error, versionado de endpoints y convenciones de paginación.
-- Flujo exacto admitido por Auth y contratos reales de inicio de sesión y usuario actual.
-- Modelo de alojamiento de Blazor y estrategia de sesión correspondiente.
-- Estrategia de autenticación de navegador para Angular y React, preferiblemente una sesión administrada en servidor/BFF cuando sea apropiado u otro diseño con análisis explícito de amenazas.
-- Nombres de las entidades de línea de factura y campos de copia histórica necesarios para trazabilidad.
-- Proveedores realmente soportados y mecanismos de migración del paquete Database.
+El documento detallado establece la dirección inicial para alojamiento/sesiones y la estructura propuesta de proyectos. Las firmas exactas de los paquetes, los DTO, las convenciones de endpoints y el comportamiento específico de cada proveedor deben confirmarse con los contratos públicos reales y probarse durante los Issues de implementación.
 
 ## Validación arquitectónica
 
