@@ -1,2 +1,25 @@
 <Solution>
+  <Folder Name="/Documentation/" />
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="CODE_OF_CONDUCT.md" />
+    <File Path="CONTRIBUTING.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="global.json" />
+    <File Path="GOVERNANCE.md" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+    <File Path="RELEASE_NOTES.md" />
+    <File Path="SECURITY.md" />
+    <File Path="SUPPORT.md" />
+  </Folder>
+  <Folder Name="/Solution Items/.github/" />
+  <Folder Name="/Solution Items/.github/workflows/">
+    <File Path=".github\workflows\ci.yml" />
+    <File Path=".github\workflows\client.yml" />
+    <File Path=".github\workflows\coverage.yml" />
+    <File Path=".github\workflows\delete-merged-branches.yml" />
+  </Folder>
+  <Folder Name="/Source/" />
+  <Folder Name="/Tests/" />
 </Solution>

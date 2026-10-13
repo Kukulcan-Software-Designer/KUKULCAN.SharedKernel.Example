@@ -1,0 +1,57 @@
+name: Delete merged branches (except main/Develop)
+
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: write
+
+jobs:
+  delete-branch:
+    name: Delete merged source branch
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Determine branch information
+        id: vars
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
+        shell: bash
+        run: |
+          echo "branch=${HEAD_REF}" >> "${GITHUB_OUTPUT}"
+          echo "same_repository=$([[ "${HEAD_REPOSITORY}" == "${BASE_REPOSITORY}" ]] && echo true || echo false)" >> "${GITHUB_OUTPUT}"
+
+      - name: Delete branch if allowed
+        if: |
+          steps.vars.outputs.same_repository == 'true' &&
+          steps.vars.outputs.branch != 'main' &&
+          steps.vars.outputs.branch != 'Develop'
+        env:
+          BRANCH_NAME: ${{ steps.vars.outputs.branch }}
+        shell: bash
+        run: |
+          echo "Deleting merged branch: ${BRANCH_NAME}"
+          gh api \
+            --method DELETE \
+            "repos/${GITHUB_REPOSITORY}/git/refs/heads/${BRANCH_NAME}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH_NAME: ${{ steps.vars.outputs.branch }}
+
+      - name: Report skipped deletion
+        if: |
+          steps.vars.outputs.same_repository != 'true' ||
+          steps.vars.outputs.branch == 'main' ||
+          steps.vars.outputs.branch == 'Develop'
+        env:
+          BRANCH_NAME: ${{ steps.vars.outputs.branch }}
+          SAME_REPOSITORY: ${{ steps.vars.outputs.same_repository }}
+        run: |
+          echo "Branch deletion skipped: ${BRANCH_NAME}"
+          echo "Same repository: ${SAME_REPOSITORY}"
