@@ -46,21 +46,22 @@ The following is the intended layout for subsequent implementation Issues. Proje
 KUKULCAN.SharedKernel.Example/
 ├── KUKULCAN.SharedKernel.Example.slnx
 ├── Source/
-│   ├── KUKULCAN.SharedKernel.Example.WebApi/          # HTTP host and composition root
-│   ├── KUKULCAN.SharedKernel.Example.Application/     # use cases, orchestration, validation
-│   ├── KUKULCAN.SharedKernel.Example.Domain/          # Sample entities and business invariants
-│   ├── KUKULCAN.SharedKernel.Example.Infrastructure/  # Database and outbound-service adapters
-│   ├── KUKULCAN.SharedKernel.Example.Web/             # Razor Pages client / server host
+│   ├── KUKULCAN.SharedKernel.Example.Razor/           # Razor client / server host
 │   ├── KUKULCAN.SharedKernel.Example.Blazor/          # Blazor client; hosting model per ADR below
 │   ├── KUKULCAN.SharedKernel.Example.Angular/         # Angular client
-│   └── KUKULCAN.SharedKernel.Example.React/           # React client
+│   ├── KUKULCAN.SharedKernel.Example.React/           # React client
+│   ├── WebAPI
+│   │     ├── KUKULCAN.SharedKernel.Example.WebApi/          # HTTP host and composition root
+│   │     ├── KUKULCAN.SharedKernel.Example.Application/     # use cases, orchestration, validation 
+│   │     ├── KUKULCAN.SharedKernel.Example.Domain/          # Sample entities and business invariants 
+│   │     └── KUKULCAN.SharedKernel.Example.Infrastructure/  # Database and outbound-service adapters 
 ├── Tests/
 │   ├── KUKULCAN.SharedKernel.Example.Domain.Tests/
 │   ├── KUKULCAN.SharedKernel.Example.Application.Tests/
 │   ├── KUKULCAN.SharedKernel.Example.WebApi.Tests/
 │   └── KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests/
 ├── Documentation/
-│   └── Architecture/ARCHITECTURE.md
+│   └── ARCHITECTURE.md
 └── .github/workflows/
 ```
 
@@ -76,13 +77,13 @@ KUKULCAN.SharedKernel.Example/
 
 ## 4. KUKULCAN integration boundaries
 
-| Dependency | Responsibility in the Example | Boundary / restriction |
-|---|---|---|
-| `KUKULCAN.SharedKernel` | Shared domain/result/value contracts where they fit a real use case | Consume published public types; do not duplicate its abstractions |
-| `KUKULCAN.SharedKernel.Auth` | Local/federated credential validation, password verification and user/tenant authentication behavior supported by its API | It is a class library, not the Example's HTTP host. The Example host owns HTTP endpoints, transport DTOs, authorization composition and JWT issuance where required. Verify exact service registration and method contracts before implementation. |
-| `KUKULCAN.SharedKernel.Database` | EF Core context base, unit of work, tenant-aware persistence and shared persistence behaviors | Configure through the published options/registration API. The Example owns its domain mappings and must not duplicate generic repositories or persistence infrastructure. |
-| `KUKULCAN.SharedKernel.JsonEngine` | A specific JSON-engine capability when a real Example use case is selected | Keep it separate from ordinary ASP.NET JSON serialization unless the actual use case requires the package. Verify the published API first. |
-| `KUKULCAN.SharedKernel.I18N` | Translation and localization service | Separate HTTP service; configure its base URL and outbound client, handle timeout/unavailability safely, and use its real endpoints/contracts. Do not call its database directly. |
+| Dependency                         | Responsibility in the Example                                                                                             | Boundary / restriction                                                                                                                                                                                                                             |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `KUKULCAN.SharedKernel`            | Shared domain/result/value contracts where they fit a real use case                                                       | Consume published public types; do not duplicate its abstractions                                                                                                                                                                                  |
+| `KUKULCAN.SharedKernel.Auth`       | Local/federated credential validation, password verification and user/tenant authentication behavior supported by its API | It is a class library, not the Example's HTTP host. The Example host owns HTTP endpoints, transport DTOs, authorization composition and JWT issuance where required. Verify exact service registration and method contracts before implementation. |
+| `KUKULCAN.SharedKernel.Database`   | EF Core context base, unit of work, tenant-aware persistence and shared persistence behaviors                             | Configure through the published options/registration API. The Example owns its domain mappings and must not duplicate generic repositories or persistence infrastructure.                                                                          |
+| `KUKULCAN.SharedKernel.JsonEngine` | A specific JSON-engine capability when a real Example use case is selected                                                | Keep it separate from ordinary ASP.NET JSON serialization unless the actual use case requires the package. Verify the published API first.                                                                                                         |
+| `KUKULCAN.SharedKernel.I18N`       | Translation and localization service                                                                                      | Separate HTTP service; configure its base URL and outbound client, handle timeout/unavailability safely, and use its real endpoints/contracts. Do not call its database directly.                                                                  |
 
 ### Database configuration
 
