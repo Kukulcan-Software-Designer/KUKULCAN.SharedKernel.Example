@@ -150,7 +150,7 @@ app.MapGet("/api/examples/shared-kernel/result/failure", () =>
 .AllowAnonymous()
 .WithName("GetSharedKernelResultFailure");
 
-app.MapAuthenticationEndpoints(authenticationDatabaseConfigured);
+app.MapAuthenticationEndpoints();
 
 app.Run();
 
