@@ -11,21 +11,21 @@ namespace KUKULCAN.SharedKernel.Example.WebApi.Authentication;
 public static class AuthenticationEndpoints
 {
     public static IEndpointRouteBuilder MapAuthenticationEndpoints(
-        this IEndpointRouteBuilder endpoints,
-        bool authenticationDatabaseConfigured)
+        this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost(
                 "/api/auth/login",
                 (LoginRequest? request,
                     LocalAuthenticationService authenticationService,
                     IAccessTokenIssuer tokenIssuer,
+                    IConfiguration configuration,
                     CancellationToken cancellationToken) =>
-                    LoginAsync(request, authenticationService, tokenIssuer, authenticationDatabaseConfigured, cancellationToken))
+                    LoginAsync(request, authenticationService, tokenIssuer, configuration, cancellationToken))
             .AllowAnonymous()
             .WithName("Login");
 
         endpoints.MapGet("/api/auth/me", (ClaimsPrincipal user) =>
-                HttpResults.Ok(CreateCurrentUserResponse(user)))
+                CreateCurrentUserResponse(user))
             .RequireAuthorization()
             .WithName("GetCurrentUser");
 
@@ -46,7 +46,7 @@ public static class AuthenticationEndpoints
         LoginRequest? request,
         LocalAuthenticationService authenticationService,
         IAccessTokenIssuer tokenIssuer,
-        bool authenticationDatabaseConfigured,
+        IConfiguration configuration,
         CancellationToken cancellationToken)
     {
         if (request is null
@@ -59,7 +59,14 @@ public static class AuthenticationEndpoints
                 detail: "Email and password are required.");
         }
 
-        if (!authenticationDatabaseConfigured || !tokenIssuer.IsConfigured)
+        var connectionString = configuration["Kukulcan:Database:ConnectionString"];
+        var defaultTenantConfigured = Guid.TryParse(
+            configuration["Kukulcan:Auth:DefaultTenantId"],
+            out var defaultTenantId) && defaultTenantId != Guid.Empty;
+
+        if (string.IsNullOrWhiteSpace(connectionString)
+            || !defaultTenantConfigured
+            || !tokenIssuer.IsConfigured)
         {
             return HttpResults.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
