@@ -19,7 +19,7 @@ public static class AuthenticationEndpoints
                     LocalAuthenticationService authenticationService,
                     IAccessTokenIssuer tokenIssuer,
                     IConfiguration configuration,
-                    ILogger<AuthenticationEndpoints> logger,
+                    ILogger<Program> logger,
                     CancellationToken cancellationToken) =>
                     LoginAsync(request, authenticationService, tokenIssuer, configuration, logger, cancellationToken))
             .AllowAnonymous()
@@ -48,7 +48,7 @@ public static class AuthenticationEndpoints
         LocalAuthenticationService authenticationService,
         IAccessTokenIssuer tokenIssuer,
         IConfiguration configuration,
-        ILogger<AuthenticationEndpoints> logger,
+        ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
         if (request is null
