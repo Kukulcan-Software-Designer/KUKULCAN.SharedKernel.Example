@@ -26,7 +26,7 @@ public static class AuthenticationEndpoints
 
         endpoints.MapGet("/api/auth/me", (ClaimsPrincipal user) =>
                 CreateCurrentUserResponse(user))
-            .RequireAuthorization()
+            .RequireAuthorization("AuthenticatedUser")
             .WithName("GetCurrentUser");
 
         endpoints.MapPost(
@@ -36,7 +36,7 @@ public static class AuthenticationEndpoints
                     IUserPasswordChanger passwordChanger,
                     CancellationToken cancellationToken) =>
                     ChangePasswordAsync(request, user, passwordChanger, cancellationToken))
-            .RequireAuthorization()
+            .RequireAuthorization("AuthenticatedUser")
             .WithName("ChangePassword");
 
         return endpoints;
