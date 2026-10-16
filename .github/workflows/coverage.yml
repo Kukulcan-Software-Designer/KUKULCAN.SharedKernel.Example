@@ -95,9 +95,7 @@ jobs:
           if [ -f CoverageReport/Summary.txt ]; then
             {
               echo "## Example Code Coverage"
-              echo '\`\`\`text'
               cat CoverageReport/Summary.txt
-              echo '\`\`\`'
             } >> "$GITHUB_STEP_SUMMARY"
           else
             {
