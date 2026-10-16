@@ -8,10 +8,10 @@
   <ItemGroup>
     <PackageReference Include="KUKULCAN.SharedKernel" Version="1.0.0" />
     <PackageReference Include="KUKULCAN.SharedKernel.Auth" Version="1.1.4" />
-    <PackageReference Include="KUKULCAN.SharedKernel.Auth.Migrations.MySQL" Version="1.1.4" />
-    <PackageReference Include="KUKULCAN.SharedKernel.Auth.Migrations.PostgreSQL" Version="1.1.4" />
-    <PackageReference Include="KUKULCAN.SharedKernel.Auth.Migrations.SQLServer" Version="1.1.4" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.13" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.*" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.*" />
+    <PackageReference Include="MySql.EntityFrameworkCore" Version="10.0.9" />
     <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Application\KUKULCAN.SharedKernel.Example.Application.csproj" />
     <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Infrastructure\KUKULCAN.SharedKernel.Example.Infrastructure.csproj" />
   </ItemGroup>
