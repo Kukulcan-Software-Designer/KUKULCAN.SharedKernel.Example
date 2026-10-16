@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="KUKULCAN.SharedKernel" Version="1.0.0" />
     <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Application\KUKULCAN.SharedKernel.Example.Application.csproj" />
     <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Infrastructure\KUKULCAN.SharedKernel.Example.Infrastructure.csproj" />
   </ItemGroup>
