@@ -29,7 +29,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore and build Web API when present
+      - name: Restore and build Example Web API
         shell: bash
         run: |
           project="Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj"
@@ -73,7 +73,7 @@ jobs:
           done
 
   build-angular:
-    name: Build Angular client when present
+    name: Build and test Angular client
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -85,7 +85,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install and build Angular client when present
+      - name: Install, build and test Angular client
         shell: bash
         run: |
           project_dir="Source/WebInterfaces/KUKULCAN.SharedKernel.Example.Angular"
@@ -99,7 +99,7 @@ jobs:
           fi
 
   build-react:
-    name: Build React client when present
+    name: Build and lint React client
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -111,7 +111,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install and build React client when present
+      - name: Install, build and lint React client
         shell: bash
         run: |
           project_dir="Source/WebInterfaces/KUKULCAN.SharedKernel.Example.React"
