@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using KUKULCAN.SharedKernel.Auth.Authentication.Local;
 using KUKULCAN.SharedKernel.Example.WebApi.Authentication;
+using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -61,6 +62,13 @@ public sealed class AuthenticationEndpointTests
     public async Task PostLogin_WithValidCredentials_ReturnsBearerTokenAndAdministratorProfile()
     {
         await using var factory = new AuthenticationTestApplicationFactory();
+
+        var configuration = factory.Services.GetRequiredService<IConfiguration>();
+        Assert.That(configuration["Kukulcan:Database:ConnectionString"], Is.Not.Null.And.Not.Empty);
+        Assert.That(configuration["Kukulcan:Auth:DefaultTenantId"],
+            Is.EqualTo(AuthenticationTestApplicationFactory.TestTenantId.ToString()));
+        Assert.That(factory.Services.GetRequiredService<IAccessTokenIssuer>().IsConfigured, Is.True);
+
         using var client = factory.CreateClient();
 
         using var response = await client.PostAsJsonAsync(
