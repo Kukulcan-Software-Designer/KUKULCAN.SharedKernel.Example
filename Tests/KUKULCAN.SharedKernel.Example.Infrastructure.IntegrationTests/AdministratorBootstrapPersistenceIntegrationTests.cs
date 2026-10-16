@@ -33,8 +33,7 @@ public sealed class AdministratorBootstrapPersistenceIntegrationTests
                 "The CI workflow checks out the v1.1.4 Auth source into _external/KUKULCAN.SharedKernel.Auth.");
         }
 
-        await using var postgres = new PostgreSqlBuilder()
-            .WithImage("postgres:16-alpine")
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("auth_integration")
             .WithUsername("postgres")
             .WithPassword("auth-integration-test-password")
