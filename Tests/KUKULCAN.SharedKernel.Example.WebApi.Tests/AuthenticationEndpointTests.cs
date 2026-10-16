@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using System.Security.Cryptography;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -160,15 +161,15 @@ public sealed class AuthenticationEndpointTests
         var unauthorizedTenant = Guid.NewGuid();
         await using var factory = new AuthenticationTestApplicationFactory(
             configuredTenantId: unauthorizedTenant,
-            userTenantId: TestTenantId);
+            userTenantId: AuthenticationTestApplicationFactory.TestTenantId);
         using var client = factory.CreateClient();
 
         using var response = await client.PostAsJsonAsync(
             "/api/auth/login",
             new
             {
-                email = TestEmail,
-                password = ValidPassword
+                email = AuthenticationTestApplicationFactory.TestEmail,
+                password = AuthenticationTestApplicationFactory.ValidPassword
             });
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
@@ -295,6 +296,8 @@ internal sealed class AuthenticationTestApplicationFactory : WebApplicationFacto
             services.RemoveAll<ILocalUserStore>();
             services.RemoveAll<IUserPasswordChanger>();
             services.RemoveAll<IPasswordHasher>();
+            services.RemoveAll<IAdministratorBootstrapStore>();
+            services.AddSingleton<IAdministratorBootstrapStore, InMemoryAdministratorBootstrapStore>();
             services.AddSingleton<IPasswordHasher, TestPasswordHasher>();
             services.AddSingleton<TestIdentityStore>(provider =>
                 new TestIdentityStore(
