@@ -1,6 +1,7 @@
 # Architecture
 **Language:** [Spanish](Arquitectura)
 
+> The detailed architecture, proposed project layout, dependency rules, authentication/session decisions, security boundaries and verification strategy are maintained in the [Example Application Architecture document](../../Architecture/ARCHITECTURE.md). That document describes the target design and does not imply that the runtime projects already exist.
 
 ## Architectural objective
 
@@ -54,15 +55,7 @@ The Example should use the public API of `KUKULCAN.SharedKernel.Database`, inclu
 
 ## Architectural decisions still to be made
 
-The following decisions must be documented during implementation rather than guessed in advance:
-
-- Exact production project layout and application-layer boundaries.
-- API DTOs, response envelope, error format, endpoint versioning, and pagination conventions.
-- The supported Auth package flow and exact login/current-user contracts.
-- Hosting model for Blazor and corresponding session strategy.
-- Browser authentication strategy for Angular and React, preferably a secure server-managed session/BFF where appropriate, or another explicitly threat-modelled design.
-- Invoice-line entity names and the precise snapshot fields required for historical traceability.
-- Actual provider support and migration mechanics of the Database package.
+The detailed document establishes the initial hosting/session direction and proposed project layout. Exact package method signatures, final transport DTOs, endpoint conventions, and provider-specific behavior must still be confirmed against the actual public contracts and tested during the implementation Issues.
 
 ## Architectural validation
 
