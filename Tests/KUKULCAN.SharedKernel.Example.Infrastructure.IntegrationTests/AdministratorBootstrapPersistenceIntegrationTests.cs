@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Reflection;
 using KUKULCAN.SharedKernel.Abstractions;
 using KUKULCAN.SharedKernel.Auth.Persistence;
+using KUKULCAN.SharedKernel.Auth.Authentication.Local;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.DomainEvents.Abstractions;
@@ -70,17 +71,20 @@ public sealed class AdministratorBootstrapPersistenceIntegrationTests
 
         await using var firstContext = CreateContext(connectionString, tenantId);
         await using var secondContext = CreateContext(connectionString, tenantId);
+        var passwordHasher = new PasswordHasher();
+        const string bootstrapPassword = "initial-test-bootstrap-password-2026";
+        var bootstrapPasswordHash = passwordHasher.Hash(bootstrapPassword);
         var firstStore = new AuthDatabaseAdministratorBootstrapStore(firstContext);
         var secondStore = new AuthDatabaseAdministratorBootstrapStore(secondContext);
 
         var outcomes = await Task.WhenAll(
             firstStore.TryCreateAsync(
                 "admin@example.test",
-                "integration-test-hash-first",
+                bootstrapPasswordHash,
                 tenantId),
             secondStore.TryCreateAsync(
                 " ADMIN@EXAMPLE.TEST ",
-                "integration-test-hash-second",
+                bootstrapPasswordHash,
                 tenantId));
 
         Assert.That(outcomes.Count(created => created), Is.EqualTo(1));
@@ -89,9 +93,39 @@ public sealed class AdministratorBootstrapPersistenceIntegrationTests
         await using var verificationContext = CreateContext(connectionString, tenantId);
         Assert.That(await verificationContext.Users.CountAsync(), Is.EqualTo(1));
         Assert.That(await verificationContext.TenantMemberships.CountAsync(), Is.EqualTo(1));
+        var storedAdministrator = await verificationContext.Users.SingleAsync();
+        Assert.That(storedAdministrator.Email, Is.EqualTo("admin@example.test"));
+        Assert.That(passwordHasher.Verify(bootstrapPassword, storedAdministrator.PasswordHash), Is.True);
+
+        var passwordChanger = new AuthDatabasePasswordChanger(verificationContext, passwordHasher);
         Assert.That(
-            (await verificationContext.Users.SingleAsync()).Email,
-            Is.EqualTo("admin@example.test"));
+            await passwordChanger.ChangeAsync(
+                storedAdministrator.UserId,
+                "incorrect-bootstrap-password",
+                "new-secure-password-for-integration"),
+            Is.EqualTo(PasswordChangeStatus.InvalidCurrentPassword));
+        Assert.That(
+            await passwordChanger.ChangeAsync(
+                storedAdministrator.UserId,
+                bootstrapPassword,
+                "short"),
+            Is.EqualTo(PasswordChangeStatus.PasswordTooShort));
+        Assert.That(
+            await passwordChanger.ChangeAsync(
+                storedAdministrator.UserId,
+                bootstrapPassword,
+                bootstrapPassword),
+            Is.EqualTo(PasswordChangeStatus.PasswordMustDiffer));
+
+        const string replacementPassword = "new-secure-password-for-integration";
+        Assert.That(
+            await passwordChanger.ChangeAsync(
+                storedAdministrator.UserId,
+                bootstrapPassword,
+                replacementPassword),
+            Is.EqualTo(PasswordChangeStatus.Changed));
+        Assert.That(passwordHasher.Verify(replacementPassword, storedAdministrator.PasswordHash), Is.True);
+        Assert.That(passwordHasher.Verify(bootstrapPassword, storedAdministrator.PasswordHash), Is.False);
     }
 
     private static AuthDbContext CreateContext(string connectionString, Guid tenantId)
