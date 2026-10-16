@@ -3,7 +3,10 @@ using System.Security.Cryptography;
 using System.Text;
 using KUKULCAN.SharedKernel.Auth.Authentication.Local;
 using KUKULCAN.SharedKernel.Auth.Persistence;
+using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
+using KUKULCAN.SharedKernel.Example.Infrastructure;
+using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using KUKULCAN.SharedKernel.Example.WebApi.Authentication;
 using KUKULCAN.SharedKernel.Results;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -18,8 +21,8 @@ var connectionString = configuration[$"{KukulcanDatabaseOptions.SectionKey}:Conn
 var defaultTenantConfigured = Guid.TryParse(
     configuration["Kukulcan:Auth:DefaultTenantId"],
     out var defaultTenantId) && defaultTenantId != Guid.Empty;
-var authenticationDatabaseConfigured = !string.IsNullOrWhiteSpace(connectionString)
-                                       && defaultTenantConfigured;
+var exampleDatabaseConfigured = !string.IsNullOrWhiteSpace(connectionString);
+var authenticationDatabaseConfigured = exampleDatabaseConfigured && defaultTenantConfigured;
 var bootstrapPassword = configuration["Kukulcan:Auth:Bootstrap:Password"];
 var administratorEmail = configuration["Kukulcan:Auth:Administrator:Email"];
 
@@ -34,6 +37,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<KUKULCAN.SharedKernel.Abstractions.IClock, SystemClock>();
 builder.Services.AddSingleton<KUKULCAN.SharedKernel.DomainEvents.Abstractions.IDomainEventDispatcher, NoOpDomainEventDispatcher>();
 builder.Services.AddScoped<KUKULCAN.SharedKernel.Database.Abstractions.ITenantContext, HttpTenantContext>();
+if (exampleDatabaseConfigured)
+    builder.Services.AddExampleDatabase(configuration);
 builder.Services.AddSingleton<IAccessTokenIssuer, AccessTokenIssuer>();
 builder.Services.AddScoped<KUKULCAN.SharedKernel.Auth.Authentication.Local.IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<LocalAuthenticationService>();
@@ -160,10 +165,66 @@ app.MapGet("/api/examples/shared-kernel/result/failure", () =>
 .AllowAnonymous()
 .WithName("GetSharedKernelResultFailure");
 
+
 app.MapAuthenticationEndpoints();
+
+if (exampleDatabaseConfigured)
+{
+    app.MapPost(
+        "/api/examples/database/records",
+        async Task<IResult> (
+            CreateDatabaseIntegrationRecordRequest request,
+            ExampleDbContext context,
+            IUnitOfWork unitOfWork,
+            KUKULCAN.SharedKernel.Database.Abstractions.ITenantContext tenantContext,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Value) || request.Value.Trim().Length > 200)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [nameof(request.Value)] = new[] { "Value is required and must not exceed 200 characters." }
+                });
+            }
+
+            var record = new DatabaseIntegrationRecord
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantContext.TenantId,
+                Value = request.Value.Trim()
+            };
+
+            context.DatabaseIntegrationRecords.Add(record);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            return Results.Created(
+                $"/api/examples/database/records/{record.Id}",
+                new { record.Id, record.Value });
+        })
+        .WithName("CreateDatabaseIntegrationRecord");
+
+    app.MapGet(
+        "/api/examples/database/records/{id:guid}",
+        async Task<IResult> (
+            Guid id,
+            ExampleDbContext context,
+            CancellationToken cancellationToken) =>
+        {
+            var record = await context.DatabaseIntegrationRecords
+                .AsNoTracking()
+                .SingleOrDefaultAsync(entity => entity.Id == id, cancellationToken);
+
+            return record is null
+                ? Results.NotFound()
+                : Results.Ok(new { record.Id, record.Value });
+        })
+        .WithName("GetDatabaseIntegrationRecord");
+}
 
 app.Run();
 
 public partial class Program
 {
 }
+
+public sealed record CreateDatabaseIntegrationRecordRequest(string Value);
