@@ -54,6 +54,7 @@ else
 
 if (!string.IsNullOrWhiteSpace(bootstrapPassword))
 {
+    builder.Services.AddScoped<IAdministratorBootstrapStore, AuthDatabaseAdministratorBootstrapStore>();
     builder.Services.AddScoped<AdministratorBootstrapper>();
     builder.Services.AddHostedService<AdministratorBootstrapHostedService>();
 }
