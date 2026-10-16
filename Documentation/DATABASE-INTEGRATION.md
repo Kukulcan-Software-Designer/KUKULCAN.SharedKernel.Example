@@ -20,7 +20,7 @@ When a non-empty database connection string is configured, the API maps these au
 - `POST /api/examples/database/records` — accepts a JSON body such as `{"value":"example"}`, validates the value, persists a record through `IUnitOfWork`, and returns `201 Created` with its identifier.
 - `GET /api/examples/database/records/{id}` — retrieves the record by identifier or returns `404 Not Found`.
 
-The endpoints are protected by the Web API's default authorization policy. They do not expose database credentials or connection details. The request/response contract is separate from the EF Core entity.
+The endpoints are protected by the Web API's default authorization policy. Each record is assigned the tenant from the authenticated request context, and the shared Database package applies its tenant query filter on reads. The request cannot choose its own tenant identifier. The endpoints do not expose database credentials or connection details. The request/response contract is separate from the EF Core entity.
 
 The `DatabaseIntegrationRecord` is a minimal integration sample only. It does not replace the business entities planned for the Sample domain-model issue.
 
