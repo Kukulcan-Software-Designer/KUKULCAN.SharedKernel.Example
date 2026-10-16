@@ -1,5 +1,8 @@
+using KUKULCAN.SharedKernel.Abstractions;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
+using KUKULCAN.SharedKernel.DomainEvents.Abstractions;
+using KUKULCAN.SharedKernel.Example.Infrastructure;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -35,6 +38,9 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
 
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton<IClock, TestClock>();
+        services.AddSingleton<IDomainEventDispatcher, TestDomainEventDispatcher>();
+        services.AddScoped<ITenantContext>(_ => new TestTenantContext(Guid.NewGuid()));
         services.AddExampleDatabase(configuration);
 
         await using var provider = services.BuildServiceProvider();
@@ -81,5 +87,25 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             () => services.AddExampleDatabase(configuration),
             Throws.InvalidOperationException.With.Message.Contains(
                 $"{KukulcanDatabaseOptions.SectionKey}:ConnectionString"));
+    }
+
+    private sealed class TestTenantContext(Guid tenantId) : ITenantContext
+    {
+        public Guid TenantId { get; } = tenantId;
+    }
+
+    private sealed class TestClock : IClock
+    {
+        public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+    }
+
+    private sealed class TestDomainEventDispatcher : IDomainEventDispatcher
+    {
+        public Task DispatchAsync(IDomainEvent domainEvent, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(domainEvent);
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
     }
 }
