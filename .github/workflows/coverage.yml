@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 'FEATURES/**'
   pull_request:
     branches:
       - main
@@ -94,9 +95,9 @@ jobs:
           if [ -f CoverageReport/Summary.txt ]; then
             {
               echo "## Example Code Coverage"
-              echo '```text'
+              echo '\`\`\`text'
               cat CoverageReport/Summary.txt
-              echo '```'
+              echo '\`\`\`'
             } >> "$GITHUB_STEP_SUMMARY"
           else
             {
