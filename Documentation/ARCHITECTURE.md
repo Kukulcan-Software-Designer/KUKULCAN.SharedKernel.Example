@@ -46,15 +46,16 @@ The following is the agreed layout. Issue #1 establishes the executable Web API 
 KUKULCAN.SharedKernel.Example/
 ├── KUKULCAN.SharedKernel.Example.slnx
 ├── Source/
-│   ├── KUKULCAN.SharedKernel.Example.Razor/           # Razor client / server host
-│   ├── KUKULCAN.SharedKernel.Example.Blazor/          # Blazor client; hosting model per ADR below
-│   ├── KUKULCAN.SharedKernel.Example.Angular/         # Angular client
-│   ├── KUKULCAN.SharedKernel.Example.React/           # React client
 │   ├── WebAPI
 │   │     ├── KUKULCAN.SharedKernel.Example.WebApi/          # HTTP host and composition root
 │   │     ├── KUKULCAN.SharedKernel.Example.Application/     # use cases, orchestration, validation 
 │   │     ├── KUKULCAN.SharedKernel.Example.Domain/          # Sample entities and business invariants 
 │   │     └── KUKULCAN.SharedKernel.Example.Infrastructure/  # Database and outbound-service adapters 
+│   └── WebInterfaces
+│         ├── KUKULCAN.SharedKernel.Example.Razor/           # Razor client / server host
+│         ├── KUKULCAN.SharedKernel.Example.Blazor/          # Blazor client; hosting model per ADR below
+│         ├── KUKULCAN.SharedKernel.Example.Angular/         # Angular client
+│         └── KUKULCAN.SharedKernel.Example.React/           # React client
 ├── Tests/
 │   ├── KUKULCAN.SharedKernel.Example.Domain.Tests/
 │   ├── KUKULCAN.SharedKernel.Example.Application.Tests/
