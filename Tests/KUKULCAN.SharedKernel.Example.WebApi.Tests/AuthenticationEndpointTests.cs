@@ -185,7 +185,7 @@ public sealed class AuthenticationEndpointTests
             "/api/auth/login",
             new
             {
-                email = TestEmail,
+                email = AuthenticationTestApplicationFactory.TestEmail,
                 password = factory.InitialPassword
             });
 
