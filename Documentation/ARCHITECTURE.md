@@ -1,8 +1,8 @@
 # Example Application Architecture
 
-**Status:** Proposed target architecture for Issue #16  
+**Status:** Architecture and integration boundaries established; the executable .NET 10 Web API baseline is delivered by Issue #1  
 **Target framework:** .NET 10  
-**Scope:** Architecture and dependency boundaries only. This document does not claim that the described projects or runtime behavior already exist.
+**Scope:** Architecture and dependency boundaries plus baseline host/test scaffolding. Business endpoints, persistence and external-service integrations remain for their implementation Issues.
 
 ## 1. Architectural decisions
 
@@ -12,7 +12,7 @@
 4. Application-specific use cases and domain rules belong to the Example, not to reusable KUKULCAN libraries. Reuse the published library contracts and do not copy their implementations.
 5. Persistence is reached through the verified public API of `KUKULCAN.SharedKernel.Database`. The Example owns its `Sample` domain model and its provider-specific host configuration; the shared package owns reusable persistence infrastructure.
 6. `KUKULCAN.SharedKernel.I18N` is a separate HTTP service. The Example consumes it through a configured typed/named HTTP client and does not reference its implementation project.
-7. The current repository contains no executable application or test projects. This is a target design, not a statement that these layers are already implemented.
+7. The baseline now includes an executable Web API host, a health endpoint and an integration test. Business endpoints, persistence, authentication and external-service integrations remain for their implementation Issues.
 
 ## 2. Logical architecture
 
@@ -40,7 +40,7 @@ All four clients call the same API endpoints and share DTOs/contracts at the HTT
 
 ## 3. Proposed repository/project layout
 
-The following is the intended layout for subsequent implementation Issues. Project creation belongs to Issue #1; this Issue defines the boundaries and does not create empty projects to simulate progress.
+The following is the agreed layout. Issue #1 establishes the executable Web API host and its first integration test; subsequent Issues add meaningful domain/application behavior and external integrations rather than treating empty project shells as completed functionality.
 
 ```text
 KUKULCAN.SharedKernel.Example/
@@ -156,7 +156,7 @@ Issue #16 is an architecture/documentation issue. It does not justify artificial
 ## 9. Implementation sequence and unresolved contract checks
 
 - **Issue #16 (this document):** establish the target architecture and dependency/security boundaries.
-- **Issue #1:** create the executable .NET 10 solution/project foundation from the updated `Develop` branch.
+- **Issue #1:** establish the .NET 10 solution foundation, executable Web API host, health endpoint and API integration-test seam.
 - Later authentication, persistence, domain and UI Issues must inspect the exact published package versions and verify the public APIs before coding. Update this document when an evidence-based decision changes the target design.
 
 Before implementing each integration, verify the package version, service registration signatures, exposed interfaces, error/result types, configuration options and supported provider/session behavior from its source/API documentation. A README-level description is not a substitute for compiling against the actual public contract.
