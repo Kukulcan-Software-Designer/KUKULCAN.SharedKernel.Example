@@ -67,7 +67,7 @@ public static class AuthenticationEndpoints
                 detail: "Authentication persistence or token signing is not configured.");
         }
 
-        KUKULCAN.SharedKernel.HttpResults.Result<AuthenticatedUser> authenticationResult;
+        KUKULCAN.SharedKernel.Results.Result<AuthenticatedUser> authenticationResult;
         try
         {
             authenticationResult = await authenticationService.AuthenticateAsync(
