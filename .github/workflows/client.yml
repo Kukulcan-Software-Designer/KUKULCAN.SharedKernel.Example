@@ -60,7 +60,7 @@ jobs:
       - name: Install and build Angular client when present
         shell: bash
         run: |
-          project_dir="Source/KUKULCAN.SharedKernel.Example.Angular"
+          project_dir="Source/WebInterfaces/KUKULCAN.SharedKernel.Example.Angular"
           if [ -f "$project_dir/package.json" ]; then
             npm --prefix "$project_dir" ci
             npm --prefix "$project_dir" run build
@@ -84,7 +84,7 @@ jobs:
       - name: Install and build React client when present
         shell: bash
         run: |
-          project_dir="Source/KUKULCAN.SharedKernel.Example.React"
+          project_dir="Source/WebInterfaces/KUKULCAN.SharedKernel.Example.React"
           if [ -f "$project_dir/package.json" ]; then
             npm --prefix "$project_dir" ci
             npm --prefix "$project_dir" run build
