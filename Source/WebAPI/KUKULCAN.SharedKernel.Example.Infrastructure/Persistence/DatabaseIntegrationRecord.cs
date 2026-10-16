@@ -8,5 +8,8 @@ public sealed class DatabaseIntegrationRecord
 {
     public Guid Id { get; set; }
 
+    /// <summary>Tenant owning this record; the shared package applies tenant query filters.</summary>
+    public Guid TenantId { get; set; }
+
     public string Value { get; set; } = string.Empty;
 }
