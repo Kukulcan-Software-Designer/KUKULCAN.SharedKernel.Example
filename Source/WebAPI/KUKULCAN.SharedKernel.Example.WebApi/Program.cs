@@ -58,21 +58,24 @@ if (!string.IsNullOrWhiteSpace(bootstrapPassword))
     builder.Services.AddHostedService<AdministratorBootstrapHostedService>();
 }
 
-var configuredSigningKey = configuration["Kukulcan:Auth:Jwt:SigningKey"];
-var configuredSigningKeyBytes = Encoding.UTF8.GetBytes(configuredSigningKey ?? string.Empty);
-var signingKeyIsConfigured = configuredSigningKeyBytes.Length >= 32;
-var validationKeyBytes = signingKeyIsConfigured
-    ? configuredSigningKeyBytes
-    : RandomNumberGenerator.GetBytes(64);
-var issuer = configuration["Kukulcan:Auth:Jwt:Issuer"]
-             ?? "KUKULCAN.SharedKernel.Example.WebApi";
-var audience = configuration["Kukulcan:Auth:Jwt:Audience"]
-               ?? "KUKULCAN.SharedKernel.Example.WebApi";
-
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // Read signing configuration when JWT options are initialized, not earlier
+        // during WebApplicationBuilder setup. This also keeps validated settings
+        // aligned with the same IConfiguration consumed by AccessTokenIssuer.
+        var configuredSigningKey = configuration["Kukulcan:Auth:Jwt:SigningKey"];
+        var configuredSigningKeyBytes = Encoding.UTF8.GetBytes(configuredSigningKey ?? string.Empty);
+        var signingKeyIsConfigured = configuredSigningKeyBytes.Length >= 32;
+        var validationKeyBytes = signingKeyIsConfigured
+            ? configuredSigningKeyBytes
+            : RandomNumberGenerator.GetBytes(64);
+        var issuer = configuration["Kukulcan:Auth:Jwt:Issuer"]
+                     ?? "KUKULCAN.SharedKernel.Example.WebApi";
+        var audience = configuration["Kukulcan:Auth:Jwt:Audience"]
+                       ?? "KUKULCAN.SharedKernel.Example.WebApi";
+
         options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
