@@ -1,6 +1,6 @@
 # Example Application Architecture
 
-**Status:** Architecture and integration boundaries established; the executable .NET 10 Web API baseline is delivered by Issue #1  
+**Status:** Architecture, executable .NET 10 Web API baseline (Issue #1), and SharedKernel Result integration demonstration (Issue #2) delivered  
 **Target framework:** .NET 10  
 **Scope:** Architecture and dependency boundaries plus baseline host/test scaffolding. Business endpoints, persistence and external-service integrations remain for their implementation Issues.
 
@@ -157,6 +157,7 @@ Issue #16 is an architecture/documentation issue. It does not justify artificial
 
 - **Issue #16 (this document):** establish the target architecture and dependency/security boundaries.
 - **Issue #1:** establish the .NET 10 solution foundation, executable Web API host, health endpoint and API integration-test seam.
+- **Issue #2:** demonstrate the published `KUKULCAN.SharedKernel` Result contract through `GET /api/examples/shared-kernel/result/success` (HTTP 200 with `isSuccess` and `value`) and `GET /api/examples/shared-kernel/result/failure` (HTTP 404 Problem Details carrying the shared error code).
 - Later authentication, persistence, domain and UI Issues must inspect the exact published package versions and verify the public APIs before coding. Update this document when an evidence-based decision changes the target design.
 
 Before implementing each integration, verify the package version, service registration signatures, exposed interfaces, error/result types, configuration options and supported provider/session behavior from its source/API documentation. A README-level description is not a substitute for compiling against the actual public contract.
