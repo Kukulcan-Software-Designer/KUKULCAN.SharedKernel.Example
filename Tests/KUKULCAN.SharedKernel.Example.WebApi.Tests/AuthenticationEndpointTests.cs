@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Net.Http.Json;
 using System.Text.Json;
 using KUKULCAN.SharedKernel.Auth.Authentication.Local;
@@ -157,7 +158,8 @@ internal sealed class AuthenticationTestApplicationFactory : WebApplicationFacto
     public static readonly Guid TestUserId = Guid.Parse("a2b88298-d9ce-4bd0-8e37-3edb4d79b1c7");
     public static readonly Guid TestTenantId = Guid.Parse("e1f28b7a-bc2e-4e31-8d30-a9db32ce6498");
     public const string TestEmail = "admin@example.test";
-    public const string ValidPassword = "CorrectPassword!2026";
+    public static readonly string ValidPassword = $"test-login-{Guid.NewGuid():N}!";
+    public static readonly string SigningKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -166,9 +168,9 @@ internal sealed class AuthenticationTestApplicationFactory : WebApplicationFacto
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Kukulcan:Database:Provider"] = "PostgresSql",
-                ["Kukulcan:Database:ConnectionString"] = "Host=localhost;Database=auth-tests;Username=test;Password=test",
+                ["Kukulcan:Database:ConnectionString"] = "Host=localhost;Database=auth-tests",
                 ["Kukulcan:Auth:DefaultTenantId"] = TestTenantId.ToString(),
-                ["Kukulcan:Auth:Jwt:SigningKey"] = "test-only-signing-key-with-at-least-thirty-two-bytes",
+                ["Kukulcan:Auth:Jwt:SigningKey"] = SigningKey,
                 ["Kukulcan:Auth:Jwt:Issuer"] = "example-auth-tests",
                 ["Kukulcan:Auth:Jwt:Audience"] = "example-auth-tests",
                 ["Kukulcan:Auth:Administrator:Email"] = TestEmail
