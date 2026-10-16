@@ -101,8 +101,10 @@ jobs:
           else
             {
               echo "## Example Code Coverage"
+              echo "::error::No Cobertura coverage file was produced. Coverage has not been measured for this run."
               echo "No Cobertura coverage file was produced. Coverage has not been measured for this run."
             } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
       - name: Upload coverage reports
