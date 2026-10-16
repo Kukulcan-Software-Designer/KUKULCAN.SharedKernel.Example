@@ -7,6 +7,7 @@ using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
 
 namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
@@ -36,11 +37,12 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             .AddInMemoryCollection(settings)
             .Build();
 
+        var tenantId = Guid.NewGuid();
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<IClock, TestClock>();
         services.AddSingleton<IDomainEventDispatcher, TestDomainEventDispatcher>();
-        services.AddScoped<ITenantContext>(_ => new TestTenantContext(Guid.NewGuid()));
+        services.AddScoped<ITenantContext>(_ => new TestTenantContext(tenantId));
         services.AddExampleDatabase(configuration);
 
         await using var provider = services.BuildServiceProvider();
@@ -53,6 +55,7 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
         var record = new DatabaseIntegrationRecord
         {
             Id = Guid.NewGuid(),
+            TenantId = tenantId,
             Value = "database-provider-integration"
         };
         context.DatabaseIntegrationRecords.Add(record);
@@ -68,7 +71,28 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
         {
             Assert.That(persisted.Id, Is.EqualTo(record.Id));
             Assert.That(persisted.Value, Is.EqualTo("database-provider-integration"));
+            Assert.That(persisted.TenantId, Is.EqualTo(tenantId));
         });
+
+        await using var otherTenantContext = new ExampleDbContext(
+            Options.Create(new KukulcanDatabaseOptions
+            {
+                Provider = DatabaseProvider.PostgresSql,
+                ConnectionString = postgres.GetConnectionString(),
+                Migration = new KukulcanDatabaseOptions.MigrationOptions
+                {
+                    AutoMigrateOnStartup = false,
+                    SeedDataOnStartup = false
+                }
+            }),
+            new TestTenantContext(Guid.NewGuid()),
+            new TestClock(),
+            new TestDomainEventDispatcher());
+        Assert.That(
+            await otherTenantContext.DatabaseIntegrationRecords
+                .AsNoTracking()
+                .SingleOrDefaultAsync(entity => entity.Id == record.Id),
+            Is.Null);
     }
 
     [Test]
