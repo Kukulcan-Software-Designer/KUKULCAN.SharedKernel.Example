@@ -94,15 +94,21 @@ builder.Services
         };
     });
 
+var applicationSessionPolicy = new AuthorizationPolicyBuilder()
+    .RequireAuthenticatedUser()
+    .RequireClaim("account_ready", "true")
+    .Build();
+
 builder.Services.AddAuthorization(options =>
 {
-    // New protected business endpoints require a fully initialized session.
-    // The explicit /api/auth/me and /api/auth/change-password routes remain
-    // accessible to authenticated users who must change their bootstrap password.
-    options.FallbackPolicy = new AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .RequireClaim("account_ready", "true")
-        .Build();
+    // The default and fallback policies protect newly added routes even when a
+    // developer uses .RequireAuthorization() without naming a weaker policy.
+    options.DefaultPolicy = applicationSessionPolicy;
+    options.FallbackPolicy = applicationSessionPolicy;
+
+    // Only the authenticated-user self-service routes may run before the initial
+    // administrator password has been changed.
+    options.AddPolicy("AuthenticatedUser", policy => policy.RequireAuthenticatedUser());
 });
 
 var app = builder.Build();
