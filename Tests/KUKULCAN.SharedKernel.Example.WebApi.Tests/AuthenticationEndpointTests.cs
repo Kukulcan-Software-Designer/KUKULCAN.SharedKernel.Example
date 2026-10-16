@@ -235,12 +235,12 @@ public sealed class AuthenticationEndpointTests
 
         using var oldCredentialResponse = await client.PostAsJsonAsync(
             "/api/auth/login",
-            new { email = TestEmail, password = factory.InitialPassword });
+            new { email = AuthenticationTestApplicationFactory.TestEmail, password = factory.InitialPassword });
         Assert.That(oldCredentialResponse.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
 
         using var newCredentialResponse = await client.PostAsJsonAsync(
             "/api/auth/login",
-            new { email = TestEmail, password = newPassword });
+            new { email = AuthenticationTestApplicationFactory.TestEmail, password = newPassword });
         Assert.That(newCredentialResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         var newLoginPayload = await newCredentialResponse.Content.ReadFromJsonAsync<JsonElement>();
         Assert.That(newLoginPayload.GetProperty("user").GetProperty("mustChangePassword").GetBoolean(), Is.False);
@@ -252,7 +252,7 @@ internal sealed class AuthenticationTestApplicationFactory : WebApplicationFacto
 {
     public static readonly Guid TestUserId = Guid.Parse("a2b88298-d9ce-4bd0-8e37-3edb4d79b1c7");
     public static readonly Guid TestTenantId = Guid.Parse("e1f28b7a-bc2e-4e31-8d30-a9db32ce6498");
-    public const string TestEmail = "admin@example.test";
+    public const string AuthenticationTestApplicationFactory.TestEmail = "admin@example.test";
     public static readonly string ValidPassword = $"test-login-{Guid.NewGuid():N}!";
     public static readonly string BootstrapPassword = $"test-bootstrap-{Guid.NewGuid():N}!";
     public static readonly string SigningKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
@@ -286,7 +286,7 @@ internal sealed class AuthenticationTestApplicationFactory : WebApplicationFacto
                 ["Kukulcan:Auth:Jwt:SigningKey"] = SigningKey,
                 ["Kukulcan:Auth:Jwt:Issuer"] = "example-auth-tests",
                 ["Kukulcan:Auth:Jwt:Audience"] = "example-auth-tests",
-                ["Kukulcan:Auth:Administrator:Email"] = TestEmail,
+                ["Kukulcan:Auth:Administrator:Email"] = AuthenticationTestApplicationFactory.TestEmail,
                 ["Kukulcan:Auth:Bootstrap:Password"] = _useBootstrapPassword ? BootstrapPassword : null
             });
         });
@@ -302,7 +302,7 @@ internal sealed class AuthenticationTestApplicationFactory : WebApplicationFacto
             services.AddSingleton<TestIdentityStore>(provider =>
                 new TestIdentityStore(
                     TestUserId,
-                    TestEmail,
+                    AuthenticationTestApplicationFactory.TestEmail,
                     _userTenantId,
                     InitialPassword,
                     provider.GetRequiredService<IPasswordHasher>()));
