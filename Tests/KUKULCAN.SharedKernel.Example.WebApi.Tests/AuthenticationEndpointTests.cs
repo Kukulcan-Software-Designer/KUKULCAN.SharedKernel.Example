@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -151,6 +153,98 @@ public sealed class AuthenticationEndpointTests
         Assert.That(payload.GetProperty("tenantIds").EnumerateArray()
             .Select(value => value.GetGuid()), Does.Contain(AuthenticationTestApplicationFactory.TestTenantId));
     }
+
+    [Test]
+    public async Task PostLogin_WhenDefaultTenantIsNotOneOfTheUsersMemberships_ReturnsForbidden()
+    {
+        var unauthorizedTenant = Guid.NewGuid();
+        await using var factory = new AuthenticationTestApplicationFactory(
+            configuredTenantId: unauthorizedTenant,
+            userTenantId: TestTenantId);
+        using var client = factory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new
+            {
+                email = TestEmail,
+                password = ValidPassword
+            });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+    }
+
+    [Test]
+    public async Task BootstrapPasswordLogin_RequiresPasswordChangeAndAllowsOnlySelfServiceUntilReady()
+    {
+        await using var factory = new AuthenticationTestApplicationFactory(useBootstrapPassword: true);
+        using var client = factory.CreateClient();
+
+        using var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new
+            {
+                email = TestEmail,
+                password = factory.InitialPassword
+            });
+
+        Assert.That(loginResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var loginPayload = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.That(loginPayload.GetProperty("user").GetProperty("mustChangePassword").GetBoolean(), Is.True);
+
+        var token = loginPayload.GetProperty("accessToken").GetString();
+        Assert.That(token, Is.Not.Null.And.Not.Empty);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var meResponse = await client.GetAsync("/api/auth/me");
+        Assert.That(meResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+
+        var parsedToken = new JwtSecurityTokenHandler().ReadJwtToken(token!);
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(parsedToken.Claims, "Bearer"));
+        var policyProvider = factory.Services.GetRequiredService<IAuthorizationPolicyProvider>();
+        var fallbackPolicy = await policyProvider.GetFallbackPolicyAsync();
+        Assert.That(fallbackPolicy, Is.Not.Null);
+        var authorization = factory.Services.GetRequiredService<IAuthorizationService>();
+        var protectedOperation = await authorization.AuthorizeAsync(
+            principal,
+            resource: null,
+            fallbackPolicy!.Requirements);
+        Assert.That(protectedOperation.Succeeded, Is.False);
+
+        using var wrongPasswordResponse = await client.PostAsJsonAsync(
+            "/api/auth/change-password",
+            new { currentPassword = "not-the-bootstrap-password", newPassword = "new-valid-password-2026" });
+        Assert.That(wrongPasswordResponse.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+
+        using var shortPasswordResponse = await client.PostAsJsonAsync(
+            "/api/auth/change-password",
+            new { currentPassword = factory.InitialPassword, newPassword = "short" });
+        Assert.That(shortPasswordResponse.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+
+        using var samePasswordResponse = await client.PostAsJsonAsync(
+            "/api/auth/change-password",
+            new { currentPassword = factory.InitialPassword, newPassword = factory.InitialPassword });
+        Assert.That(samePasswordResponse.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+
+        const string newPassword = "new-valid-password-2026";
+        using var changedResponse = await client.PostAsJsonAsync(
+            "/api/auth/change-password",
+            new { currentPassword = factory.InitialPassword, newPassword });
+        Assert.That(changedResponse.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+
+        using var oldCredentialResponse = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email = TestEmail, password = factory.InitialPassword });
+        Assert.That(oldCredentialResponse.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+
+        using var newCredentialResponse = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email = TestEmail, password = newPassword });
+        Assert.That(newCredentialResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var newLoginPayload = await newCredentialResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.That(newLoginPayload.GetProperty("user").GetProperty("mustChangePassword").GetBoolean(), Is.False);
+    }
+
 }
 
 internal sealed class AuthenticationTestApplicationFactory : WebApplicationFactory<Program>
@@ -159,7 +253,25 @@ internal sealed class AuthenticationTestApplicationFactory : WebApplicationFacto
     public static readonly Guid TestTenantId = Guid.Parse("e1f28b7a-bc2e-4e31-8d30-a9db32ce6498");
     public const string TestEmail = "admin@example.test";
     public static readonly string ValidPassword = $"test-login-{Guid.NewGuid():N}!";
+    public static readonly string BootstrapPassword = $"test-bootstrap-{Guid.NewGuid():N}!";
     public static readonly string SigningKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
+
+    private readonly bool _useBootstrapPassword;
+    private readonly Guid _configuredTenantId;
+    private readonly Guid _userTenantId;
+
+    public AuthenticationTestApplicationFactory(
+        bool useBootstrapPassword = false,
+        Guid? configuredTenantId = null,
+        Guid? userTenantId = null)
+    {
+        _useBootstrapPassword = useBootstrapPassword;
+        _configuredTenantId = configuredTenantId ?? TestTenantId;
+        _userTenantId = userTenantId ?? TestTenantId;
+        InitialPassword = useBootstrapPassword ? BootstrapPassword : ValidPassword;
+    }
+
+    public string InitialPassword { get; }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -169,50 +281,99 @@ internal sealed class AuthenticationTestApplicationFactory : WebApplicationFacto
             {
                 ["Kukulcan:Database:Provider"] = "PostgresSql",
                 ["Kukulcan:Database:ConnectionString"] = "Host=localhost;Database=auth-tests",
-                ["Kukulcan:Auth:DefaultTenantId"] = TestTenantId.ToString(),
+                ["Kukulcan:Auth:DefaultTenantId"] = _configuredTenantId.ToString(),
                 ["Kukulcan:Auth:Jwt:SigningKey"] = SigningKey,
                 ["Kukulcan:Auth:Jwt:Issuer"] = "example-auth-tests",
                 ["Kukulcan:Auth:Jwt:Audience"] = "example-auth-tests",
-                ["Kukulcan:Auth:Administrator:Email"] = TestEmail
+                ["Kukulcan:Auth:Administrator:Email"] = TestEmail,
+                ["Kukulcan:Auth:Bootstrap:Password"] = _useBootstrapPassword ? BootstrapPassword : null
             });
         });
 
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<ILocalUserStore>();
-            services.AddSingleton<ILocalUserStore>(
-                new TestLocalUserStore(TestUserId, TestEmail, TestTenantId));
-
+            services.RemoveAll<IUserPasswordChanger>();
             services.RemoveAll<IPasswordHasher>();
             services.AddSingleton<IPasswordHasher, TestPasswordHasher>();
+            services.AddSingleton<TestIdentityStore>(provider =>
+                new TestIdentityStore(
+                    TestUserId,
+                    TestEmail,
+                    _userTenantId,
+                    InitialPassword,
+                    provider.GetRequiredService<IPasswordHasher>()));
+            services.AddSingleton<ILocalUserStore>(provider =>
+                provider.GetRequiredService<TestIdentityStore>());
+            services.AddSingleton<IUserPasswordChanger>(provider =>
+                provider.GetRequiredService<TestIdentityStore>());
         });
     }
+}
 
-    private sealed class TestLocalUserStore(Guid userId, string email, Guid tenantId) : ILocalUserStore
+internal sealed class TestIdentityStore(
+    Guid userId,
+    string email,
+    Guid tenantId,
+    string initialPassword,
+    IPasswordHasher passwordHasher) : ILocalUserStore, IUserPasswordChanger
+{
+    private string _passwordHash = passwordHasher.Hash(initialPassword);
+
+    public Task<LocalUser?> FindByEmailAsync(
+        string emailAddress,
+        CancellationToken cancellationToken = default)
     {
-        public Task<LocalUser?> FindByEmailAsync(
-            string emailAddress,
-            CancellationToken cancellationToken = default)
+        cancellationToken.ThrowIfCancellationRequested();
+
+        LocalUser? user = string.Equals(emailAddress, email, StringComparison.OrdinalIgnoreCase)
+            ? new LocalUser(
+                userId,
+                email,
+                _passwordHash,
+                [new TenantMembership(tenantId)])
+            : null;
+
+        return Task.FromResult(user);
+    }
+
+    public Task<PasswordChangeStatus> ChangeAsync(
+        Guid requestedUserId,
+        string currentPassword,
+        string newPassword,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (newPassword.Length < 12)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            LocalUser? user = string.Equals(emailAddress, email, StringComparison.OrdinalIgnoreCase)
-                ? new LocalUser(
-                    userId,
-                    email,
-                    $"test-only-hash:{ValidPassword}",
-                    [new TenantMembership(tenantId)])
-                : null;
-
-            return Task.FromResult(user);
+            return Task.FromResult(PasswordChangeStatus.PasswordTooShort);
         }
-    }
 
-    private sealed class TestPasswordHasher : IPasswordHasher
-    {
-        public string Hash(string password) => $"test-only-hash:{password}";
+        if (requestedUserId != userId)
+        {
+            return Task.FromResult(PasswordChangeStatus.UserNotFound);
+        }
 
-        public bool Verify(string password, string passwordHash)
-            => string.Equals(Hash(password), passwordHash, StringComparison.Ordinal);
+        if (!passwordHasher.Verify(currentPassword, _passwordHash))
+        {
+            return Task.FromResult(PasswordChangeStatus.InvalidCurrentPassword);
+        }
+
+        if (passwordHasher.Verify(newPassword, _passwordHash))
+        {
+            return Task.FromResult(PasswordChangeStatus.PasswordMustDiffer);
+        }
+
+        _passwordHash = passwordHasher.Hash(newPassword);
+        return Task.FromResult(PasswordChangeStatus.Changed);
     }
+}
+
+internal sealed class TestPasswordHasher : IPasswordHasher
+{
+    public string Hash(string password) => $"test-only-hash:{password}";
+
+    public bool Verify(string password, string passwordHash)
+        => string.Equals(Hash(password), passwordHash, StringComparison.Ordinal);
 }
