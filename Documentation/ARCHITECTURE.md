@@ -1,6 +1,6 @@
 # Example Application Architecture
 
-**Status:** Architecture, executable .NET 10 Web API baseline (Issue #1), SharedKernel Result integration (Issue #2), and authentication/current-user/administrator-bootstrap behavior (Issue #3) implemented and under automated security/regression verification  
+**Status:** Architecture, executable .NET 10 Web API baseline (Issue #1), SharedKernel Result integration (Issue #2), authentication/current-user/administrator-bootstrap behavior (Issue #3), and the initial Database package integration (Issue #4) implemented and under automated verification  
 **Target framework:** .NET 10  
 **Scope:** Architecture, security and dependency boundaries. Full Sample-domain persistence, business endpoints and external-service integrations remain for their implementation Issues.
 
@@ -92,7 +92,7 @@ Use .NET configuration keys `Kukulcan:Database:Provider` and `Kukulcan:Database:
 
 The Database package documents SQL Server, PostgreSQL and MySQL provider selection, but the Example must only claim support for a provider after its own migrations and behavior have been validated against a real instance of that provider.
 
-The Example domain schema is `Sample`. Authentication-owned tables and schema are not to be recreated by the Example domain model.
+The Example domain schema is `Sample`. Authentication-owned tables and schema are not to be recreated by the Example domain model. The initial persistence sample uses `KUKULCAN.SharedKernel.Database` through `Infrastructure/ExampleDbContext`, with provider configuration from `Kukulcan__Database__Provider` and `Kukulcan__Database__ConnectionString`. See [DATABASE-INTEGRATION.md](DATABASE-INTEGRATION.md) for endpoints, secret handling, and the distinction between integration testing and production migrations.
 
 ## 5. HTTP API contract
 
