@@ -29,7 +29,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Restore and build Web API when present
+      - name: Restore and build Example Web API
         shell: bash
         run: |
           project="Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj"
@@ -37,15 +37,43 @@ jobs:
             dotnet restore "$project"
             dotnet build "$project" --no-restore --configuration Release
           else
-            echo "::notice::Web API build skipped: project not created yet (Issue #1)."
-            {
-              echo "## Reference Client"
-              echo "Web API build skipped because the architecture-defined project does not exist yet: `$project` (Issue #1)."
-            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Required Web API project is missing: $project"
+            exit 1
           fi
 
+  build-dotnet-web-interfaces:
+    name: Build Razor and Blazor clients
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore and build Razor and Blazor
+        shell: bash
+        run: |
+          projects=(
+            "Source/WebInterfaces/KUKULCAN.SharedKernel.Example.Razor/KUKULCAN.SharedKernel.Example.Razor.csproj"
+            "Source/WebInterfaces/KUKULCAN.SharedKernel.Example.Blazor/KUKULCAN.SharedKernel.Example.Blazor.csproj"
+          )
+
+          for project in "${projects[@]}"; do
+            if [ ! -f "$project" ]; then
+              echo "::error::Required web interface project is missing: $project"
+              exit 1
+            fi
+
+            dotnet restore "$project"
+            dotnet build "$project" --no-restore --configuration Release
+          done
+
   build-angular:
-    name: Build Angular client when present
+    name: Build and test Angular client
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -57,19 +85,21 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install and build Angular client when present
+      - name: Install, build and test Angular client
         shell: bash
         run: |
           project_dir="Source/WebInterfaces/KUKULCAN.SharedKernel.Example.Angular"
           if [ -f "$project_dir/package.json" ]; then
             npm --prefix "$project_dir" ci
             npm --prefix "$project_dir" run build
+            npm --prefix "$project_dir" run test -- --watch=false
           else
-            echo "Angular build skipped: $project_dir/package.json does not exist yet."
+            echo "::error::Required Angular client project is missing: $project_dir/package.json"
+            exit 1
           fi
 
   build-react:
-    name: Build React client when present
+    name: Build and lint React client
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -81,13 +111,15 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install and build React client when present
+      - name: Install, build and lint React client
         shell: bash
         run: |
           project_dir="Source/WebInterfaces/KUKULCAN.SharedKernel.Example.React"
           if [ -f "$project_dir/package.json" ]; then
             npm --prefix "$project_dir" ci
             npm --prefix "$project_dir" run build
+            npm --prefix "$project_dir" run lint
           else
-            echo "React build skipped: $project_dir/package.json does not exist yet."
+            echo "::error::Required React client project is missing: $project_dir/package.json"
+            exit 1
           fi

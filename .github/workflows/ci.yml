@@ -19,6 +19,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Checkout Auth migration sources
+        uses: actions/checkout@v5
+        with:
+          repository: Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Auth
+          ref: 0932ab3a7215a9128cc0eb41740262803a81ef73
+          path: _external/KUKULCAN.SharedKernel.Auth
+          persist-credentials: false
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:

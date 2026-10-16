@@ -1,8 +1,8 @@
 # Example Application Architecture
 
-**Status:** Architecture, executable .NET 10 Web API baseline (Issue #1), and SharedKernel Result integration demonstration (Issue #2) delivered  
+**Status:** Architecture, executable .NET 10 Web API baseline (Issue #1), SharedKernel Result integration (Issue #2), and authentication/current-user/administrator-bootstrap behavior (Issue #3) implemented and under automated security/regression verification  
 **Target framework:** .NET 10  
-**Scope:** Architecture and dependency boundaries plus baseline host/test scaffolding. Business endpoints, persistence and external-service integrations remain for their implementation Issues.
+**Scope:** Architecture, security and dependency boundaries. Full Sample-domain persistence, business endpoints and external-service integrations remain for their implementation Issues.
 
 ## 1. Architectural decisions
 
@@ -12,7 +12,7 @@
 4. Application-specific use cases and domain rules belong to the Example, not to reusable KUKULCAN libraries. Reuse the published library contracts and do not copy their implementations.
 5. Persistence is reached through the verified public API of `KUKULCAN.SharedKernel.Database`. The Example owns its `Sample` domain model and its provider-specific host configuration; the shared package owns reusable persistence infrastructure.
 6. `KUKULCAN.SharedKernel.I18N` is a separate HTTP service. The Example consumes it through a configured typed/named HTTP client and does not reference its implementation project.
-7. The baseline now includes an executable Web API host, a health endpoint and an integration test. Business endpoints, persistence, authentication and external-service integrations remain for their implementation Issues.
+7. The baseline includes an executable Web API host, health endpoint, authentication endpoints and automated Web API/database integration tests. Sample business endpoints and outbound-service integrations remain for their implementation Issues.
 
 ## 2. Logical architecture
 
@@ -46,15 +46,16 @@ The following is the agreed layout. Issue #1 establishes the executable Web API 
 KUKULCAN.SharedKernel.Example/
 ├── KUKULCAN.SharedKernel.Example.slnx
 ├── Source/
-│   ├── KUKULCAN.SharedKernel.Example.Razor/           # Razor client / server host
-│   ├── KUKULCAN.SharedKernel.Example.Blazor/          # Blazor client; hosting model per ADR below
-│   ├── KUKULCAN.SharedKernel.Example.Angular/         # Angular client
-│   ├── KUKULCAN.SharedKernel.Example.React/           # React client
 │   ├── WebAPI
 │   │     ├── KUKULCAN.SharedKernel.Example.WebApi/          # HTTP host and composition root
 │   │     ├── KUKULCAN.SharedKernel.Example.Application/     # use cases, orchestration, validation 
 │   │     ├── KUKULCAN.SharedKernel.Example.Domain/          # Sample entities and business invariants 
 │   │     └── KUKULCAN.SharedKernel.Example.Infrastructure/  # Database and outbound-service adapters 
+│   └── WebInterfaces
+│         ├── KUKULCAN.SharedKernel.Example.Razor/           # Razor client / server host
+│         ├── KUKULCAN.SharedKernel.Example.Blazor/          # Blazor client; hosting model per ADR below
+│         ├── KUKULCAN.SharedKernel.Example.Angular/         # Angular client
+│         └── KUKULCAN.SharedKernel.Example.React/           # React client
 ├── Tests/
 │   ├── KUKULCAN.SharedKernel.Example.Domain.Tests/
 │   ├── KUKULCAN.SharedKernel.Example.Application.Tests/
@@ -108,7 +109,7 @@ The Example domain schema is `Sample`. Authentication-owned tables and schema ar
 
 ### Authentication authority
 
-The Example Web API is the security enforcement point for protected application operations. It consumes the real public contracts of `KUKULCAN.SharedKernel.Auth`; it must not invent library methods or assume that the library itself hosts HTTP endpoints. The Auth README specifies that the consuming host owns HTTP routing, transport DTOs and application-level JWT issuance. Exact login, user-bootstrap and membership contracts must be checked against the pinned package API during the authentication Issue.
+The Example Web API is the security enforcement point for protected application operations. It consumes the public contracts of the published `KUKULCAN.SharedKernel.Auth` 1.1.4 package; Auth remains a class library and does not host these HTTP routes or issue this application's JWTs. `LocalAuthenticationService` validates local credentials and returns membership data, while the Example host applies its HTTP policies and issues signed access tokens.
 
 ### Interface-specific session model
 
@@ -117,7 +118,7 @@ The Example Web API is the security enforcement point for protected application 
 - **Angular and React:** treat both as browser clients of the same API. Prefer same-origin deployment and a secure, HttpOnly, Secure, appropriately SameSite session cookie with CSRF/antiforgery protection for cookie-authenticated state-changing requests. Do not put access tokens, signing keys or secrets in local storage, source code, or client bundles. If deployment cannot provide same-origin cookie sessions, document and review an explicit alternative before implementing it.
 - The concrete cookie/BFF endpoint mechanics must be implemented within the agreed single API boundary or its existing host; do not introduce a separate authentication service solely for this Example without a demonstrated requirement.
 
-The exact session adapters and endpoint contracts are implementation details to validate against ASP.NET Core and the Auth package. These decisions establish security constraints, not a claim that login/session code currently exists.
+The UI-specific cookie/BFF session mechanics above remain work for the corresponding client Issues. The API bearer-token contract implemented here does not permit browser clients to receive signing keys, database credentials or other server secrets.
 
 ### Authorization and tenant context
 
@@ -127,9 +128,44 @@ The exact session adapters and endpoint contracts are implementation details to 
 - Do not treat `Guid.Empty` as a global/default tenant unless the real Auth and Database contracts explicitly define and enforce that meaning.
 - Test cross-tenant access denial wherever tenant isolation is enabled.
 
-### Administrator bootstrap and secrets
+### Implemented authentication API and administrator bootstrap
 
-Bootstrap the initial `Admin` user idempotently using the actual Auth package contract. Supply any initial credential through an environment-specific secret source or a secure interactive setup process. Never commit a password, signing key, access token or credential-bearing connection string. Repeated startup must not duplicate the account or reset an existing administrator's password unexpectedly.
+The Example host consumes the published `KUKULCAN.SharedKernel.Auth` 1.1.4 public contract. The Auth package remains a class library; it does not host HTTP routes or issue the Example's application JWTs.
+
+| Endpoint | Behavior |
+|---|---|
+| `POST /api/auth/login` | Validates local credentials through `LocalAuthenticationService`; returns a short-lived bearer token and a safe current-user profile on success. Malformed/missing credentials return HTTP 400, invalid credentials return 401, and a user without access to the configured active tenant is denied. |
+| `GET /api/auth/me` | Requires a validated bearer token and returns the current principal's user ID, email, display name, administrator marker, password-change flag and tenant memberships. |
+| `POST /api/auth/change-password` | Requires an authenticated principal, verifies the current password with the Auth package's `IPasswordHasher`, requires at least 12 characters for the new password and refuses a password that does not change the credential. |
+
+The host issues HMAC-SHA-256 JWT bearer tokens with a 30-minute lifetime. A configured signing key of at least 32 UTF-8 bytes is mandatory for issuance; there is no persistent fallback key. Validation enforces signature, issuer, audience and expiration. Claims are limited to the user ID, email, display name, configured administrator role/marker, password-change/account-readiness flags, the active tenant and the user's tenant membership IDs. Passwords, password hashes, signing keys and database connection strings are never included in token claims or API response DTOs.
+
+The Auth public entity contract has no persisted display-name or role field. Consequently, this Example identifies the initial administrator by the configured administrator email, emits display name `Administrador` for that identity in API/JWT responses, and emits the `Admin` role claim. This is an Example-host policy based on configuration, not a claim that `KUKULCAN.SharedKernel.Auth` persists roles or display names.
+
+### Administrator bootstrap and secret configuration
+
+The optional `AdministratorBootstrapHostedService` runs only when an initial bootstrap password is supplied. It requires the Auth database configuration, a non-empty default tenant ID and the administrator email. It uses the Auth package's secure `IPasswordHasher` and a bootstrap store backed by `AuthDbContext`. Startup checks for an existing canonical email before creating the initial user and tenant membership; the persistence adapter also handles a concurrent duplicate-create conflict idempotently. An existing user's password is never reset by repeated startup.
+
+Supply these settings through a secure environment-specific secret source or secret manager. Do not add their values to source control, appsettings files committed to the repository, test fixtures with real credentials, logs or client bundles.
+
+| .NET configuration key | Environment variable | Purpose |
+|---|---|---|
+| `Kukulcan:Database:Provider` | `KUKULCAN__DATABASE__PROVIDER` | `SqlServer`, `PostgresSql` or `MySql` |
+| `Kukulcan:Database:ConnectionString` | `KUKULCAN__DATABASE__CONNECTIONSTRING` | Connection string for the Auth database |
+| `Kukulcan:Auth:DefaultTenantId` | `KUKULCAN__AUTH__DEFAULTTENANTID` | Non-empty tenant GUID selected by the server for initial login |
+| `Kukulcan:Auth:Jwt:SigningKey` | `KUKULCAN__AUTH__JWT__SIGNINGKEY` | Secret key with at least 32 UTF-8 bytes |
+| `Kukulcan:Auth:Jwt:Issuer` | `KUKULCAN__AUTH__JWT__ISSUER` | Optional explicit token issuer |
+| `Kukulcan:Auth:Jwt:Audience` | `KUKULCAN__AUTH__JWT__AUDIENCE` | Optional explicit token audience |
+| `Kukulcan:Auth:Administrator:Email` | `KUKULCAN__AUTH__ADMINISTRATOR__EMAIL` | Canonical administrator login identity |
+| `Kukulcan:Auth:Bootstrap:Password` | `KUKULCAN__AUTH__BOOTSTRAP__PASSWORD` | Optional initial password, supplied only through a secure secret source |
+
+The bootstrap password is not embedded in source or committed configuration; it must be supplied through the secure bootstrap setting. A successful login with that configured initial password yields `must_change_password=true` and `account_ready=false`. The default and fallback authorization policies require an authenticated principal with `account_ready=true`, while `GET /api/auth/me` and `POST /api/auth/change-password` deliberately permit the authenticated user to complete the forced change. Password changes verify the current password, reject values shorter than 12 characters and reject an unchanged password. After a successful change, the administrator must log in again to obtain a ready token; existing tokens remain unready. Remove or rotate the bootstrap secret after the credential change; startup never resets an existing account.
+
+Before issuing a token, the host verifies that the configured server-selected default tenant is present in the authenticated user's actual Auth membership collection. The token receives `tenant_id` only after this membership check. On authenticated requests, `HttpTenantContext` uses the tenant claim from the signature/issuer/audience/lifetime-validated principal and fails closed with `Guid.Empty` when the claim is missing, invalid or empty; it never falls back to the configured default tenant for an authenticated principal. Tenant membership is not reloaded on each request, so removal of membership may take up to the 30-minute token lifetime to take effect; the implementation deliberately does not claim immediate revocation.
+
+**Database prerequisite:** the provider-specific Auth schema/tables and migrations must already be applied before enabling login or bootstrap. The Example does not run migrations automatically at startup. Use the existing provider-specific migration projects from [KUKULCAN.SharedKernel.Auth](https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Auth/tree/main/Source) and follow that repository's migration guidance; provision the Auth database and credentials separately from the Example's `Sample` domain data.
+
+Refresh-token renewal and logout/revocation endpoints are not implemented: the current flow uses short-lived stateless bearer tokens and does not define a refresh-token store or revocation contract. The browser clients must continue to follow the session-storage constraints in the interface-specific session model above; do not store signing keys or credentials in browser bundles or local storage.
 
 ## 7. Error handling, dependency injection and external services
 
@@ -158,6 +194,7 @@ Issue #16 is an architecture/documentation issue. It does not justify artificial
 - **Issue #16 (this document):** establish the target architecture and dependency/security boundaries.
 - **Issue #1:** establish the .NET 10 solution foundation, executable Web API host, health endpoint and API integration-test seam.
 - **Issue #2:** demonstrate the published `KUKULCAN.SharedKernel` Result contract through `GET /api/examples/shared-kernel/result/success` (HTTP 200 with `isSuccess` and `value`) and `GET /api/examples/shared-kernel/result/failure` (HTTP 404 Problem Details carrying the shared error code).
-- Later authentication, persistence, domain and UI Issues must inspect the exact published package versions and verify the public APIs before coding. Update this document when an evidence-based decision changes the target design.
+- **Issue #3:** add `POST /api/auth/login`, `GET /api/auth/me` and authenticated password change using the published `KUKULCAN.SharedKernel.Auth` contract; issue/validate short-lived bearer JWTs in the Example host; and provide idempotent, secret-configured administrator bootstrap with password hashing and automated behavior tests.
+- Later persistence, domain and UI Issues must inspect the exact published package versions and verify the public APIs before coding. Update this document when an evidence-based decision changes the target design.
 
 Before implementing each integration, verify the package version, service registration signatures, exposed interfaces, error/result types, configuration options and supported provider/session behavior from its source/API documentation. A README-level description is not a substitute for compiling against the actual public contract.
