@@ -176,6 +176,7 @@ if (exampleDatabaseConfigured)
             CreateDatabaseIntegrationRecordRequest request,
             ExampleDbContext context,
             IUnitOfWork unitOfWork,
+            KUKULCAN.SharedKernel.Database.Abstractions.ITenantContext tenantContext,
             CancellationToken cancellationToken) =>
         {
             if (string.IsNullOrWhiteSpace(request.Value) || request.Value.Trim().Length > 200)
@@ -189,6 +190,7 @@ if (exampleDatabaseConfigured)
             var record = new DatabaseIntegrationRecord
             {
                 Id = Guid.NewGuid(),
+                TenantId = tenantContext.TenantId,
                 Value = request.Value.Trim()
             };
 
