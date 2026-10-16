@@ -19,8 +19,9 @@ public static class AuthenticationEndpoints
                     LocalAuthenticationService authenticationService,
                     IAccessTokenIssuer tokenIssuer,
                     IConfiguration configuration,
+                    ILogger<AuthenticationEndpoints> logger,
                     CancellationToken cancellationToken) =>
-                    LoginAsync(request, authenticationService, tokenIssuer, configuration, cancellationToken))
+                    LoginAsync(request, authenticationService, tokenIssuer, configuration, logger, cancellationToken))
             .AllowAnonymous()
             .WithName("Login");
 
@@ -47,6 +48,7 @@ public static class AuthenticationEndpoints
         LocalAuthenticationService authenticationService,
         IAccessTokenIssuer tokenIssuer,
         IConfiguration configuration,
+        ILogger<AuthenticationEndpoints> logger,
         CancellationToken cancellationToken)
     {
         if (request is null
@@ -98,7 +100,10 @@ public static class AuthenticationEndpoints
 
         if (authenticationResult.IsFailure)
         {
-            // Do not reveal whether the credentials were valid when tenant access is denied.
+            // Keep the cause in server-side diagnostics only; never expose it in the response.
+            logger.LogWarning(
+                "Login rejected with authentication error code {AuthenticationErrorCode}.",
+                authenticationResult.Error.Code);
             return CreateGenericLoginFailure();
         }
 
@@ -108,9 +113,11 @@ public static class AuthenticationEndpoints
         {
             issuedToken = tokenIssuer.Issue(authenticatedUser, request.Password);
         }
-        catch (TenantAccessDeniedException)
+        catch (TenantAccessDeniedException exception)
         {
             // Keep credential and tenant-membership failures indistinguishable to callers.
+            logger.LogWarning("Login rejected because the configured tenant is not a user membership: {Reason}.",
+                exception.Message);
             return CreateGenericLoginFailure();
         }
 
