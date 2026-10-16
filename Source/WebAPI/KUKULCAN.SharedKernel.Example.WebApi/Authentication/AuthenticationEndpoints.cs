@@ -98,15 +98,8 @@ public static class AuthenticationEndpoints
 
         if (authenticationResult.IsFailure)
         {
-            var noTenantAccess = authenticationResult.Error.Code == "Auth.NoTenantAccess";
-            return HttpResults.Problem(
-                statusCode: noTenantAccess
-                    ? StatusCodes.Status403Forbidden
-                    : StatusCodes.Status401Unauthorized,
-                title: noTenantAccess ? "Forbidden" : "Unauthorized",
-                detail: noTenantAccess
-                    ? "The authenticated user has no access to the configured tenant."
-                    : "The supplied email or password is invalid.");
+            // Do not reveal whether the credentials were valid when tenant access is denied.
+            return CreateGenericLoginFailure();
         }
 
         var authenticatedUser = authenticationResult.Value;
@@ -117,10 +110,8 @@ public static class AuthenticationEndpoints
         }
         catch (TenantAccessDeniedException)
         {
-            return HttpResults.Problem(
-                statusCode: StatusCodes.Status403Forbidden,
-                title: "Forbidden",
-                detail: "The authenticated user has no access to the configured tenant.");
+            // Keep credential and tenant-membership failures indistinguishable to callers.
+            return CreateGenericLoginFailure();
         }
 
         var response = new LoginResponse(
@@ -137,6 +128,12 @@ public static class AuthenticationEndpoints
 
         return HttpResults.Ok(response);
     }
+
+    private static IResult CreateGenericLoginFailure()
+        => HttpResults.Problem(
+            statusCode: StatusCodes.Status401Unauthorized,
+            title: "Unauthorized",
+            detail: "The supplied email or password is invalid.");
 
     private static IResult CreateCurrentUserResponse(ClaimsPrincipal principal)
     {
