@@ -195,7 +195,11 @@ internal sealed class AuthenticationTestApplicationFactory : WebApplicationFacto
             cancellationToken.ThrowIfCancellationRequested();
 
             LocalUser? user = string.Equals(emailAddress, email, StringComparison.OrdinalIgnoreCase)
-                ? new LocalUser(userId, email, "test-password-hash", [new TenantMembership(tenantId)])
+                ? new LocalUser(
+                    userId,
+                    email,
+                    $"test-only-hash:{ValidPassword}",
+                    [new TenantMembership(tenantId)])
                 : null;
 
             return Task.FromResult(user);
