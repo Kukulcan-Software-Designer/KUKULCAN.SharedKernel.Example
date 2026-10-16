@@ -1,0 +1,83 @@
+<Solution>
+  <Folder Name="/Documentation/">
+    <File Path="Documentation\ARCHITECTURE.md" />
+  </Folder>
+  <Folder Name="/Documentation/Scripts/">
+    <File Path="Documentation\Scripts\setup-example-milestones.sh" />
+  </Folder>
+  <Folder Name="/Documentation/Wiki/">
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\publish-example-wiki.sh" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\README-Publishing.md" />
+  </Folder>
+  <Folder Name="/Documentation/Wiki/pages/">
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Architecture.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Arquitectura.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Autenticacion-y-Seguridad.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Authentication-and-Security.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Base-de-Datos-y-Migraciones.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\CI-and-Quality-Gates.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\CI-y-Criterios-de-Calidad.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Cobertura-de-Codigo.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Code-Coverage.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Database-and-Migrations.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Descripcion-del-Proyecto.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Development-Workflow.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Domain-Model.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Estrategia-de-Pruebas.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Flujo-de-Desarrollo.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Hoja-de-Ruta-y-Hitos.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Home.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Inicio.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Integraciones-KUKULCAN.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Interfaces-Web.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\KUKULCAN-Integrations.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Modelo-de-Dominio.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Project-Overview.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Resolucion-de-Problemas.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Roadmap-and-Milestones.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Technology-Stack.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Tecnologias.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Testing-Strategy.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Troubleshooting.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\Web-Interfaces.md" />
+    <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\pages\_Sidebar.md" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path="CODE_OF_CONDUCT.md" />
+    <File Path="CONTRIBUTING.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="global.json" />
+    <File Path="GOVERNANCE.md" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+    <File Path="RELEASE_NOTES.md" />
+    <File Path="SECURITY.md" />
+    <File Path="SUPPORT.md" />
+  </Folder>
+  <Folder Name="/Solution Items/.github/" />
+  <Folder Name="/Solution Items/.github/workflows/">
+    <File Path=".github\workflows\ci.yml" />
+    <File Path=".github\workflows\client.yml" />
+    <File Path=".github\workflows\coverage.yml" />
+    <File Path=".github\workflows\delete-merged-branches.yml" />
+  </Folder>
+  <Folder Name="/Source/" />
+  <Folder Name="/Source/WebAPI/">
+    <Project Path="Source/WebAPI/KUKULCAN.SharedKernel.Example.Application/KUKULCAN.SharedKernel.Example.Application.csproj" />
+    <Project Path="Source/WebAPI/KUKULCAN.SharedKernel.Example.Domain/KUKULCAN.SharedKernel.Example.Domain.csproj" />
+    <Project Path="Source/WebAPI/KUKULCAN.SharedKernel.Example.Infrastructure/KUKULCAN.SharedKernel.Example.Infrastructure.csproj" />
+    <Project Path="Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj" />
+  </Folder>
+  <Folder Name="/Source/WebInterfaces/">
+    <Project Path="Source/WebInterfaces/KUKULCAN.SharedKernel.Example.Blazor/KUKULCAN.SharedKernel.Example.Blazor.csproj" />
+    <Project Path="Source/WebInterfaces/KUKULCAN.SharedKernel.Example.Razor/KUKULCAN.SharedKernel.Example.Razor.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/KUKULCAN.SharedKernel.Example.Application.Tests/KUKULCAN.SharedKernel.Example.Application.Tests.csproj" />
+    <Project Path="Tests/KUKULCAN.SharedKernel.Example.Domain.Tests/KUKULCAN.SharedKernel.Example.Domain.Tests.csproj" />
+    <Project Path="Tests/KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests/KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests.csproj" />
+    <Project Path="Tests/KUKULCAN.SharedKernel.Example.WebApi.Tests/KUKULCAN.SharedKernel.Example.WebApi.Tests.csproj" />
+  </Folder>
+</Solution>

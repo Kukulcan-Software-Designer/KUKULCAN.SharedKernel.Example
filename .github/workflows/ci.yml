@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Restore, build and test Example
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore KUKULCAN.SharedKernel.Example.slnx
+
+      - name: Build
+        run: dotnet build KUKULCAN.SharedKernel.Example.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test KUKULCAN.SharedKernel.Example.slnx --configuration Release --no-build --no-restore

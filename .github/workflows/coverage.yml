@@ -1,0 +1,108 @@
+name: Code Coverage
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    name: Measure and publish Example coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Create coverage settings
+        shell: bash
+        run: |
+          cat > /tmp/example-coverage.runsettings <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <RunSettings>
+            <DataCollectionRunSettings>
+              <DataCollectors>
+                <DataCollector friendlyName="XPlat Code Coverage">
+                  <Configuration>
+                    <Format>cobertura</Format>
+                    <Include>[KUKULCAN.SharedKernel.Example.*]*</Include>
+                    <ExcludeByAttribute>CompilerGeneratedAttribute</ExcludeByAttribute>
+                    <SingleHit>false</SingleHit>
+                    <UseSourceLink>true</UseSourceLink>
+                    <SkipAutoProps>true</SkipAutoProps>
+                  </Configuration>
+                </DataCollector>
+              </DataCollectors>
+            </DataCollectionRunSettings>
+          </RunSettings>
+          EOF
+
+      - name: Restore
+        run: dotnet restore KUKULCAN.SharedKernel.Example.slnx
+
+      - name: Build
+        run: dotnet build KUKULCAN.SharedKernel.Example.slnx --no-restore --configuration Release
+
+      - name: Test and collect coverage
+        run: >
+          dotnet test KUKULCAN.SharedKernel.Example.slnx
+          --no-build
+          --no-restore
+          --configuration Release
+          --settings /tmp/example-coverage.runsettings
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+
+      - name: Install ReportGenerator
+        if: hashFiles('TestResults/**/coverage.cobertura.xml') != ''
+        run: dotnet tool install dotnet-reportgenerator-globaltool --tool-path ./tools
+
+      - name: Generate coverage report
+        if: hashFiles('TestResults/**/coverage.cobertura.xml') != ''
+        run: >
+          ./tools/reportgenerator
+          "-reports:TestResults/**/coverage.cobertura.xml"
+          "-targetdir:CoverageReport"
+          "-reporttypes:Html;Cobertura;TextSummary"
+
+      - name: Publish coverage summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f CoverageReport/Summary.txt ]; then
+            {
+              echo "## Example Code Coverage"
+              echo '```text'
+              cat CoverageReport/Summary.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "## Example Code Coverage"
+              echo "No Cobertura coverage file was produced. Coverage has not been measured for this run."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: example-code-coverage
+          path: |
+            CoverageReport/
+            TestResults/**/coverage.cobertura.xml
+          if-no-files-found: warn
+          retention-days: 14
