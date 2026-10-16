@@ -193,6 +193,39 @@ public sealed class AuthenticationEndpointTests
     }
 
     [Test]
+    public async Task PostLogin_WhenUserHasNoTenantMembership_ReturnsSameGenericFailureAsInvalidCredentials()
+    {
+        await using var factory = new AuthenticationTestApplicationFactory(
+            userTenantId: Guid.Empty);
+        using var client = factory.CreateClient();
+
+        using var invalidCredentialsResponse = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new
+            {
+                email = AuthenticationTestApplicationFactory.TestEmail,
+                password = "incorrect-password"
+            });
+        using var noMembershipResponse = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new
+            {
+                email = AuthenticationTestApplicationFactory.TestEmail,
+                password = AuthenticationTestApplicationFactory.ValidPassword
+            });
+
+        Assert.That(invalidCredentialsResponse.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        Assert.That(noMembershipResponse.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+
+        var invalidCredentials = await invalidCredentialsResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var noMembership = await noMembershipResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.That(noMembership.GetProperty("title").GetString(),
+            Is.EqualTo(invalidCredentials.GetProperty("title").GetString()));
+        Assert.That(noMembership.GetProperty("detail").GetString(),
+            Is.EqualTo(invalidCredentials.GetProperty("detail").GetString()));
+    }
+
+    [Test]
     public async Task BootstrapPasswordLogin_RequiresPasswordChangeAndAllowsOnlySelfServiceUntilReady()
     {
         await using var factory = new AuthenticationTestApplicationFactory(useBootstrapPassword: true);
@@ -346,12 +379,11 @@ internal sealed class TestIdentityStore(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        IReadOnlyCollection<TenantMembership> memberships = tenantId == Guid.Empty
+            ? []
+            : [new TenantMembership(tenantId)];
         LocalUser? user = string.Equals(emailAddress, email, StringComparison.OrdinalIgnoreCase)
-            ? new LocalUser(
-                userId,
-                email,
-                _passwordHash,
-                [new TenantMembership(tenantId)])
+            ? new LocalUser(userId, email, _passwordHash, memberships)
             : null;
 
         return Task.FromResult(user);
