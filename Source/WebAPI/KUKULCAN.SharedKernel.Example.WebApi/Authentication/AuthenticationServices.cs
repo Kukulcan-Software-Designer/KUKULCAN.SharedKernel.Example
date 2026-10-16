@@ -275,8 +275,75 @@ public sealed class UnconfiguredUserPasswordChanger : IUserPasswordChanger
         => Task.FromResult(PasswordChangeStatus.NotConfigured);
 }
 
+public interface IAdministratorBootstrapStore
+{
+    Task<bool> ExistsByEmailAsync(
+        string email,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> TryCreateAsync(
+        string email,
+        string passwordHash,
+        Guid tenantId,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class AuthDatabaseAdministratorBootstrapStore(AuthDbContext context)
+    : IAdministratorBootstrapStore
+{
+    public Task<bool> ExistsByEmailAsync(
+        string email,
+        CancellationToken cancellationToken = default)
+        => context.Users.AnyAsync(
+            user => user.Email == email,
+            cancellationToken);
+
+    public async Task<bool> TryCreateAsync(
+        string email,
+        string passwordHash,
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = Guid.NewGuid();
+        context.Users.Add(new AuthUserEntity
+        {
+            UserId = userId,
+            Email = email,
+            PasswordHash = passwordHash,
+            TenantMemberships =
+            [
+                new AuthTenantMembershipEntity
+                {
+                    UserId = userId,
+                    TenantId = tenantId
+                }
+            ]
+        });
+
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            // The unique email index makes simultaneous startup attempts idempotent.
+            context.ChangeTracker.Clear();
+
+            if (await context.Users.AnyAsync(
+                    user => user.Email == email,
+                    cancellationToken))
+            {
+                return false;
+            }
+
+            throw;
+        }
+    }
+}
+
 public sealed class AdministratorBootstrapper(
-    AuthDbContext context,
+    IAdministratorBootstrapStore store,
     IPasswordHasher passwordHasher,
     IConfiguration configuration)
 {
@@ -303,46 +370,13 @@ public sealed class AdministratorBootstrapper(
                 "Administrator bootstrap requires a non-empty Kukulcan:Auth:DefaultTenantId.");
         }
 
-        if (await context.Users.AnyAsync(user => user.Email == email, cancellationToken))
+        if (await store.ExistsByEmailAsync(email, cancellationToken))
         {
             return false;
         }
 
-        var userId = Guid.NewGuid();
-        var administrator = new AuthUserEntity
-        {
-            UserId = userId,
-            Email = email,
-            PasswordHash = passwordHasher.Hash(password),
-            TenantMemberships =
-            [
-                new AuthTenantMembershipEntity
-                {
-                    UserId = userId,
-                    TenantId = tenantId
-                }
-            ]
-        };
-
-        context.Users.Add(administrator);
-
-        try
-        {
-            await context.SaveChangesAsync(cancellationToken);
-            return true;
-        }
-        catch (DbUpdateException)
-        {
-            // The unique email index makes concurrent startup attempts idempotent.
-            context.ChangeTracker.Clear();
-
-            if (await context.Users.AnyAsync(user => user.Email == email, cancellationToken))
-            {
-                return false;
-            }
-
-            throw;
-        }
+        var passwordHash = passwordHasher.Hash(password);
+        return await store.TryCreateAsync(email, passwordHash, tenantId, cancellationToken);
     }
 }
 
