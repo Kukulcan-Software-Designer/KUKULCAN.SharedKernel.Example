@@ -252,7 +252,7 @@ internal sealed class AuthenticationTestApplicationFactory : WebApplicationFacto
 {
     public static readonly Guid TestUserId = Guid.Parse("a2b88298-d9ce-4bd0-8e37-3edb4d79b1c7");
     public static readonly Guid TestTenantId = Guid.Parse("e1f28b7a-bc2e-4e31-8d30-a9db32ce6498");
-    public const string AuthenticationTestApplicationFactory.TestEmail = "admin@example.test";
+    public const string TestEmail = "admin@example.test";
     public static readonly string ValidPassword = $"test-login-{Guid.NewGuid():N}!";
     public static readonly string BootstrapPassword = $"test-bootstrap-{Guid.NewGuid():N}!";
     public static readonly string SigningKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
