@@ -90,6 +90,12 @@ public sealed class AccessTokenIssuer(IConfiguration configuration, IClock clock
             ? configuredTenantId
             : (Guid?)null;
 
+        if (!defaultTenantId.HasValue
+            || !user.Tenants.Any(membership => membership.TenantId == defaultTenantId.Value))
+        {
+            throw new TenantAccessDeniedException();
+        }
+
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
@@ -105,10 +111,7 @@ public sealed class AccessTokenIssuer(IConfiguration configuration, IClock clock
             claims.Add(new Claim("role", "Admin"));
         }
 
-        if (defaultTenantId.HasValue)
-        {
-            claims.Add(new Claim("tenant_id", defaultTenantId.Value.ToString()));
-        }
+        claims.Add(new Claim("tenant_id", defaultTenantId.Value.ToString()));
 
         foreach (var tenant in user.Tenants.Select(item => item.TenantId).Distinct())
         {
@@ -145,6 +148,14 @@ public sealed class AccessTokenIssuer(IConfiguration configuration, IClock clock
     }
 }
 
+public sealed class TenantAccessDeniedException : InvalidOperationException
+{
+    public TenantAccessDeniedException()
+        : base("The authenticated user is not a member of the configured default tenant.")
+    {
+    }
+}
+
 public sealed class HttpTenantContext(
     IHttpContextAccessor httpContextAccessor,
     IConfiguration configuration) : ITenantContext
@@ -154,16 +165,18 @@ public sealed class HttpTenantContext(
         get
         {
             var principal = httpContextAccessor.HttpContext?.User;
-            if (principal?.Identity?.IsAuthenticated == true
-                && Guid.TryParse(principal.FindFirst("tenant_id")?.Value, out var claimTenantId)
-                && claimTenantId != Guid.Empty)
+            if (principal?.Identity?.IsAuthenticated == true)
             {
-                return claimTenantId;
+                return Guid.TryParse(principal.FindFirst("tenant_id")?.Value, out var claimTenantId)
+                       && claimTenantId != Guid.Empty
+                    ? claimTenantId
+                    : Guid.Empty;
             }
 
             return Guid.TryParse(
                 configuration["Kukulcan:Auth:DefaultTenantId"],
                 out var configuredTenantId)
+                && configuredTenantId != Guid.Empty
                 ? configuredTenantId
                 : Guid.Empty;
         }
@@ -294,9 +307,14 @@ public sealed class AuthDatabaseAdministratorBootstrapStore(AuthDbContext contex
     public Task<bool> ExistsByEmailAsync(
         string email,
         CancellationToken cancellationToken = default)
-        => context.Users.AnyAsync(
-            user => user.Email == email,
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        var canonicalEmail = CanonicalizeEmail(email);
+
+        return context.Users.AnyAsync(
+            user => user.Email == canonicalEmail,
             cancellationToken);
+    }
 
     public async Task<bool> TryCreateAsync(
         string email,
@@ -304,11 +322,19 @@ public sealed class AuthDatabaseAdministratorBootstrapStore(AuthDbContext contex
         Guid tenantId,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
+        if (tenantId == Guid.Empty)
+        {
+            throw new ArgumentException("A valid tenant identifier is required.", nameof(tenantId));
+        }
+
+        var canonicalEmail = CanonicalizeEmail(email);
         var userId = Guid.NewGuid();
         context.Users.Add(new AuthUserEntity
         {
             UserId = userId,
-            Email = email,
+            Email = canonicalEmail,
             PasswordHash = passwordHash,
             TenantMemberships =
             [
@@ -331,7 +357,7 @@ public sealed class AuthDatabaseAdministratorBootstrapStore(AuthDbContext contex
             context.ChangeTracker.Clear();
 
             if (await context.Users.AnyAsync(
-                    user => user.Email == email,
+                    user => user.Email == canonicalEmail,
                     cancellationToken))
             {
                 return false;
@@ -340,6 +366,9 @@ public sealed class AuthDatabaseAdministratorBootstrapStore(AuthDbContext contex
             throw;
         }
     }
+
+    private static string CanonicalizeEmail(string email)
+        => email.Trim().ToLowerInvariant();
 }
 
 public sealed class AdministratorBootstrapper(
