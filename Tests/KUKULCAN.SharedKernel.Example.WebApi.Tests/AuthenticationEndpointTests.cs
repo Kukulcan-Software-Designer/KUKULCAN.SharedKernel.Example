@@ -156,7 +156,7 @@ public sealed class AuthenticationEndpointTests
     }
 
     [Test]
-    public async Task PostLogin_WhenDefaultTenantIsNotOneOfTheUsersMemberships_ReturnsForbidden()
+    public async Task PostLogin_WhenCredentialsAreInvalidOrTenantAccessIsDenied_ReturnsIndistinguishableFailures()
     {
         var unauthorizedTenant = Guid.NewGuid();
         await using var factory = new AuthenticationTestApplicationFactory(
@@ -164,7 +164,14 @@ public sealed class AuthenticationEndpointTests
             userTenantId: AuthenticationTestApplicationFactory.TestTenantId);
         using var client = factory.CreateClient();
 
-        using var response = await client.PostAsJsonAsync(
+        using var invalidCredentialsResponse = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new
+            {
+                email = AuthenticationTestApplicationFactory.TestEmail,
+                password = "incorrect-password"
+            });
+        using var tenantAccessDeniedResponse = await client.PostAsJsonAsync(
             "/api/auth/login",
             new
             {
@@ -172,7 +179,17 @@ public sealed class AuthenticationEndpointTests
                 password = AuthenticationTestApplicationFactory.ValidPassword
             });
 
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+        Assert.That(invalidCredentialsResponse.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        Assert.That(tenantAccessDeniedResponse.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+
+        var invalidCredentials = await invalidCredentialsResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var tenantAccessDenied = await tenantAccessDeniedResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.That(tenantAccessDenied.GetProperty("status").GetInt32(),
+            Is.EqualTo(invalidCredentials.GetProperty("status").GetInt32()));
+        Assert.That(tenantAccessDenied.GetProperty("title").GetString(),
+            Is.EqualTo(invalidCredentials.GetProperty("title").GetString()));
+        Assert.That(tenantAccessDenied.GetProperty("detail").GetString(),
+            Is.EqualTo(invalidCredentials.GetProperty("detail").GetString()));
     }
 
     [Test]
