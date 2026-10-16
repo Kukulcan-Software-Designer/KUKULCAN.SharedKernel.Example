@@ -110,7 +110,19 @@ public static class AuthenticationEndpoints
         }
 
         var authenticatedUser = authenticationResult.Value;
-        var issuedToken = tokenIssuer.Issue(authenticatedUser, request.Password);
+        IssuedAccessToken issuedToken;
+        try
+        {
+            issuedToken = tokenIssuer.Issue(authenticatedUser, request.Password);
+        }
+        catch (TenantAccessDeniedException)
+        {
+            return HttpResults.Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: "Forbidden",
+                detail: "The authenticated user has no access to the configured tenant.");
+        }
+
         var response = new LoginResponse(
             issuedToken.Value,
             "Bearer",
