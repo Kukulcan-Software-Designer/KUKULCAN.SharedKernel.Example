@@ -1,4 +1,5 @@
 using KUKULCAN.SharedKernel.Example.Application.JsonEngine;
+using HttpResults = Microsoft.AspNetCore.Http.Results;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.JsonEngine;
 
@@ -22,11 +23,11 @@ public static class JsonEngineQueryEndpoints
     {
         try
         {
-            return Results.Ok(queryService.Execute(request.Document, request.Query));
+            return HttpResults.Ok(queryService.Execute(request.Document, request.Query));
         }
         catch (JsonEngineQueryValidationException exception)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
+            return HttpResults.ValidationProblem(new Dictionary<string, string[]>
             {
                 [exception.FieldName] = new[] { exception.Message }
             });
