@@ -14,7 +14,7 @@ partial class ExampleDbContextModelSnapshot : ModelSnapshot
     {
         modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
         modelBuilder.HasAnnotation("Relational:MaxIdentifierLength", 64);
-        ExampleDbContextModelConfiguration.Configure(modelBuilder);
+        ExampleDbContextModelConfiguration.ConfigureForProvider(modelBuilder, DatabaseProvider.MySql);
         modelBuilder.ApplySoftDeleteFilter();
         modelBuilder.ApplyTenantFilter(new SnapshotTenantContext());
     }
