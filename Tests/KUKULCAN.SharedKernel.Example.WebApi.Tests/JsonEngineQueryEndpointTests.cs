@@ -1,7 +1,7 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.Tests;
 
@@ -11,8 +11,8 @@ public sealed class JsonEngineQueryEndpointTests
     [Test]
     public async Task PostJsonEngineQuery_WithFilterProjectionOrderingAndLimit_ReturnsMatchingRows()
     {
-        await using var factory = new WebApplicationFactory<Program>();
-        using var client = factory.CreateClient();
+        await using var factory = new AuthenticationTestApplicationFactory();
+        using var client = await CreateAuthenticatedClientAsync(factory);
 
         using var response = await client.PostAsJsonAsync(
             "/api/examples/json-engine/query",
@@ -59,8 +59,8 @@ public sealed class JsonEngineQueryEndpointTests
     [TestCase("SELECT id FROM $.items[*]")]
     public async Task PostJsonEngineQuery_WithInvalidOrUnboundedQuery_ReturnsBadRequest(string query)
     {
-        await using var factory = new WebApplicationFactory<Program>();
-        using var client = factory.CreateClient();
+        await using var factory = new AuthenticationTestApplicationFactory();
+        using var client = await CreateAuthenticatedClientAsync(factory);
 
         using var response = await client.PostAsJsonAsync(
             "/api/examples/json-engine/query",
@@ -82,8 +82,8 @@ public sealed class JsonEngineQueryEndpointTests
     [Test]
     public async Task PostJsonEngineQuery_WithScalarDocument_ReturnsBadRequest()
     {
-        await using var factory = new WebApplicationFactory<Program>();
-        using var client = factory.CreateClient();
+        await using var factory = new AuthenticationTestApplicationFactory();
+        using var client = await CreateAuthenticatedClientAsync(factory);
 
         using var response = await client.PostAsJsonAsync(
             "/api/examples/json-engine/query",
@@ -99,12 +99,32 @@ public sealed class JsonEngineQueryEndpointTests
     [Test]
     public async Task PostJsonEngineQuery_WithMalformedJson_ReturnsBadRequest()
     {
-        await using var factory = new WebApplicationFactory<Program>();
-        using var client = factory.CreateClient();
+        await using var factory = new AuthenticationTestApplicationFactory();
+        using var client = await CreateAuthenticatedClientAsync(factory);
         using var content = new StringContent("{", System.Text.Encoding.UTF8, "application/json");
 
         using var response = await client.PostAsync("/api/examples/json-engine/query", content);
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
+
+    private static async Task<HttpClient> CreateAuthenticatedClientAsync(
+        AuthenticationTestApplicationFactory factory)
+    {
+        var client = factory.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new
+            {
+                email = AuthenticationTestApplicationFactory.TestEmail,
+                password = AuthenticationTestApplicationFactory.ValidPassword
+            });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        using var payload = await response.Content.ReadFromJsonAsync<JsonDocument>();
+        var token = payload!.RootElement.GetProperty("accessToken").GetString();
+        Assert.That(token, Is.Not.Null.And.Not.Empty);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return client;
     }
 }
