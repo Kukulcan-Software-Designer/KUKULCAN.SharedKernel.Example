@@ -4,7 +4,7 @@
 
 ## Design objective
 
-The Example must demonstrate reusable persistence capabilities from `KUKULCAN.SharedKernel.Database`, not fork or reproduce that infrastructure. Business entities use schema `Example`. The separate `DatabaseIntegrationRecord` used by the initial integration sample remains in schema `Sample`.
+The Example must demonstrate reusable persistence capabilities from `KUKULCAN.SharedKernel.Database`, not fork or reproduce that infrastructure. All owned tables, including `DatabaseIntegrationRecord`, use schema `Example`.
 
 ## Configuration contract
 
