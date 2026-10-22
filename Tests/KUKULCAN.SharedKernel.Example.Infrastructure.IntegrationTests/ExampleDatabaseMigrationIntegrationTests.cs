@@ -4,6 +4,7 @@ using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.DomainEvents.Abstractions;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
@@ -88,10 +89,15 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
         await context.Database.MigrateAsync();
         context.ChangeTracker.Clear();
 
+        var clientPreserved = await context.Clients.AsNoTracking().AnyAsync(entity => entity.Id == client.Id);
+        var integrationRecordPreserved = await context.DatabaseIntegrationRecords
+            .AsNoTracking()
+            .AnyAsync(entity => entity.Id == integrationRecord.Id);
+
         Assert.Multiple(() =>
         {
-            Assert.That(context.Clients.AsNoTracking().AnyAsync(entity => entity.Id == client.Id).GetAwaiter().GetResult(), Is.True);
-            Assert.That(context.DatabaseIntegrationRecords.AsNoTracking().AnyAsync(entity => entity.Id == integrationRecord.Id).GetAwaiter().GetResult(), Is.True);
+            Assert.That(clientPreserved, Is.True);
+            Assert.That(integrationRecordPreserved, Is.True);
         });
     }
 
