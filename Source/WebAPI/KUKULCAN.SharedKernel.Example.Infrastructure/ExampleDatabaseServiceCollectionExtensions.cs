@@ -1,3 +1,4 @@
+using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.Database.Extensions;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
@@ -17,6 +18,22 @@ public static class ExampleDatabaseServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+
+        var databaseSection = configuration.GetSection(KukulcanDatabaseOptions.SectionKey);
+        var providerValue = databaseSection["Provider"];
+        if (string.IsNullOrWhiteSpace(providerValue)
+            || !Enum.TryParse<DatabaseProvider>(providerValue, ignoreCase: true, out var provider)
+            || !Enum.IsDefined(provider))
+        {
+            throw new InvalidOperationException(
+                "Database initialization requires a supported provider configured through KUKULCAN__DATABASE__PROVIDER.");
+        }
+
+        if (string.IsNullOrWhiteSpace(databaseSection["ConnectionString"]))
+        {
+            throw new InvalidOperationException(
+                "Database initialization requires a connection string configured through KUKULCAN__DATABASE__CONNECTIONSTRING.");
+        }
 
         services.AddKukulcanDbContext<ExampleDbContext>(configuration);
 
