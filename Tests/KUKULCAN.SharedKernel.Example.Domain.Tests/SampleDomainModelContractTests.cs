@@ -27,6 +27,15 @@ public sealed class SampleDomainModelContractTests
             $"The Sample domain entity '{entityName}' must be a class.");
     }
 
+    [TestCase("Client", "TenantId")]
+    [TestCase("Provider", "TenantId")]
+    [TestCase("Product", "TenantId")]
+    [TestCase("Warehouse", "TenantId")]
+    [TestCase("WarehouseStock", "TenantId")]
+    [TestCase("Invoice", "TenantId")]
+    [TestCase("InvoiceLine", "TenantId")]
+    [TestCase("ProdInvoice", "TenantId")]
+    [TestCase("ProdInvoiceLine", "TenantId")]
     [TestCase("Client", "Name")]
     [TestCase("Client", "City")]
     [TestCase("Client", "State")]
