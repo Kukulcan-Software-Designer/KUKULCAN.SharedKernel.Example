@@ -39,7 +39,7 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
     }
 
     [Test]
-    public async Task PostgreSqlMigrations_CreateBothOwnedSchemasAndCanBeReappliedWithoutLosingData()
+    public async Task PostgreSqlMigrations_InitializeExampleSchemaAndCanBeReappliedWithoutLosingData()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_migrations_integration")
