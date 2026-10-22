@@ -280,6 +280,13 @@ public partial class InitialExampleSchema : Migration
             schema: "Example", table: "WarehouseStocks", columns: new[] { "WarehouseId", "ProductId" }, unique: true);
 
         migrationBuilder.CreateIndex(
+            name: "IX_WarehouseStocks_TenantId_ProductId",
+            schema: "Example", table: "WarehouseStocks", columns: new[] { "TenantId", "ProductId" });
+        migrationBuilder.CreateIndex(
+            name: "IX_WarehouseStocks_TenantId_WarehouseId",
+            schema: "Example", table: "WarehouseStocks", columns: new[] { "TenantId", "WarehouseId" });
+
+        migrationBuilder.CreateIndex(
             name: "IX_Invoices_TenantId_InvoiceNumber",
             schema: "Example", table: "Invoices", columns: new[] { "TenantId", "InvoiceNumber" }, unique: true);
         migrationBuilder.CreateIndex(
@@ -289,6 +296,9 @@ public partial class InitialExampleSchema : Migration
         migrationBuilder.CreateIndex(
             name: "IX_InvoiceLines_TenantId_InvoiceId_LineNumber",
             schema: "Example", table: "InvoiceLines", columns: new[] { "TenantId", "InvoiceId", "LineNumber" }, unique: true);
+        migrationBuilder.CreateIndex(
+            name: "IX_InvoiceLines_TenantId_ProductId",
+            schema: "Example", table: "InvoiceLines", columns: new[] { "TenantId", "ProductId" });
 
         migrationBuilder.CreateIndex(
             name: "IX_ProdInvoices_TenantId_InvoiceNumber",
@@ -300,6 +310,9 @@ public partial class InitialExampleSchema : Migration
         migrationBuilder.CreateIndex(
             name: "IX_ProdInvoiceLines_TenantId_ProdInvoiceId_LineNumber",
             schema: "Example", table: "ProdInvoiceLines", columns: new[] { "TenantId", "ProdInvoiceId", "LineNumber" }, unique: true);
+        migrationBuilder.CreateIndex(
+            name: "IX_ProdInvoiceLines_TenantId_ProductId",
+            schema: "Example", table: "ProdInvoiceLines", columns: new[] { "TenantId", "ProductId" });
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
