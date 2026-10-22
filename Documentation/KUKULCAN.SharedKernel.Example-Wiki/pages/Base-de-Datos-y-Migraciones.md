@@ -4,7 +4,7 @@
 
 ## Objetivo de diseño
 
-El Example debe demostrar las capacidades reutilizables de persistencia de `KUKULCAN.SharedKernel.Database`, sin crear una bifurcación ni reproducir esa infraestructura. El esquema objetivo es `Sample`.
+El Example debe demostrar las capacidades reutilizables de persistencia de `KUKULCAN.SharedKernel.Database`, sin crear una bifurcación ni reproducir esa infraestructura. Las entidades de negocio usan el esquema `Example`. El registro auxiliar `DatabaseIntegrationRecord`, usado en la demostración inicial de integración, permanece en el esquema `Sample`.
 
 ## Contrato de configuración
 
@@ -31,7 +31,7 @@ Son objetivos de validación, no una afirmación de que el Example funcione actu
 
 1. Definir las relaciones y restricciones de las entidades en el Issue del modelo.
 2. Usar las capacidades de migración e inicialización que realmente exponga el paquete Database.
-3. Generar migraciones versionadas para el esquema `Sample` y los proveedores seleccionados, respetando las convenciones del paquete.
+3. Generar migraciones versionadas para las entidades del esquema `Example` y los proveedores seleccionados, respetando las convenciones del paquete.
 4. Verificar que se puede inicializar una base de datos nueva desde cero.
 5. Verificar que la aplicación repetida y las rutas de actualización no recrean ni corrompen datos.
 6. Probar claves, claves foráneas, índices, precisión decimal, comparación de cadenas, borrado lógico y conservación del histórico de ventas/compras.
