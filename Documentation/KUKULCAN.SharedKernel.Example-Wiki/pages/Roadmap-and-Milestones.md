@@ -28,7 +28,7 @@ This roadmap reflects the six project Milestones agreed for the 22-Issue backlog
 ## M3 — Sample Domain and Database Providers
 **Due date:** 13 November 2026
 
-**Purpose:** Define the domain model and schema `Sample`, make migrations repeatable, and validate PostgreSQL, SQL Server, and MySQL independently where supported.
+**Purpose:** Define the Sample domain model in schema `Example`, make migrations repeatable, and validate PostgreSQL, SQL Server, and MySQL independently where supported.
 
 **Issues:**
 - [#7 — Define the Sample domain model and database schema](https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Example/issues/7)
