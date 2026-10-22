@@ -1,6 +1,7 @@
 using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 
@@ -199,8 +200,7 @@ public static class ExampleDbContextModelConfiguration
     public static void ConfigureForProvider(ModelBuilder modelBuilder, DatabaseProvider provider)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
-        Configure(modelBuilder);
-
+        modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
         modelBuilder.HasAnnotation(
             "Relational:MaxIdentifierLength",
             provider switch
@@ -210,6 +210,22 @@ public static class ExampleDbContextModelConfiguration
                 DatabaseProvider.MySql => 64,
                 _ => throw new NotSupportedException($"Database provider '{provider}' is not supported.")
             });
+
+        switch (provider)
+        {
+            case DatabaseProvider.PostgresSql:
+                NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+                break;
+            case DatabaseProvider.SqlServer:
+                SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+                break;
+            case DatabaseProvider.MySql:
+                break;
+            default:
+                throw new NotSupportedException($"Database provider '{provider}' is not supported.");
+        }
+
+        Configure(modelBuilder);
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes().ToArray())
         {
