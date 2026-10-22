@@ -65,14 +65,14 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
             .GetDifferences(snapshotModel.GetRelationalModel(), currentModel.GetRelationalModel());
         if (modelDifferences.Count > 0)
         {
-            TestContext.WriteLine("Pending Example model differences:");
+            TestContext.Out.WriteLine("Pending Example model differences:");
             foreach (var operation in modelDifferences)
             {
                 var details = operation.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
                     .Where(property => property.Name is "Name" or "Table" or "Schema" or "ColumnType"
                         or "OldColumnType" or "IsNullable" or "MaxLength" or "Precision" or "Scale")
                     .Select(property => $"{property.Name}={property.GetValue(operation)}");
-                TestContext.WriteLine($"{operation.GetType().Name}: {string.Join(", ", details)}");
+                TestContext.Out.WriteLine($"{operation.GetType().Name}: {string.Join(", ", details)}");
             }
         }
 
