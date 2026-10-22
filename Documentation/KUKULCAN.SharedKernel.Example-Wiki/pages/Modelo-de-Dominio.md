@@ -34,7 +34,7 @@ Las líneas de venta y de compra son tipos separados porque pertenecen a documen
 
 ## Mapeo y restricciones de base de datos
 
-- Todas las entidades de negocio se mapean al esquema `Sample` con un nombre explícito de tabla.
+- Todas las entidades de negocio se mapean al esquema `Example` con un nombre explícito de tabla.
 - Las claves primarias son valores GUID `Id`. Las claves alternativas compuestas (`TenantId`, `Id`) permiten relaciones seguras entre tenants.
 - `WarehouseStock` tiene un índice único sobre `(WarehouseId, ProductId)`.
 - Los códigos de producto y los números de documentos de venta/compra son únicos por tenant.
