@@ -62,13 +62,14 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
             """
             SELECT COUNT(*)::integer AS "Value"
             FROM information_schema.tables
-            WHERE (table_schema = 'Example' AND table_name IN (
+            WHERE table_schema = 'Example'
+              AND table_name IN (
                 'Clients', 'Providers', 'Products', 'Warehouses', 'WarehouseStocks',
-                'Invoices', 'InvoiceLines', 'ProdInvoices', 'ProdInvoiceLines'))
-               OR (table_schema = 'Sample' AND table_name = 'DatabaseIntegrationRecords')
+                'Invoices', 'InvoiceLines', 'ProdInvoices', 'ProdInvoiceLines',
+                'DatabaseIntegrationRecords')
             """).SingleAsync();
 
-        Assert.That(expectedTables, Is.EqualTo(10), "All business tables must be in Example and the integration demo table must remain in Sample.");
+        Assert.That(expectedTables, Is.EqualTo(10), "All ten Example-owned tables must be initialized in schema Example.");
 
         var client = new Client
         {
