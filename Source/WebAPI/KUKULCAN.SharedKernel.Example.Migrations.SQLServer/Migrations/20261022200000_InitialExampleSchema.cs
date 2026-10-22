@@ -1,4 +1,5 @@
 using KUKULCAN.SharedKernel.Database.Abstractions;
+using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.Database.Extensions;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -319,8 +320,8 @@ public partial class InitialExampleSchema : Migration
     protected override void BuildTargetModel(ModelBuilder modelBuilder)
     {
         modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
-        modelBuilder.HasAnnotation("Relational:MaxIdentifierLength", 128);
-        ExampleDbContextModelConfiguration.Configure(modelBuilder);
+        SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+        ExampleDbContextModelConfiguration.ConfigureForProvider(modelBuilder, DatabaseProvider.SqlServer);
         modelBuilder.ApplySoftDeleteFilter();
         modelBuilder.ApplyTenantFilter(new MigrationTenantContext());
     }
