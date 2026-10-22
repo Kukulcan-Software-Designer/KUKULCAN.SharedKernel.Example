@@ -56,7 +56,7 @@ public sealed class ExampleDbContext(
 
         modelBuilder.Entity<Client>(entity =>
         {
-            entity.ToTable("Clients", "Sample");
+            entity.ToTable("Clients", "Example");
             entity.HasKey(client => client.Id);
             entity.HasAlternateKey(client => new { client.TenantId, client.Id });
             entity.Property(client => client.Id).ValueGeneratedNever();
@@ -76,7 +76,7 @@ public sealed class ExampleDbContext(
 
         modelBuilder.Entity<Provider>(entity =>
         {
-            entity.ToTable("Providers", "Sample");
+            entity.ToTable("Providers", "Example");
             entity.HasKey(provider => provider.Id);
             entity.HasAlternateKey(provider => new { provider.TenantId, provider.Id });
             entity.Property(provider => provider.Id).ValueGeneratedNever();
@@ -96,7 +96,7 @@ public sealed class ExampleDbContext(
 
         modelBuilder.Entity<Product>(entity =>
         {
-            entity.ToTable("Products", "Sample");
+            entity.ToTable("Products", "Example");
             entity.HasKey(product => product.Id);
             entity.HasAlternateKey(product => new { product.TenantId, product.Id });
             entity.Property(product => product.Id).ValueGeneratedNever();
@@ -124,7 +124,7 @@ public sealed class ExampleDbContext(
 
         modelBuilder.Entity<Warehouse>(entity =>
         {
-            entity.ToTable("Warehouses", "Sample");
+            entity.ToTable("Warehouses", "Example");
             entity.HasKey(warehouse => warehouse.Id);
             entity.HasAlternateKey(warehouse => new { warehouse.TenantId, warehouse.Id });
             entity.Property(warehouse => warehouse.Id).ValueGeneratedNever();
@@ -142,7 +142,7 @@ public sealed class ExampleDbContext(
 
         modelBuilder.Entity<WarehouseStock>(entity =>
         {
-            entity.ToTable("WarehouseStocks", "Sample");
+            entity.ToTable("WarehouseStocks", "Example");
             entity.HasKey(stock => stock.Id);
             entity.Property(stock => stock.Id).ValueGeneratedNever();
             entity.Property(stock => stock.Quantity).HasPrecision(18, 3);
@@ -151,7 +151,7 @@ public sealed class ExampleDbContext(
 
         modelBuilder.Entity<Invoice>(entity =>
         {
-            entity.ToTable("Invoices", "Sample");
+            entity.ToTable("Invoices", "Example");
             entity.HasKey(invoice => invoice.Id);
             entity.HasAlternateKey(invoice => new { invoice.TenantId, invoice.Id });
             entity.Property(invoice => invoice.Id).ValueGeneratedNever();
@@ -169,7 +169,7 @@ public sealed class ExampleDbContext(
 
         modelBuilder.Entity<InvoiceLine>(entity =>
         {
-            entity.ToTable("InvoiceLines", "Sample");
+            entity.ToTable("InvoiceLines", "Example");
             entity.HasKey(line => line.Id);
             entity.Property(line => line.Id).ValueGeneratedNever();
             entity.Property(line => line.ProductCode).HasMaxLength(64).IsRequired();
@@ -186,7 +186,7 @@ public sealed class ExampleDbContext(
 
         modelBuilder.Entity<ProdInvoice>(entity =>
         {
-            entity.ToTable("ProdInvoices", "Sample");
+            entity.ToTable("ProdInvoices", "Example");
             entity.HasKey(invoice => invoice.Id);
             entity.HasAlternateKey(invoice => new { invoice.TenantId, invoice.Id });
             entity.Property(invoice => invoice.Id).ValueGeneratedNever();
@@ -204,7 +204,7 @@ public sealed class ExampleDbContext(
 
         modelBuilder.Entity<ProdInvoiceLine>(entity =>
         {
-            entity.ToTable("ProdInvoiceLines", "Sample");
+            entity.ToTable("ProdInvoiceLines", "Example");
             entity.HasKey(line => line.Id);
             entity.Property(line => line.Id).ValueGeneratedNever();
             entity.Property(line => line.ProductCode).HasMaxLength(64).IsRequired();
