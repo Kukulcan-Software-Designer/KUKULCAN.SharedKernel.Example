@@ -3,6 +3,7 @@ using KUKULCAN.SharedKernel.Example.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
 
@@ -34,5 +35,63 @@ public sealed class ExampleDatabaseStartupRegistrationTests
             () => provider.GetServices<IHostedService>().ToArray(),
             Throws.Nothing,
             "Example must integrate with KUKULCAN.SharedKernel.Database 1.1.0 without resolving a scoped initializer from the root provider.");
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void AddExampleDatabase_UsesDatabaseProviderAndConnectionStringFromEnvironmentVariables()
+    {
+        const string providerKey = "KUKULCAN__DATABASE__PROVIDER";
+        const string connectionStringKey = "KUKULCAN__DATABASE__CONNECTIONSTRING";
+        const string autoMigrateKey = "KUKULCAN__DATABASE__MIGRATION__AUTOMIGRATEONSTARTUP";
+        const string seedDataKey = "KUKULCAN__DATABASE__MIGRATION__SEEDDATAONSTARTUP";
+
+        var originalValues = new Dictionary<string, string?>
+        {
+            [providerKey] = Environment.GetEnvironmentVariable(providerKey),
+            [connectionStringKey] = Environment.GetEnvironmentVariable(connectionStringKey),
+            [autoMigrateKey] = Environment.GetEnvironmentVariable(autoMigrateKey),
+            [seedDataKey] = Environment.GetEnvironmentVariable(seedDataKey)
+        };
+
+        try
+        {
+            Environment.SetEnvironmentVariable(providerKey, nameof(DatabaseProvider.MySql));
+            Environment.SetEnvironmentVariable(
+                connectionStringKey,
+                "Server=localhost;Database=example-tests;User=test;Password=test");
+            Environment.SetEnvironmentVariable(autoMigrateKey, "false");
+            Environment.SetEnvironmentVariable(seedDataKey, "false");
+
+            IConfiguration configuration = new ConfigurationBuilder()
+                .AddEnvironmentVariables()
+                .Build();
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddExampleDatabase(configuration);
+
+            using var serviceProvider = services.BuildServiceProvider(
+                new ServiceProviderOptions { ValidateScopes = true });
+
+            var options = serviceProvider
+                .GetRequiredService<IOptions<KukulcanDatabaseOptions>>()
+                .Value;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(options.Provider, Is.EqualTo(DatabaseProvider.MySql));
+                Assert.That(
+                    options.ConnectionString,
+                    Is.EqualTo("Server=localhost;Database=example-tests;User=test;Password=test"));
+            });
+        }
+        finally
+        {
+            foreach (var (key, value) in originalValues)
+            {
+                Environment.SetEnvironmentVariable(key, value);
+            }
+        }
     }
 }
