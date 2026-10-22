@@ -4,7 +4,7 @@
 
 ## Objetivo de diseño
 
-El Example debe demostrar las capacidades reutilizables de persistencia de `KUKULCAN.SharedKernel.Database`, sin crear una bifurcación ni reproducir esa infraestructura. Las entidades de negocio usan el esquema `Example`. El registro auxiliar `DatabaseIntegrationRecord`, usado en la demostración inicial de integración, permanece en el esquema `Sample`.
+El Example debe demostrar las capacidades reutilizables de persistencia de `KUKULCAN.SharedKernel.Database`, sin crear una bifurcación ni reproducir esa infraestructura. Todas las tablas propias, incluido `DatabaseIntegrationRecord`, usan el esquema `Example`.
 
 ## Contrato de configuración
 
