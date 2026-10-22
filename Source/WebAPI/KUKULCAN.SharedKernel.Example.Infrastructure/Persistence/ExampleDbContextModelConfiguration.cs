@@ -1,3 +1,4 @@
+using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -190,5 +191,99 @@ public static class ExampleDbContextModelConfiguration
                 .OnDelete(DeleteBehavior.Restrict);
         });
     
+    }    
+    /// <summary>
+    /// Configures provider-specific column types and identifier metadata so runtime models,
+    /// migration targets, and snapshots remain aligned for the same database engine.
+    /// </summary>
+    public static void ConfigureForProvider(ModelBuilder modelBuilder, DatabaseProvider provider)
+    {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+        Configure(modelBuilder);
+
+        modelBuilder.HasAnnotation(
+            "Relational:MaxIdentifierLength",
+            provider switch
+            {
+                DatabaseProvider.PostgresSql => 63,
+                DatabaseProvider.SqlServer => 128,
+                DatabaseProvider.MySql => 64,
+                _ => throw new NotSupportedException($"Database provider '{provider}' is not supported.")
+            });
+
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes().ToArray())
+        {
+            var entity = modelBuilder.Entity(entityType.ClrType);
+            foreach (var property in entityType.GetProperties())
+            {
+                entity.Property(property.Name).HasColumnType(GetStoreType(property, provider));
+            }
+        }
     }
+
+    private static string GetStoreType(Microsoft.EntityFrameworkCore.Metadata.IProperty property, DatabaseProvider provider)
+    {
+        var clrType = Nullable.GetUnderlyingType(property.ClrType) ?? property.ClrType;
+
+        if (clrType == typeof(Guid))
+        {
+            return provider switch
+            {
+                DatabaseProvider.PostgresSql => "uuid",
+                DatabaseProvider.SqlServer => "uniqueidentifier",
+                DatabaseProvider.MySql => "char(36)",
+                _ => throw new NotSupportedException()
+            };
+        }
+
+        if (clrType == typeof(string))
+        {
+            var length = property.GetMaxLength();
+            return provider switch
+            {
+                DatabaseProvider.PostgresSql => length.HasValue ? $"character varying({length.Value})" : "text",
+                DatabaseProvider.SqlServer => length.HasValue ? $"nvarchar({length.Value})" : "nvarchar(max)",
+                DatabaseProvider.MySql => length.HasValue ? $"varchar({length.Value})" : "longtext",
+                _ => throw new NotSupportedException()
+            };
+        }
+
+        if (clrType == typeof(bool))
+        {
+            return provider switch
+            {
+                DatabaseProvider.PostgresSql => "boolean",
+                DatabaseProvider.SqlServer => "bit",
+                DatabaseProvider.MySql => "tinyint(1)",
+                _ => throw new NotSupportedException()
+            };
+        }
+
+        if (clrType == typeof(DateTimeOffset))
+        {
+            return provider switch
+            {
+                DatabaseProvider.PostgresSql => "timestamp with time zone",
+                DatabaseProvider.SqlServer => "datetimeoffset",
+                DatabaseProvider.MySql => "datetime(6)",
+                _ => throw new NotSupportedException()
+            };
+        }
+
+        if (clrType == typeof(int))
+        {
+            return provider == DatabaseProvider.PostgresSql ? "integer" : "int";
+        }
+
+        if (clrType == typeof(decimal))
+        {
+            var precision = property.GetPrecision() ?? 18;
+            var scale = property.GetScale() ?? 2;
+            var storeType = provider == DatabaseProvider.PostgresSql ? "numeric" : "decimal";
+            return $"{storeType}({precision},{scale})";
+        }
+
+        throw new NotSupportedException($"No Example migration store type is defined for CLR type '{clrType}'.");
+    }
+
 }
