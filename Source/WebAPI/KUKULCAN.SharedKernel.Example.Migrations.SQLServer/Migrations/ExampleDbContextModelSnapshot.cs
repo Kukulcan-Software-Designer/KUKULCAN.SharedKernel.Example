@@ -11,16 +11,6 @@ namespace KUKULCAN.SharedKernel.Example.Migrations.SQLServer.Migrations;
 partial class ExampleDbContextModelSnapshot : ModelSnapshot
 {
     protected override void BuildModel(ModelBuilder modelBuilder)
-    {
-        modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
-        SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-        ExampleDbContextModelConfiguration.ConfigureForProvider(modelBuilder, DatabaseProvider.SqlServer);
-        modelBuilder.ApplySoftDeleteFilter();
-        modelBuilder.ApplyTenantFilter(new SnapshotTenantContext());
-    }
+        => ExampleSchemaV1Model.Configure(modelBuilder);
 
-    private sealed class SnapshotTenantContext : ITenantContext
-    {
-        public Guid TenantId => Guid.Empty;
-    }
 }
