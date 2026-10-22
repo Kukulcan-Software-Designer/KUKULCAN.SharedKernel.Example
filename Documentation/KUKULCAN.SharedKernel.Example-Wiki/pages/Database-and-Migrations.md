@@ -4,7 +4,7 @@
 
 ## Design objective
 
-The Example must demonstrate reusable persistence capabilities from `KUKULCAN.SharedKernel.Database`, not fork or reproduce that infrastructure. The target schema is `Sample`.
+The Example must demonstrate reusable persistence capabilities from `KUKULCAN.SharedKernel.Database`, not fork or reproduce that infrastructure. Business entities use schema `Example`. The separate `DatabaseIntegrationRecord` used by the initial integration sample remains in schema `Sample`.
 
 ## Configuration contract
 
@@ -31,7 +31,7 @@ These are targets for validation, not a claim that the Example currently works w
 
 1. Define entity relationships and constraints in the domain/model issue.
 2. Use the migration and initialization capabilities that the Database package actually exposes.
-3. Generate versioned migrations for schema `Sample` and the selected provider(s), respecting package conventions.
+3. Generate versioned migrations for schema `Example` business entities and the selected provider(s), respecting package conventions.
 4. Verify a fresh database can be initialized from an empty state.
 5. Verify repeat application and upgrade paths do not recreate or corrupt data.
 6. Test keys, foreign keys, indexes, decimal precision, string comparison behavior, soft deletion, and preserved sales/purchase history.
