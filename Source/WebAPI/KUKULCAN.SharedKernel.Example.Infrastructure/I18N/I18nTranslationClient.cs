@@ -53,7 +53,7 @@ public sealed class I18nTranslationClient(HttpClient httpClient)
 
             return translation;
         }
-        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             throw new TimeoutException("The I18N service request timed out.", exception);
         }
