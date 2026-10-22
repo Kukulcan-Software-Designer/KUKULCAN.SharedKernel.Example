@@ -100,7 +100,9 @@ public sealed class SampleModelMappingTests
         var dependent = RequireEntity(dependentName);
         var relationship = dependent.GetForeignKeys().SingleOrDefault(foreignKey =>
             foreignKey.Properties.Select(property => property.Name)
-                .SequenceEqual(new[] { foreignKeyProperty })
+                .SequenceEqual(new[] { "TenantId", foreignKeyProperty })
+            && foreignKey.PrincipalKey.Properties.Select(property => property.Name)
+                .SequenceEqual(new[] { "TenantId", "Id" })
             && foreignKey.PrincipalEntityType.ClrType.FullName == FullEntityName(principalName));
 
         Assert.That(relationship, Is.Not.Null,
@@ -123,7 +125,9 @@ public sealed class SampleModelMappingTests
         var dependent = RequireEntity(dependentName);
         var relationship = dependent.GetForeignKeys().SingleOrDefault(foreignKey =>
             foreignKey.Properties.Select(property => property.Name)
-                .SequenceEqual(new[] { foreignKeyProperty })
+                .SequenceEqual(new[] { "TenantId", foreignKeyProperty })
+            && foreignKey.PrincipalKey.Properties.Select(property => property.Name)
+                .SequenceEqual(new[] { "TenantId", "Id" })
             && foreignKey.PrincipalEntityType.ClrType.FullName == FullEntityName(principalName));
 
         Assert.That(relationship, Is.Not.Null,
