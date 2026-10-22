@@ -38,6 +38,7 @@ public static class ExampleDbContextModelConfiguration
             entity.Property(client => client.State).HasMaxLength(120);
             entity.Property(client => client.PostalCode).HasMaxLength(32);
             entity.Property(client => client.IsDeleted).HasDefaultValue(false);
+            entity.Property(client => client.DeletedOn);
             entity.HasIndex(client => new { client.TenantId, client.Name });
             entity.HasIndex(client => new { client.TenantId, client.City, client.State, client.PostalCode });
             entity.HasMany(client => client.Invoices)
@@ -58,6 +59,7 @@ public static class ExampleDbContextModelConfiguration
             entity.Property(provider => provider.State).HasMaxLength(120);
             entity.Property(provider => provider.PostalCode).HasMaxLength(32);
             entity.Property(provider => provider.IsDeleted).HasDefaultValue(false);
+            entity.Property(provider => provider.DeletedOn);
             entity.HasIndex(provider => new { provider.TenantId, provider.Name });
             entity.HasIndex(provider => new { provider.TenantId, provider.City, provider.State, provider.PostalCode });
             entity.HasMany(provider => provider.ProdInvoices)
@@ -120,6 +122,8 @@ public static class ExampleDbContextModelConfiguration
             entity.Property(stock => stock.Id).ValueGeneratedNever();
             entity.Property(stock => stock.Quantity).HasPrecision(18, 3);
             entity.HasIndex(stock => new { stock.WarehouseId, stock.ProductId }).IsUnique();
+            entity.HasIndex(stock => new { stock.TenantId, stock.ProductId });
+            entity.HasIndex(stock => new { stock.TenantId, stock.WarehouseId });
         });
 
         modelBuilder.Entity<Invoice>(entity =>
@@ -150,6 +154,7 @@ public static class ExampleDbContextModelConfiguration
             entity.Property(line => line.Quantity).HasPrecision(18, 3);
             entity.Property(line => line.UnitPrice).HasPrecision(18, 2);
             entity.HasIndex(line => new { line.TenantId, line.InvoiceId, line.LineNumber }).IsUnique();
+            entity.HasIndex(line => new { line.TenantId, line.ProductId });
             entity.HasOne(line => line.Product)
                 .WithMany(product => product.InvoiceLines)
                 .HasForeignKey(line => new { line.TenantId, line.ProductId })
@@ -185,6 +190,7 @@ public static class ExampleDbContextModelConfiguration
             entity.Property(line => line.Quantity).HasPrecision(18, 3);
             entity.Property(line => line.UnitPrice).HasPrecision(18, 2);
             entity.HasIndex(line => new { line.TenantId, line.ProdInvoiceId, line.LineNumber }).IsUnique();
+            entity.HasIndex(line => new { line.TenantId, line.ProductId });
             entity.HasOne(line => line.Product)
                 .WithMany(product => product.ProdInvoiceLines)
                 .HasForeignKey(line => new { line.TenantId, line.ProductId })
