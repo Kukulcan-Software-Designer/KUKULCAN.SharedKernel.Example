@@ -31,8 +31,8 @@ This roadmap reflects the six project Milestones agreed for the 22-Issue backlog
 **Purpose:** Define the Sample domain model in schema `Example`, make migrations repeatable, and validate PostgreSQL, SQL Server, and MySQL independently where supported.
 
 **Issues:**
-- [#7 — Define the Sample domain model and database schema](https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Example/issues/7)
-- [#17 — Implement database migrations and Sample schema initialization](https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Example/issues/17)
+- [#7 — Define the Sample domain model in the Example database schema](https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Example/issues/7)
+- [#17 — Implement database migrations and Example schema initialization](https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Example/issues/17)
 - [#20 — Validate PostgreSQL persistence](https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Example/issues/20)
 - [#21 — Validate Microsoft SQL Server persistence](https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Example/issues/21)
 - [#22 — Validate MySQL persistence](https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Example/issues/22)
