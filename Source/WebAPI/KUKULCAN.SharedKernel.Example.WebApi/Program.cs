@@ -7,6 +7,10 @@ using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.Example.Infrastructure;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
+using KUKULCAN.SharedKernel.Example.Application.JsonEngine;
+using KUKULCAN.SharedKernel.Example.WebApi.JsonEngine;
+using KUKULCAN.SharedKernel.JsonEngine.SQL;
+using KUKULCAN.SharedKernel.JsonEngine.SQL.Interfaces;
 using KUKULCAN.SharedKernel.Example.WebApi.Authentication;
 using KUKULCAN.SharedKernel.Results;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -34,6 +38,8 @@ if (!string.IsNullOrWhiteSpace(bootstrapPassword)
 }
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<IJsonSqlEngine, JsonSqlEngine>();
+builder.Services.AddSingleton<JsonEngineQueryService>();
 builder.Services.AddSingleton<KUKULCAN.SharedKernel.Abstractions.IClock, SystemClock>();
 builder.Services.AddSingleton<KUKULCAN.SharedKernel.DomainEvents.Abstractions.IDomainEventDispatcher, NoOpDomainEventDispatcher>();
 builder.Services.AddScoped<KUKULCAN.SharedKernel.Database.Abstractions.ITenantContext, HttpTenantContext>();
@@ -165,6 +171,8 @@ app.MapGet("/api/examples/shared-kernel/result/failure", () =>
 .AllowAnonymous()
 .WithName("GetSharedKernelResultFailure");
 
+
+app.MapJsonEngineQueryEndpoints();
 
 app.MapAuthenticationEndpoints();
 

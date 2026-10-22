@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="KUKULCAN.SharedKernel.JsonEngine" Version="1.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Domain\KUKULCAN.SharedKernel.Example.Domain.csproj" />
   </ItemGroup>
 </Project>
