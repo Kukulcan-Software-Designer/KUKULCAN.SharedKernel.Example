@@ -12,5 +12,8 @@
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Application\KUKULCAN.SharedKernel.Example.Application.csproj" />
     <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Infrastructure\KUKULCAN.SharedKernel.Example.Infrastructure.csproj" />
+    <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL\KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL.csproj" />
+    <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Migrations.SQLServer\KUKULCAN.SharedKernel.Example.Migrations.SQLServer.csproj" />
+    <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Migrations.MySQL\KUKULCAN.SharedKernel.Example.Migrations.MySQL.csproj" />
   </ItemGroup>
 </Project>
