@@ -6,6 +6,7 @@ using KUKULCAN.SharedKernel.Database.Interceptors;
 using KUKULCAN.SharedKernel.DomainEvents.Abstractions;
 using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Options;
 
 namespace KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
@@ -21,6 +22,8 @@ public sealed class ExampleDbContext(
     SlowQueryInterceptor? slowQueryInterceptor = null)
     : KukulcanDbContextBase(options, tenantContext, clock, domainEventDispatcher, slowQueryInterceptor)
 {
+    private readonly KukulcanDatabaseOptions _databaseOptions = options.Value;
+
     public DbSet<DatabaseIntegrationRecord> DatabaseIntegrationRecords => Set<DatabaseIntegrationRecord>();
 
     public DbSet<Client> Clients => Set<Client>();
@@ -40,6 +43,17 @@ public sealed class ExampleDbContext(
     public DbSet<ProdInvoice> ProdInvoices => Set<ProdInvoice>();
 
     public DbSet<ProdInvoiceLine> ProdInvoiceLines => Set<ProdInvoiceLine>();
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+
+        var relationalOptions = RelationalOptionsExtension.Extract(optionsBuilder.Options);
+        ((IDbContextOptionsBuilderInfrastructure)optionsBuilder)
+            .AddOrUpdateExtension(
+                relationalOptions.WithMigrationsAssembly(
+                    ExampleMigrations.GetAssemblyName(_databaseOptions.Provider)));
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
