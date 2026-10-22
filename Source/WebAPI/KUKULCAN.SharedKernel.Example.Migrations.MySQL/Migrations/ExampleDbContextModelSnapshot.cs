@@ -1,4 +1,5 @@
 using KUKULCAN.SharedKernel.Database.Abstractions;
+using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.Database.Extensions;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
