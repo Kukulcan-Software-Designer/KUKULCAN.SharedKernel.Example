@@ -4,7 +4,7 @@
 
 ## Design objective
 
-The Example must demonstrate reusable persistence capabilities from `KUKULCAN.SharedKernel.Database`, not fork or reproduce that infrastructure. Business entities use schema `Example`. The separate `DatabaseIntegrationRecord` used by the initial integration sample remains in schema `Sample`.
+The Example must demonstrate reusable persistence capabilities from `KUKULCAN.SharedKernel.Database`, not fork or reproduce that infrastructure. All owned tables, including `DatabaseIntegrationRecord`, use schema `Example`.
 
 ## Configuration contract
 
@@ -37,6 +37,57 @@ These are targets for validation, not a claim that the Example currently works w
 6. Test keys, foreign keys, indexes, decimal precision, string comparison behavior, soft deletion, and preserved sales/purchase history.
 7. Keep provider-specific differences explicit, including schema support, identifier rules, string collation, and supported column types.
 8. Document a reproducible local integration-test setup without committing credentials.
+
+## Running the versioned migrations
+
+Provider-specific migrations are stored in three projects:
+
+- `KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL`
+- `KUKULCAN.SharedKernel.Example.Migrations.SQLServer`
+- `KUKULCAN.SharedKernel.Example.Migrations.MySQL`
+
+Each project contains `InitialExampleSchema`, a model snapshot, and an `ExampleDbContextFactory`. The factory validates the environment-selected provider and requires the connection string through configuration. All Example-owned tables, including `DatabaseIntegrationRecords`, map to `Example`.
+
+Install the .NET 10 EF Core command-line tool if needed:
+
+```bash
+dotnet tool install --global dotnet-ef --version 10.*
+dotnet ef --version
+```
+
+Set the provider and connection string in the shell. Use a disposable development/test database and keep real secrets out of tracked files:
+
+```bash
+export KUKULCAN__DATABASE__PROVIDER='PostgresSql'
+export KUKULCAN__DATABASE__CONNECTIONSTRING='Host=localhost;Database=Example;Username=...;Password=...;'
+```
+
+List and apply the PostgreSQL migrations:
+
+```bash
+dotnet ef migrations list \
+  --project Source/WebAPI/KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL/KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL.csproj \
+  --context ExampleDbContext
+
+dotnet ef database update \
+  --project Source/WebAPI/KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL/KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL.csproj \
+  --context ExampleDbContext
+```
+
+For SQL Server, select `KUKULCAN__DATABASE__PROVIDER='SqlServer'` and use the `KUKULCAN.SharedKernel.Example.Migrations.SQLServer.csproj` project. For MySQL, select `KUKULCAN__DATABASE__PROVIDER='MySql'` and use `KUKULCAN.SharedKernel.Example.Migrations.MySQL.csproj`. In both cases, supply the provider's connection string through `KUKULCAN__DATABASE__CONNECTIONSTRING`; never reuse a connection string intended for a different provider.
+
+To scaffold a later model change, create a new migration in each provider-specific project that is intended to remain supported, using the same logical migration name, for example:
+
+```bash
+dotnet ef migrations add <MigrationName> \
+  --project Source/WebAPI/KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL/KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL.csproj \
+  --context ExampleDbContext \
+  --output-dir Migrations
+```
+
+Repeat for the SQL Server and MySQL migration projects. Review the generated migration and model snapshot before applying it. Never edit an already-applied migration. The initial migration snapshots are verified against the current EF model for all three provider configurations; the real-container migration/re-application test currently runs against PostgreSQL. SQL Server and MySQL are not declared validated until Issues #21 and #22 pass their provider-backed checks. MySQL uses database/catalog semantics for schema names; the `Example` catalog must be provisioned and validated according to the MySQL provider before claiming support.
+
+The Database package exposes `Kukulcan:Database:Migration:AutoMigrateOnStartup`, which defaults to `false`. Apply production migrations as an explicit deployment step after reviewing the target provider's migration. Do not treat `EnsureCreatedAsync` as a substitute for versioned migrations.
 
 ## Transactions and unit of work
 

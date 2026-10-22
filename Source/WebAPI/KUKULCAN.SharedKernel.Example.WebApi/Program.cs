@@ -24,10 +24,19 @@ var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
 
 var connectionString = configuration[$"{KukulcanDatabaseOptions.SectionKey}:ConnectionString"];
+var databaseProvider = configuration[$"{KukulcanDatabaseOptions.SectionKey}:Provider"];
+var exampleDatabaseConfigured = !string.IsNullOrWhiteSpace(connectionString);
+var databaseProviderConfigured = !string.IsNullOrWhiteSpace(databaseProvider);
+
+if (exampleDatabaseConfigured != databaseProviderConfigured)
+{
+    throw new InvalidOperationException(
+        "Database configuration requires both KUKULCAN__DATABASE__PROVIDER and KUKULCAN__DATABASE__CONNECTIONSTRING.");
+}
+
 var defaultTenantConfigured = Guid.TryParse(
     configuration["Kukulcan:Auth:DefaultTenantId"],
     out var defaultTenantId) && defaultTenantId != Guid.Empty;
-var exampleDatabaseConfigured = !string.IsNullOrWhiteSpace(connectionString);
 var authenticationDatabaseConfigured = exampleDatabaseConfigured && defaultTenantConfigured;
 var bootstrapPassword = configuration["Kukulcan:Auth:Bootstrap:Password"];
 var administratorEmail = configuration["Kukulcan:Auth:Administrator:Email"];
