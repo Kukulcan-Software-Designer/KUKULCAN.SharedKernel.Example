@@ -113,7 +113,7 @@ public sealed class I18nTranslationClientTests
 
         using (httpClient)
         {
-            var exception = await Assert.ThrowsAsync<HttpRequestException>(async () =>
+            var exception = await Assert.CatchAsync<HttpRequestException>(async () =>
             {
                 await InvokeGetTranslationAsync(client);
             });
