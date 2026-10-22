@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/Documentation/">
     <File Path="Documentation\ARCHITECTURE.md" />
+    <File Path="Documentation\DATABASE-INTEGRATION.md" />
   </Folder>
   <Folder Name="/Documentation/Scripts/">
     <File Path="Documentation\Scripts\setup-example-milestones.sh" />

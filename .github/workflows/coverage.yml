@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 'FEATURES/**'
   pull_request:
     branches:
       - main
@@ -22,6 +23,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Checkout Auth migration sources
+        uses: actions/checkout@v5
+        with:
+          repository: Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Auth
+          ref: 0932ab3a7215a9128cc0eb41740262803a81ef73
+          path: _external/KUKULCAN.SharedKernel.Auth
+          persist-credentials: false
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
@@ -39,6 +48,7 @@ jobs:
                   <Configuration>
                     <Format>cobertura</Format>
                     <Include>[KUKULCAN.SharedKernel.Example.*]*</Include>
+                    <Exclude>[KUKULCAN.SharedKernel.Example.*Tests]*</Exclude>
                     <ExcludeByAttribute>CompilerGeneratedAttribute</ExcludeByAttribute>
                     <SingleHit>false</SingleHit>
                     <UseSourceLink>true</UseSourceLink>
@@ -85,15 +95,15 @@ jobs:
           if [ -f CoverageReport/Summary.txt ]; then
             {
               echo "## Example Code Coverage"
-              echo '```text'
               cat CoverageReport/Summary.txt
-              echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           else
             {
               echo "## Example Code Coverage"
+              echo "::error::No Cobertura coverage file was produced. Coverage has not been measured for this run."
               echo "No Cobertura coverage file was produced. Coverage has not been measured for this run."
             } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
       - name: Upload coverage reports
