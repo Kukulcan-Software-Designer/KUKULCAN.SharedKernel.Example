@@ -11,16 +11,6 @@ namespace KUKULCAN.SharedKernel.Example.Migrations.MySQL.Migrations;
 partial class ExampleDbContextModelSnapshot : ModelSnapshot
 {
     protected override void BuildModel(ModelBuilder modelBuilder)
-    {
-        modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
-        modelBuilder.HasAnnotation("Relational:MaxIdentifierLength", 64);
-        ExampleDbContextModelConfiguration.ConfigureForProvider(modelBuilder, DatabaseProvider.MySql);
-        modelBuilder.ApplySoftDeleteFilter();
-        modelBuilder.ApplyTenantFilter(new SnapshotTenantContext());
-    }
+        => ExampleSchemaV1Model.Configure(modelBuilder);
 
-    private sealed class SnapshotTenantContext : ITenantContext
-    {
-        public Guid TenantId => Guid.Empty;
-    }
 }
