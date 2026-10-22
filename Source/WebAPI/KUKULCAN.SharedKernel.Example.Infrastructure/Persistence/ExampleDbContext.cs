@@ -47,7 +47,7 @@ public sealed class ExampleDbContext(
 
         modelBuilder.Entity<DatabaseIntegrationRecord>(entity =>
         {
-            entity.ToTable("DatabaseIntegrationRecords", "Sample");
+            entity.ToTable("DatabaseIntegrationRecords", "Example");
             entity.HasKey(record => record.Id);
             entity.Property(record => record.Value)
                 .HasMaxLength(200)
