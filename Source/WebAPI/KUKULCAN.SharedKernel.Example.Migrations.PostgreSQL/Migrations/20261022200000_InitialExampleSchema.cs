@@ -332,16 +332,6 @@ public partial class InitialExampleSchema : Migration
     }
 
     protected override void BuildTargetModel(ModelBuilder modelBuilder)
-    {
-        modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
-        NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-        ExampleDbContextModelConfiguration.ConfigureForProvider(modelBuilder, DatabaseProvider.PostgresSql);
-        modelBuilder.ApplySoftDeleteFilter();
-        modelBuilder.ApplyTenantFilter(new MigrationTenantContext());
-    }
+        => ExampleSchemaV1Model.Configure(modelBuilder);
 
-    private sealed class MigrationTenantContext : ITenantContext
-    {
-        public Guid TenantId => Guid.Empty;
-    }
 }
