@@ -55,8 +55,9 @@ public sealed class I18nTranslationEndpointTests
     [Test]
     public async Task GetTranslation_WhenI18nServiceIsUnavailable_ReturnsServiceUnavailableWithoutDiagnostics()
     {
-        using var factory = CreateFactory(new StubHandler(_ =>
-            throw new HttpRequestException("internal-upstream-host-and-port")));
+        using var factory = CreateFactory(new StubHandler(
+            (Func<CancellationToken, HttpResponseMessage>)(_ =>
+                throw new HttpRequestException("internal-upstream-host-and-port"))));
         using var client = CreateAuthorizedClient(factory);
 
         using var response = await client.GetAsync(Endpoint);
