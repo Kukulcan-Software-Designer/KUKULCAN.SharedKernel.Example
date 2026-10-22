@@ -17,7 +17,7 @@ The intended example brings together:
 
 ## Intended business demonstration
 
-The data model is in the `Sample` database schema and covers clients, providers, products, warehouses, sales, purchases, and warehouse stock. The API is expected to demonstrate ordinary create/read/update operations, appropriate search filters, authentication, data integrity, and the agreed historical-data policy.
+The data model is in the `Example` database schema and covers clients, providers, products, warehouses, sales, purchases, and warehouse stock. The API is expected to demonstrate ordinary create/read/update operations, appropriate search filters, authentication, data integrity, and the agreed historical-data policy.
 
 ## What this project is not
 
