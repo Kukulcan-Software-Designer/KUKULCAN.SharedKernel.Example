@@ -39,7 +39,7 @@ The application, API, persistence model, test suite, and four interfaces remain 
 1. A buildable .NET 10 `.slnx` solution with API and automated test projects.
 2. A documented architecture with explicit integration boundaries.
 3. Secure authentication and idempotent administrator bootstrap using supported library contracts.
-4. A Sample domain model and versioned schema initialization.
+4. A Sample business-domain model mapped to schema `Example`, with versioned schema initialization.
 5. A common API with business rules, searches, and lifecycle policies.
 6. Provider-backed validation for PostgreSQL, Microsoft SQL Server, and MySQL where the packages and implementation support them.
 7. Four independently buildable, authenticated web clients.
