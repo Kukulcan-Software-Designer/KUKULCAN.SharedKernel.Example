@@ -59,7 +59,9 @@ public sealed class JsonEngineQueryService(IJsonSqlEngine queryEngine)
                 "query");
         }
 
-        string normalizedQuery = query.Trim();
+        // JsonEngine parses ORDER BY direction tokens by spaces; normalize line breaks and tabs
+        // so multiline API requests keep the same query semantics as single-line statements.
+        string normalizedQuery = Regex.Replace(query.Trim(), @"\s+", " ");
         if (!QueryShape.IsMatch(normalizedQuery))
         {
             throw new JsonEngineQueryValidationException(
