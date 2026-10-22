@@ -47,14 +47,14 @@ public sealed class SampleModelMappingTests
     [TestCase("InvoiceLine", "InvoiceLines")]
     [TestCase("ProdInvoice", "ProdInvoices")]
     [TestCase("ProdInvoiceLine", "ProdInvoiceLines")]
-    public void BusinessEntity_IsMappedToTheSampleSchema(string entityName, string tableName)
+    public void BusinessEntity_IsMappedToTheExampleSchema(string entityName, string tableName)
     {
         var entity = RequireEntity(entityName);
 
         Assert.Multiple(() =>
         {
-            Assert.That(entity.GetSchema(), Is.EqualTo("Sample"),
-                $"{entityName} must be mapped under schema Sample.");
+            Assert.That(entity.GetSchema(), Is.EqualTo("Example"),
+                $"{entityName} must be mapped under schema Example.");
             Assert.That(entity.GetTableName(), Is.EqualTo(tableName),
                 $"{entityName} must have a stable explicit table mapping.");
             Assert.That(entity.FindPrimaryKey()?.Properties.Select(property => property.Name),
@@ -173,7 +173,7 @@ public sealed class SampleModelMappingTests
             .SingleOrDefault(candidate => candidate.ClrType.FullName == FullEntityName(entityName));
 
         Assert.That(entity, Is.Not.Null,
-            $"ExampleDbContext must map {FullEntityName(entityName)} into the Sample schema.");
+            $"ExampleDbContext must map {FullEntityName(entityName)} into the Example schema.");
         return entity!;
     }
 
