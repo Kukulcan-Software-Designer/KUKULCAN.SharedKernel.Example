@@ -221,7 +221,7 @@ public static class ExampleDbContextModelConfiguration
         }
     }
 
-    private static string GetStoreType(Microsoft.EntityFrameworkCore.Metadata.IProperty property, DatabaseProvider provider)
+    private static string GetStoreType(Microsoft.EntityFrameworkCore.Metadata.IReadOnlyProperty property, DatabaseProvider provider)
     {
         var clrType = Nullable.GetUnderlyingType(property.ClrType) ?? property.ClrType;
 
