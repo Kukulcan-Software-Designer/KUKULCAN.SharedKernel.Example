@@ -63,6 +63,20 @@ public sealed class SampleModelMappingTests
         });
     }
 
+
+    [Test]
+    public void DatabaseIntegrationRecord_IsMappedToTheExampleSchema()
+    {
+        var entity = _context.Model.FindEntityType(typeof(DatabaseIntegrationRecord));
+
+        Assert.That(entity, Is.Not.Null, "ExampleDbContext must map DatabaseIntegrationRecord.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(entity!.GetSchema(), Is.EqualTo("Example"));
+            Assert.That(entity.GetTableName(), Is.EqualTo("DatabaseIntegrationRecords"));
+        });
+    }
+
     [Test]
     public void WarehouseStock_HasUniqueWarehouseProductPairAndDoesNotDuplicateProductNameOrCode()
     {
