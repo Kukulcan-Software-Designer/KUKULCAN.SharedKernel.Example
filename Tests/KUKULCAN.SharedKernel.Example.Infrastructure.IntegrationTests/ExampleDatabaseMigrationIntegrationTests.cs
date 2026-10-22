@@ -60,9 +60,11 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
 
         var migrationsAssembly = context.GetService<IMigrationsAssembly>();
         var snapshotModel = migrationsAssembly.ModelSnapshot!.Model;
+        var initializedSnapshotModel = context.GetService<IModelRuntimeInitializer>()
+            .Initialize(snapshotModel, designTime: true);
         var currentModel = context.GetService<IDesignTimeModel>().Model;
         var modelDifferences = context.GetService<IMigrationsModelDiffer>()
-            .GetDifferences(snapshotModel.GetRelationalModel(), currentModel.GetRelationalModel());
+            .GetDifferences(initializedSnapshotModel.GetRelationalModel(), currentModel.GetRelationalModel());
         if (modelDifferences.Count > 0)
         {
             TestContext.Out.WriteLine("Pending Example model differences:");
