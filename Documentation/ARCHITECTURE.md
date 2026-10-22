@@ -1,6 +1,6 @@
 # Example Application Architecture
 
-**Status:** Architecture and executable .NET 10 Web API baseline (Issue #1), SharedKernel Result integration (Issue #2), authentication/current-user/administrator-bootstrap behavior (Issue #3), initial Database package integration (Issue #4), and JsonEngine query integration (Issue #5) implemented and under automated verification  
+**Status:** Architecture and executable .NET 10 Web API baseline (Issue #1), SharedKernel Result integration (Issue #2), authentication/current-user/administrator-bootstrap behavior (Issue #3), initial Database package integration (Issue #4), JsonEngine query integration (Issue #5), and outbound I18N HTTP integration (Issue #6) implemented and under automated verification  
 **Target framework:** .NET 10  
 **Scope:** Architecture, security and dependency boundaries. Full Sample-domain persistence, business endpoints and external-service integrations remain for their implementation Issues.
 

@@ -6,6 +6,8 @@ using KUKULCAN.SharedKernel.Auth.Persistence;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.Example.Infrastructure;
+using KUKULCAN.SharedKernel.Example.Infrastructure.I18N;
+using KUKULCAN.SharedKernel.Example.WebApi.I18N;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using KUKULCAN.SharedKernel.Example.Application.JsonEngine;
 using KUKULCAN.SharedKernel.Example.WebApi.JsonEngine;
@@ -38,6 +40,28 @@ if (!string.IsNullOrWhiteSpace(bootstrapPassword)
 }
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddTransient<I18nServiceTokenHandler>();
+builder.Services.AddHttpClient("KukulcanI18N", client =>
+{
+    var configuredBaseAddress = configuration["Kukulcan:I18N:BaseUrl"];
+    if (Uri.TryCreate(configuredBaseAddress, UriKind.Absolute, out var baseAddress)
+        && (baseAddress.Scheme == Uri.UriSchemeHttp || baseAddress.Scheme == Uri.UriSchemeHttps))
+    {
+        client.BaseAddress = new Uri(baseAddress.AbsoluteUri.TrimEnd('/') + "/");
+    }
+
+    var timeoutSeconds = configuration.GetValue<int?>("Kukulcan:I18N:TimeoutSeconds") ?? 5;
+    if (timeoutSeconds is < 1 or > 120)
+    {
+        throw new InvalidOperationException(
+            "Kukulcan:I18N:TimeoutSeconds must be between 1 and 120 seconds.");
+    }
+
+    client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+}).AddHttpMessageHandler<I18nServiceTokenHandler>();
+builder.Services.AddTransient<I18nTranslationClient>(serviceProvider =>
+    new I18nTranslationClient(
+        serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("KukulcanI18N")));
 builder.Services.AddSingleton<IJsonSqlEngine, JsonSqlEngine>();
 builder.Services.AddSingleton<JsonEngineQueryService>();
 builder.Services.AddSingleton<KUKULCAN.SharedKernel.Abstractions.IClock, SystemClock>();
@@ -173,6 +197,7 @@ app.MapGet("/api/examples/shared-kernel/result/failure", () =>
 
 
 app.MapJsonEngineQueryEndpoints();
+app.MapI18nTranslationEndpoints();
 
 app.MapAuthenticationEndpoints();
 
