@@ -1,3 +1,4 @@
+using System.Reflection;
 using KUKULCAN.SharedKernel.Abstractions;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
@@ -6,6 +7,7 @@ using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
@@ -55,6 +57,24 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
             context.Database.GetMigrations().Any(migration => migration.EndsWith("_InitialExampleSchema", StringComparison.Ordinal)),
             Is.True,
             "Versioned migrations must be registered before they can initialize a fresh database.");
+
+        var migrationsAssembly = context.GetService<IMigrationsAssembly>();
+        var snapshotModel = migrationsAssembly.ModelSnapshot!.Model;
+        var currentModel = context.GetService<IDesignTimeModel>().Model;
+        var modelDifferences = context.GetService<IMigrationsModelDiffer>()
+            .GetDifferences(snapshotModel.GetRelationalModel(), currentModel.GetRelationalModel());
+        if (modelDifferences.Count > 0)
+        {
+            TestContext.WriteLine("Pending Example model differences:");
+            foreach (var operation in modelDifferences)
+            {
+                var details = operation.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                    .Where(property => property.Name is "Name" or "Table" or "Schema" or "ColumnType"
+                        or "OldColumnType" or "IsNullable" or "MaxLength" or "Precision" or "Scale")
+                    .Select(property => $"{property.Name}={property.GetValue(operation)}");
+                TestContext.WriteLine($"{operation.GetType().Name}: {string.Join(", ", details)}");
+            }
+        }
 
         await context.Database.MigrateAsync();
 
