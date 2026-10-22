@@ -34,7 +34,7 @@ Sales and purchase lines are separate types because they belong to different doc
 
 ## Database mapping and constraints
 
-- Every business entity maps to the `Sample` schema with an explicit table name.
+- Every business entity maps to the `Example` schema with an explicit table name.
 - Primary keys are GUID `Id` values. Composite alternate keys (`TenantId`, `Id`) support tenant-safe foreign keys.
 - `WarehouseStock` has a unique index over `(WarehouseId, ProductId)`.
 - Product codes and sales/purchase document numbers are unique per tenant.
