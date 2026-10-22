@@ -94,4 +94,23 @@ public sealed class ExampleDatabaseStartupRegistrationTests
             }
         }
     }
+    [Test]
+    public void AddExampleDatabase_RejectsConnectionStringWithoutExplicitProvider()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{KukulcanDatabaseOptions.SectionKey}:ConnectionString"] =
+                    "Host=localhost;Database=example-tests;Username=test;Password=test"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => services.AddExampleDatabase(configuration));
+
+        Assert.That(exception!.Message, Does.Contain("KUKULCAN__DATABASE__PROVIDER"));
+    }
+
 }
