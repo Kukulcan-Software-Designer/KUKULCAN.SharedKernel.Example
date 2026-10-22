@@ -29,6 +29,12 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
 
         var migrationAssembly = context.GetService<IMigrationsAssembly>();
         var migrations = context.Database.GetMigrations().ToArray();
+        var snapshotModel = migrationAssembly.ModelSnapshot!.Model;
+        var initializedSnapshotModel = context.GetService<IModelRuntimeInitializer>()
+            .Initialize(snapshotModel, designTime: true);
+        var currentModel = context.GetService<IDesignTimeModel>().Model;
+        var modelDifferences = context.GetService<IMigrationsModelDiffer>()
+            .GetDifferences(initializedSnapshotModel.GetRelationalModel(), currentModel.GetRelationalModel());
 
         Assert.Multiple(() =>
         {
@@ -37,6 +43,10 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
                 migrations.Any(migration => migration.EndsWith("_InitialExampleSchema", StringComparison.Ordinal)),
                 Is.True,
                 "The provider migration assembly must contain the initial Example schema migration.");
+            Assert.That(
+                modelDifferences,
+                Is.Empty,
+                $"The {provider} migration snapshot must match the current ExampleDbContext relational model.");
         });
     }
 
