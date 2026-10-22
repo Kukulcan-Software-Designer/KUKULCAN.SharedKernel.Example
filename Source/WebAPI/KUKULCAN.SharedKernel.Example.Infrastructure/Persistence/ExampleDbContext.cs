@@ -58,6 +58,6 @@ public sealed class ExampleDbContext(
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        ExampleDbContextModelConfiguration.Configure(modelBuilder);
+        ExampleDbContextModelConfiguration.ConfigureForProvider(modelBuilder, _databaseOptions.Provider);
     }
 }
