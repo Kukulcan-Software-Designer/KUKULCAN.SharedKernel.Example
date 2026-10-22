@@ -26,7 +26,7 @@ The `DatabaseIntegrationRecord` is a minimal integration sample only. It does no
 
 ## Schema and provider support
 
-The `DatabaseIntegrationRecords` demonstration table maps to the `Sample` schema and remains separate from the business entities, which map to schema `Example`. The integration test uses PostgreSQL Testcontainers and `EnsureCreatedAsync` against an isolated disposable database to prove insert/retrieve behavior through the package's context and unit-of-work contracts.
+The `DatabaseIntegrationRecords` demonstration table and all business entity tables map to schema `Example`. The integration test uses PostgreSQL Testcontainers and `EnsureCreatedAsync` against an isolated disposable database to prove insert/retrieve behavior through the package's context and unit-of-work contracts.
 
 Production schema creation and versioned migrations belong to the migration/schema-initialization issue. Do not use `EnsureCreated` as a production migration strategy.
 
