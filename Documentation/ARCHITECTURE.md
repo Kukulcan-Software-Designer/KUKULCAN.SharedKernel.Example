@@ -1,8 +1,8 @@
 # Example Application Architecture
 
-**Status:** Architecture and executable .NET 10 Web API baseline (Issue #1), SharedKernel Result integration (Issue #2), authentication/current-user/administrator-bootstrap behavior (Issue #3), initial Database package integration (Issue #4), JsonEngine query integration (Issue #5), and outbound I18N HTTP integration (Issue #6) implemented and under automated verification  
+**Status:** Architecture and executable .NET 10 Web API baseline (Issue #1), SharedKernel Result integration (Issue #2), authentication/current-user/administrator-bootstrap behavior (Issue #3), initial Database package integration (Issue #4), JsonEngine query integration (Issue #5), outbound I18N HTTP integration (Issue #6), and Sample domain entities/EF Core mappings (Issue #7) implemented and under automated verification  
 **Target framework:** .NET 10  
-**Scope:** Architecture, security and dependency boundaries. Full Sample-domain persistence, business endpoints and external-service integrations remain for their implementation Issues.
+**Scope:** Architecture, security and dependency boundaries. Versioned Sample migrations, real-provider validation, Sample business endpoints and client interfaces remain for their implementation Issues.
 
 ## 1. Architectural decisions
 
@@ -92,7 +92,7 @@ Use .NET configuration keys `Kukulcan:Database:Provider` and `Kukulcan:Database:
 
 The Database package documents SQL Server, PostgreSQL and MySQL provider selection, but the Example must only claim support for a provider after its own migrations and behavior have been validated against a real instance of that provider.
 
-The Example domain schema is `Sample`. Authentication-owned tables and schema are not to be recreated by the Example domain model. The initial persistence sample uses `KUKULCAN.SharedKernel.Database` through `Infrastructure/ExampleDbContext`, with provider configuration from `Kukulcan__Database__Provider` and `Kukulcan__Database__ConnectionString`. See [DATABASE-INTEGRATION.md](DATABASE-INTEGRATION.md) for endpoints, secret handling, and the distinction between integration testing and production migrations.
+The Example business entities map to database schema `Example`. Authentication-owned tables and schema are not to be recreated by the Example domain model. The CLR entities live in `Source/WebAPI/KUKULCAN.SharedKernel.Example.Domain`; their explicit tenant-aware EF Core mappings are configured in `Infrastructure/ExampleDbContext`. The separate `DatabaseIntegrationRecord` used to demonstrate Issue #4's Database integration remains mapped to `Sample`; it is not part of the business domain. Versioned migrations and provider-specific integration checks for the business entities remain tracked in Issues #17 and #20–#22. See [DATABASE-INTEGRATION.md](DATABASE-INTEGRATION.md) for endpoints, secret handling, and the distinction between integration testing and production migrations.
 
 ## 5. HTTP API contract
 
@@ -163,7 +163,7 @@ The bootstrap password is not embedded in source or committed configuration; it 
 
 Before issuing a token, the host verifies that the configured server-selected default tenant is present in the authenticated user's actual Auth membership collection. The token receives `tenant_id` only after this membership check. On authenticated requests, `HttpTenantContext` uses the tenant claim from the signature/issuer/audience/lifetime-validated principal and fails closed with `Guid.Empty` when the claim is missing, invalid or empty; it never falls back to the configured default tenant for an authenticated principal. Tenant membership is not reloaded on each request, so removal of membership may take up to the 30-minute token lifetime to take effect; the implementation deliberately does not claim immediate revocation.
 
-**Database prerequisite:** the provider-specific Auth schema/tables and migrations must already be applied before enabling login or bootstrap. The Example does not run migrations automatically at startup. Use the existing provider-specific migration projects from [KUKULCAN.SharedKernel.Auth](https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Auth/tree/main/Source) and follow that repository's migration guidance; provision the Auth database and credentials separately from the Example's `Sample` domain data.
+**Database prerequisite:** the provider-specific Auth schema/tables and migrations must already be applied before enabling login or bootstrap. The Example does not run migrations automatically at startup. Use the existing provider-specific migration projects from [KUKULCAN.SharedKernel.Auth](https://github.com/Kukulcan-Software-Designer/KUKULCAN.SharedKernel.Auth/tree/main/Source) and follow that repository's migration guidance; provision the Auth database and credentials separately from the Example's business data in the `Example` schema.
 
 Refresh-token renewal and logout/revocation endpoints are not implemented: the current flow uses short-lived stateless bearer tokens and does not define a refresh-token store or revocation contract. The browser clients must continue to follow the session-storage constraints in the interface-specific session model above; do not store signing keys or credentials in browser bundles or local storage.
 
