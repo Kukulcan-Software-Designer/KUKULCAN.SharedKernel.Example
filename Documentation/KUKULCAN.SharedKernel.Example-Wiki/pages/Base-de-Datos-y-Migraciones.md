@@ -89,6 +89,16 @@ Repite el procedimiento para los proyectos de SQL Server y MySQL. Revisa la migr
 
 El paquete Database ofrece `Kukulcan:Database:Migration:AutoMigrateOnStartup`, cuyo valor predeterminado es `false`. En producción aplica las migraciones como un paso explícito del despliegue tras revisar la migración y el proveedor objetivo. `EnsureCreatedAsync` no sustituye a las migraciones versionadas.
 
+## Seguridad de las migraciones y privilegios de base de datos
+
+Utiliza identidades de base de datos separadas para desplegar migraciones y para el tráfico normal de la aplicación:
+
+- La identidad de migración debe disponer únicamente de los privilegios DDL necesarios para aplicar las migraciones revisadas en la base de datos y el esquema previstos. No utilices una cuenta administradora de todo el servidor ni la cuenta root de MySQL para los despliegues habituales.
+- La identidad de ejecución de la aplicación debe tener solo los privilegios de acceso a datos que necesite sobre el esquema `Example`; normalmente no debe poder crear, alterar ni eliminar objetos del esquema.
+- Guarda las credenciales de ambas identidades en el almacén de secretos del despliegue o en configuración de entorno protegida. No incluyas credenciales en el repositorio, scripts, registros ni archivos fuente de migración.
+- Ejecuta las migraciones como un paso explícito del despliegue, confirma el entorno de destino y dispone de un plan de recuperación/copia de seguridad adecuado. Mantén desactivado `Kukulcan:Database:Migration:AutoMigrateOnStartup` en producción.
+- La sintaxis de concesión y los permisos de esquema/catálogo varían según el proveedor. Verifica los permisos mínimos exactos para el proveedor de destino antes del despliegue; no deduzcas los permisos de SQL Server o MySQL a partir de la prueba de integración de PostgreSQL.
+
 ## Transacciones y unidad de trabajo
 
 Utilizar las abstracciones reales `KukulcanDbContextBase`/`IUnitOfWork` cuando sean aplicables al contrato público del paquete. Definir límites transaccionales para operaciones que afecten a varios registros, en particular cabeceras y líneas de documentos o actualizaciones de existencias. Evitar operaciones parcialmente persistidas cuando falle la validación o la escritura en base de datos.
