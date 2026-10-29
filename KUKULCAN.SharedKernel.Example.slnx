@@ -2,6 +2,7 @@
   <Folder Name="/Documentation/">
     <File Path="Documentation\ARCHITECTURE.md" />
     <File Path="Documentation\DATABASE-INTEGRATION.md" />
+    <File Path="Documentation\I18N-INTEGRATION.md" />
     <File Path="Documentation\JSONENGINE-INTEGRATION.md" />
   </Folder>
   <Folder Name="/Documentation/Scripts/">
