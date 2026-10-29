@@ -22,13 +22,13 @@ When a non-empty database connection string is configured, the API maps these au
 
 The endpoints are protected by the Web API's default authorization policy. Each record is assigned the tenant from the authenticated request context, and the shared Database package applies its tenant query filter on reads. The request cannot choose its own tenant identifier. The endpoints do not expose database credentials or connection details. The request/response contract is separate from the EF Core entity.
 
-The `DatabaseIntegrationRecord` is a minimal integration sample only. It does not replace the business entities planned for the Sample domain-model issue.
+The `DatabaseIntegrationRecord` is a minimal persistence-test entity. It complements, and does not replace, the business entities in the `Example` domain model.
 
 ## Schema and provider support
 
-The `DatabaseIntegrationRecords` demonstration table and all business entity tables map to schema `Example`. The integration test uses PostgreSQL Testcontainers and `EnsureCreatedAsync` against an isolated disposable database to prove insert/retrieve behavior through the package's context and unit-of-work contracts.
+The `DatabaseIntegrationRecords` demonstration table and all business entity tables map to schema `Example`. The integration test uses PostgreSQL Testcontainers and `EnsureCreatedAsync` against an isolated disposable database to demonstrate insert/retrieve behavior through the package's context and unit-of-work contracts. This is a separate persistence-contract test; it does not validate versioned migrations.
 
-Production schema creation and versioned migrations belong to the migration/schema-initialization issue. Do not use `EnsureCreated` as a production migration strategy.
+Production schema creation and versioned migrations are implemented in the provider-specific migration projects listed below. Do not use `EnsureCreated` as a production migration strategy.
 
 ## Versioned migrations
 
