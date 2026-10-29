@@ -134,7 +134,7 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             Assert.That(configuredOptions.ConnectionString, Is.EqualTo(connectionString));
         });
 
-        var exception = Assert.CatchAsync<Exception>(
+        var exception = await Assert.CatchAsync<Exception>(
             async () => await context.Database.OpenConnectionAsync());
 
         Assert.That(exception, Is.Not.Null, "A failed PostgreSQL connection must be reported as an error.");
