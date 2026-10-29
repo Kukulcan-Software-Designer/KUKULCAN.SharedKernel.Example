@@ -118,6 +118,57 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
 
         Assert.That(expectedTables, Is.EqualTo(10), "All ten Example-owned tables must be initialized in schema Example.");
 
+        var foreignKeyCount = await context.Database.SqlQueryRaw<int>(
+            """
+            SELECT COUNT(*)::integer AS "Value"
+            FROM pg_constraint AS constraint_info
+            INNER JOIN pg_namespace AS schema_info
+                ON schema_info.oid = constraint_info.connamespace
+            WHERE schema_info.nspname = 'Example'
+              AND constraint_info.contype = 'f'
+            """).SingleAsync();
+
+        var expectedUniqueIndexes = await context.Database.SqlQueryRaw<int>(
+            """
+            SELECT COUNT(*)::integer AS "Value"
+            FROM pg_indexes
+            WHERE schemaname = 'Example'
+              AND indexname IN (
+                'IX_Products_TenantId_Code',
+                'IX_WarehouseStocks_WarehouseId_ProductId',
+                'IX_Invoices_TenantId_InvoiceNumber',
+                'IX_InvoiceLines_TenantId_InvoiceId_LineNumber',
+                'IX_ProdInvoices_TenantId_InvoiceNumber',
+                'IX_ProdInvoiceLines_TenantId_ProdInvoiceId_LineNumber')
+            """).SingleAsync();
+
+        var foreignKeysWithUnexpectedDeleteBehavior = await context.Database.SqlQueryRaw<int>(
+            """
+            SELECT COUNT(*)::integer AS "Value"
+            FROM pg_constraint AS constraint_info
+            INNER JOIN pg_namespace AS schema_info
+                ON schema_info.oid = constraint_info.connamespace
+            WHERE schema_info.nspname = 'Example'
+              AND constraint_info.contype = 'f'
+              AND constraint_info.confdeltype <> 'r'
+            """).SingleAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                foreignKeyCount,
+                Is.EqualTo(8),
+                "The migrated Example schema must contain all eight documented business foreign keys.");
+            Assert.That(
+                expectedUniqueIndexes,
+                Is.EqualTo(6),
+                "The migrated Example schema must enforce the six documented business uniqueness rules.");
+            Assert.That(
+                foreignKeysWithUnexpectedDeleteBehavior,
+                Is.Zero,
+                "Business foreign keys must restrict deletion to preserve historical commercial records.");
+        });
+
         var client = new Client
         {
             Id = Guid.NewGuid(),
