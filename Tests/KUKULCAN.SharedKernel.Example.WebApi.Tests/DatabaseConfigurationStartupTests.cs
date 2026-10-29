@@ -1,30 +1,30 @@
 using System.Net;
-using KUKULCAN.SharedKernel.Database.Configuration;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.Tests;
 
 [TestFixture]
+[NonParallelizable]
 public sealed class DatabaseConfigurationStartupTests
 {
-    private static readonly string ProviderKey = $"{KukulcanDatabaseOptions.SectionKey}:Provider";
-    private static readonly string ConnectionStringKey = $"{KukulcanDatabaseOptions.SectionKey}:ConnectionString";
-    private static readonly string AutoMigrateKey = $"{KukulcanDatabaseOptions.SectionKey}:Migration:AutoMigrateOnStartup";
-    private static readonly string SeedDataKey = $"{KukulcanDatabaseOptions.SectionKey}:Migration:SeedDataOnStartup";
+    private const string ProviderVariable = "KUKULCAN__DATABASE__PROVIDER";
+    private const string ConnectionStringVariable = "KUKULCAN__DATABASE__CONNECTIONSTRING";
+    private const string AutoMigrateVariable = "KUKULCAN__DATABASE__MIGRATION__AUTOMIGRATEONSTARTUP";
+    private const string SeedDataVariable = "KUKULCAN__DATABASE__MIGRATION__SEEDDATAONSTARTUP";
+    private const string TestConnectionString =
+        "Host=localhost;Database=example-tests;Username=test;Password=test";
 
     [Test]
     public void Startup_RejectsProviderWithoutConnectionString()
     {
-        using var factory = CreateFactory(new Dictionary<string, string?>
-        {
-            [ProviderKey] = "PostgresSql",
-            [ConnectionStringKey] = string.Empty,
-            [AutoMigrateKey] = "false",
-            [SeedDataKey] = "false"
-        });
+        using var environment = new DatabaseEnvironment(
+            provider: "PostgresSql",
+            connectionString: null);
+        using var factory = new WebApplicationFactory<Program>();
 
         var exception = Assert.Catch<Exception>(() => factory.CreateClient());
+
+        Assert.That(exception, Is.Not.Null);
         Assert.That(GetExceptionMessages(exception), Does.Contain(
             "Database configuration requires both KUKULCAN__DATABASE__PROVIDER and KUKULCAN__DATABASE__CONNECTIONSTRING."));
     }
@@ -32,15 +32,14 @@ public sealed class DatabaseConfigurationStartupTests
     [Test]
     public void Startup_RejectsConnectionStringWithoutProvider()
     {
-        using var factory = CreateFactory(new Dictionary<string, string?>
-        {
-            [ProviderKey] = string.Empty,
-            [ConnectionStringKey] = "Host=localhost;Database=example-tests;Username=test;Password=test",
-            [AutoMigrateKey] = "false",
-            [SeedDataKey] = "false"
-        });
+        using var environment = new DatabaseEnvironment(
+            provider: null,
+            connectionString: TestConnectionString);
+        using var factory = new WebApplicationFactory<Program>();
 
         var exception = Assert.Catch<Exception>(() => factory.CreateClient());
+
+        Assert.That(exception, Is.Not.Null);
         Assert.That(GetExceptionMessages(exception), Does.Contain(
             "Database configuration requires both KUKULCAN__DATABASE__PROVIDER and KUKULCAN__DATABASE__CONNECTIONSTRING."));
     }
@@ -48,15 +47,14 @@ public sealed class DatabaseConfigurationStartupTests
     [Test]
     public void Startup_RejectsUnsupportedProvider()
     {
-        using var factory = CreateFactory(new Dictionary<string, string?>
-        {
-            [ProviderKey] = "NotARealProvider",
-            [ConnectionStringKey] = "Host=localhost;Database=example-tests;Username=test;Password=test",
-            [AutoMigrateKey] = "false",
-            [SeedDataKey] = "false"
-        });
+        using var environment = new DatabaseEnvironment(
+            provider: "NotARealProvider",
+            connectionString: TestConnectionString);
+        using var factory = new WebApplicationFactory<Program>();
 
         var exception = Assert.Catch<Exception>(() => factory.CreateClient());
+
+        Assert.That(exception, Is.Not.Null);
         Assert.That(GetExceptionMessages(exception), Does.Contain(
             "Database initialization requires a supported provider configured through KUKULCAN__DATABASE__PROVIDER."));
     }
@@ -64,31 +62,16 @@ public sealed class DatabaseConfigurationStartupTests
     [Test]
     public async Task Startup_AcceptsExplicitProviderAndConnectionString()
     {
-        using var factory = CreateFactory(new Dictionary<string, string?>
-        {
-            [ProviderKey] = "PostgresSql",
-            [ConnectionStringKey] = "Host=localhost;Database=example-tests;Username=test;Password=test",
-            [AutoMigrateKey] = "false",
-            [SeedDataKey] = "false"
-        });
+        using var environment = new DatabaseEnvironment(
+            provider: "PostgresSql",
+            connectionString: TestConnectionString);
+        using var factory = new WebApplicationFactory<Program>();
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync("/health");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
     }
-
-    private static WebApplicationFactory<Program> CreateFactory(
-        IDictionary<string, string?> settings) =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.ConfigureAppConfiguration((_, configuration) =>
-            {
-                // Isolate these startup tests from environment variables and appsettings
-                // so each case proves behavior for exactly the supplied configuration.
-                // Add this provider last so explicit test values override environment variables
-                // and appsettings values without depending on CI machine configuration.
-                configuration.AddInMemoryCollection(settings);
-            }));
 
     private static string GetExceptionMessages(Exception? exception)
     {
@@ -100,5 +83,32 @@ public sealed class DatabaseConfigurationStartupTests
         }
 
         return string.Join(Environment.NewLine, messages);
+    }
+
+    private sealed class DatabaseEnvironment : IDisposable
+    {
+        private readonly Dictionary<string, string?> _originalValues = new();
+
+        public DatabaseEnvironment(string? provider, string? connectionString)
+        {
+            SetVariable(ProviderVariable, provider);
+            SetVariable(ConnectionStringVariable, connectionString);
+            SetVariable(AutoMigrateVariable, "false");
+            SetVariable(SeedDataVariable, "false");
+        }
+
+        public void Dispose()
+        {
+            foreach (var (name, value) in _originalValues)
+            {
+                Environment.SetEnvironmentVariable(name, value);
+            }
+        }
+
+        private void SetVariable(string name, string? value)
+        {
+            _originalValues[name] = Environment.GetEnvironmentVariable(name);
+            Environment.SetEnvironmentVariable(name, value);
+        }
     }
 }
