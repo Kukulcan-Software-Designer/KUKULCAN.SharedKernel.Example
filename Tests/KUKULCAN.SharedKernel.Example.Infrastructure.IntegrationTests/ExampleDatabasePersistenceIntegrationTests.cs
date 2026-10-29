@@ -162,6 +162,143 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
                 "KUKULCAN__DATABASE__CONNECTIONSTRING"));
     }
 
+
+    [Test]
+    public async Task PostgreSqlSoftDelete_MarksClientAsDeletedWithoutRemovingHistoricalRecord()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
+            .WithDatabase("example_soft_delete_integration")
+            .WithUsername("postgres")
+            .WithPassword("example-soft-delete-integration-password")
+            .Build();
+        await postgres.StartAsync();
+
+        var tenantId = Guid.NewGuid();
+        await using var context = CreateContext(postgres.GetConnectionString(), tenantId);
+        await context.Database.MigrateAsync();
+
+        var client = new KUKULCAN.SharedKernel.Example.Domain.Entities.Client
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Client retained for history"
+        };
+        context.Clients.Add(client);
+        await context.SaveChangesAsync();
+
+        context.Clients.Remove(client);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var persisted = await context.Clients
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .SingleAsync(entity => entity.Id == client.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.IsDeleted, Is.True,
+                "Removing a soft-deletable client must mark it as deleted instead of physically deleting it.");
+            Assert.That(persisted.DeletedOn, Is.Not.Null,
+                "Soft deletion must record when the client was deleted.");
+        });
+    }
+
+    [Test]
+    public async Task PostgreSqlTransaction_RollbackDoesNotPersistPartialChanges()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
+            .WithDatabase("example_transaction_integration")
+            .WithUsername("postgres")
+            .WithPassword("example-transaction-integration-password")
+            .Build();
+        await postgres.StartAsync();
+
+        var tenantId = Guid.NewGuid();
+        await using var context = CreateContext(postgres.GetConnectionString(), tenantId);
+        await context.Database.MigrateAsync();
+
+        var record = new KUKULCAN.SharedKernel.Example.Infrastructure.Persistence.DatabaseIntegrationRecord
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Value = "must-not-survive-rollback"
+        };
+
+        await using (var transaction = await context.Database.BeginTransactionAsync())
+        {
+            context.DatabaseIntegrationRecords.Add(record);
+            await context.SaveChangesAsync();
+            await transaction.RollbackAsync();
+        }
+
+        context.ChangeTracker.Clear();
+        var persisted = await context.DatabaseIntegrationRecords
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .SingleOrDefaultAsync(entity => entity.Id == record.Id);
+
+        Assert.That(persisted, Is.Null,
+            "A rolled-back PostgreSQL transaction must not leave a partially persisted record.");
+    }
+
+    [Test]
+    public async Task PostgreSqlBusinessQueries_AreScopedToTheCurrentTenant()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
+            .WithDatabase("example_tenant_query_integration")
+            .WithUsername("postgres")
+            .WithPassword("example-tenant-query-integration-password")
+            .Build();
+        await postgres.StartAsync();
+
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        await using var context = CreateContext(postgres.GetConnectionString(), tenantId);
+        await context.Database.MigrateAsync();
+
+        var ownClient = new KUKULCAN.SharedKernel.Example.Domain.Entities.Client
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Current tenant client"
+        };
+        var otherClient = new KUKULCAN.SharedKernel.Example.Domain.Entities.Client
+        {
+            Id = Guid.NewGuid(),
+            TenantId = otherTenantId,
+            Name = "Other tenant client"
+        };
+
+        context.Clients.AddRange(ownClient, otherClient);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var visibleClients = await context.Clients
+            .AsNoTracking()
+            .Select(client => client.Name)
+            .ToArrayAsync();
+
+        Assert.That(visibleClients, Is.EquivalentTo(new[] { "Current tenant client" }),
+            "Business queries must not return clients belonging to a different tenant.");
+    }
+
+    private static ExampleDbContext CreateContext(string connectionString, Guid tenantId)
+        => new(
+            Options.Create(new KukulcanDatabaseOptions
+            {
+                Provider = DatabaseProvider.PostgresSql,
+                ConnectionString = connectionString,
+                Migration = new KukulcanDatabaseOptions.MigrationOptions
+                {
+                    AutoMigrateOnStartup = false,
+                    SeedDataOnStartup = false
+                }
+            }),
+            new TestTenantContext(tenantId),
+            new TestClock(),
+            new TestDomainEventDispatcher());
+
     private sealed class TestTenantContext(Guid tenantId) : ITenantContext
     {
         public Guid TenantId { get; } = tenantId;
