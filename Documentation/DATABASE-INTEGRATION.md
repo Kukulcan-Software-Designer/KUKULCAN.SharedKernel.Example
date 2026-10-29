@@ -6,8 +6,8 @@ The Example Web API reads the database provider and connection string from .NET 
 
 | Configuration key                    | Environment variable                   | Purpose                                               |
 |--------------------------------------|----------------------------------------|-------------------------------------------------------|
-| `Kukulcan:Database:Provider`         | `Kukulcan__Database__Provider`         | Provider enum: `PostgresSql`, `SqlServer`, or `MySql` |
-| `Kukulcan:Database:ConnectionString` | `Kukulcan__Database__ConnectionString` | Provider-specific connection string                   |
+| `Kukulcan:Database:Provider`         | `KUKULCAN__DATABASE__PROVIDER`         | Provider enum: `PostgresSql`, `SqlServer`, or `MySql` |
+| `Kukulcan:Database:ConnectionString` | `KUKULCAN__DATABASE__CONNECTIONSTRING` | Provider-specific connection string                   |
 
 Provide credentials through a secret manager, deployment environment, or local user-secrets. Do not commit credentials in `appsettings*.json`, source code, test output, or documentation.
 
