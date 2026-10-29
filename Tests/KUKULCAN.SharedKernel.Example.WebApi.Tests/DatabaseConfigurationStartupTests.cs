@@ -1,4 +1,5 @@
 using System.Net;
+using KUKULCAN.SharedKernel.Database.Configuration;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 
@@ -7,10 +8,10 @@ namespace KUKULCAN.SharedKernel.Example.WebApi.Tests;
 [TestFixture]
 public sealed class DatabaseConfigurationStartupTests
 {
-    private const string ProviderKey = "KUKULCAN__DATABASE__PROVIDER";
-    private const string ConnectionStringKey = "KUKULCAN__DATABASE__CONNECTIONSTRING";
-    private const string AutoMigrateKey = "KUKULCAN__DATABASE__MIGRATION__AUTOMIGRATEONSTARTUP";
-    private const string SeedDataKey = "KUKULCAN__DATABASE__MIGRATION__SEEDDATAONSTARTUP";
+    private static readonly string ProviderKey = $"{KukulcanDatabaseOptions.SectionKey}:Provider";
+    private static readonly string ConnectionStringKey = $"{KukulcanDatabaseOptions.SectionKey}:ConnectionString";
+    private static readonly string AutoMigrateKey = $"{KukulcanDatabaseOptions.SectionKey}:Migration:AutoMigrateOnStartup";
+    private static readonly string SeedDataKey = $"{KukulcanDatabaseOptions.SectionKey}:Migration:SeedDataOnStartup";
 
     [Test]
     public void Startup_RejectsProviderWithoutConnectionString()
@@ -23,7 +24,7 @@ public sealed class DatabaseConfigurationStartupTests
             [SeedDataKey] = "false"
         });
 
-        var exception = Assert.Throws<Exception>(() => factory.CreateClient());
+        var exception = Assert.Catch<Exception>(() => factory.CreateClient());
         Assert.That(GetExceptionMessages(exception), Does.Contain(
             "Database configuration requires both KUKULCAN__DATABASE__PROVIDER and KUKULCAN__DATABASE__CONNECTIONSTRING."));
     }
@@ -39,7 +40,7 @@ public sealed class DatabaseConfigurationStartupTests
             [SeedDataKey] = "false"
         });
 
-        var exception = Assert.Throws<Exception>(() => factory.CreateClient());
+        var exception = Assert.Catch<Exception>(() => factory.CreateClient());
         Assert.That(GetExceptionMessages(exception), Does.Contain(
             "Database configuration requires both KUKULCAN__DATABASE__PROVIDER and KUKULCAN__DATABASE__CONNECTIONSTRING."));
     }
@@ -55,7 +56,7 @@ public sealed class DatabaseConfigurationStartupTests
             [SeedDataKey] = "false"
         });
 
-        var exception = Assert.Throws<Exception>(() => factory.CreateClient());
+        var exception = Assert.Catch<Exception>(() => factory.CreateClient());
         Assert.That(GetExceptionMessages(exception), Does.Contain(
             "Database initialization requires a supported provider configured through KUKULCAN__DATABASE__PROVIDER."));
     }
