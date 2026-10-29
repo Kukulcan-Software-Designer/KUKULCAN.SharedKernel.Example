@@ -89,6 +89,16 @@ Repeat for the SQL Server and MySQL migration projects. Review the generated mig
 
 The Database package exposes `Kukulcan:Database:Migration:AutoMigrateOnStartup`, which defaults to `false`. Apply production migrations as an explicit deployment step after reviewing the target provider's migration. Do not treat `EnsureCreatedAsync` as a substitute for versioned migrations.
 
+## Migration security and database privileges
+
+Use separate database identities for deployment migrations and normal application traffic:
+
+- The migration identity should have only the DDL privileges needed to apply the reviewed migrations to the intended database and schema. Do not use a server-wide administrator or MySQL root account for routine deployments.
+- The runtime application identity should have only the data-access privileges required by the application on schema `Example`; it should not normally have permission to create, alter, or drop schema objects.
+- Store both identities' credentials in the deployment secret store or protected environment configuration. Do not commit credentials or place them in scripts, logs, or migration source files.
+- Run migrations as an explicit deployment step with the target environment confirmed and a recovery/backup plan appropriate to that environment. Keep `Kukulcan:Database:Migration:AutoMigrateOnStartup` disabled in production.
+- Grant syntax and schema/catalog permissions differ by provider. Verify the exact least-privilege grants against the target provider before deployment; do not infer SQL Server or MySQL privileges from the PostgreSQL integration test.
+
 ## Transactions and unit of work
 
 Use the actual `KukulcanDbContextBase`/`IUnitOfWork` abstractions where applicable to the package's public contract. Define transaction boundaries around multi-record operations, particularly document headers and lines or inventory updates. Avoid partially persisted operations when validation or database writes fail.
