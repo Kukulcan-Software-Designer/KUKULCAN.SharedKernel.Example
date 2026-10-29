@@ -119,6 +119,47 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
 
         Assert.That(expectedTables, Is.EqualTo(10), "All ten Example-owned tables must be initialized in schema Example.");
 
+        var actualExampleTableNames = await context.Database.SqlQueryRaw<string>(
+            """
+            SELECT table_name AS "Value"
+            FROM information_schema.tables
+            WHERE table_schema = 'Example'
+              AND table_type = 'BASE TABLE'
+            ORDER BY table_name
+            """).ToArrayAsync();
+
+        var authSchemaTableCount = await context.Database.SqlQueryRaw<int>(
+            """
+            SELECT COUNT(*)::integer AS "Value"
+            FROM information_schema.tables
+            WHERE table_schema = 'Auth'
+              AND table_type = 'BASE TABLE'
+            """).SingleAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                actualExampleTableNames,
+                Is.EquivalentTo(new[]
+                {
+                    "Clients",
+                    "DatabaseIntegrationRecords",
+                    "InvoiceLines",
+                    "Invoices",
+                    "ProdInvoiceLines",
+                    "ProdInvoices",
+                    "Products",
+                    "Providers",
+                    "WarehouseStocks",
+                    "Warehouses"
+                }),
+                "The initial migration must create exactly the ten documented tables in schema Example.");
+            Assert.That(
+                authSchemaTableCount,
+                Is.Zero,
+                "Example migrations must not recreate Auth-owned tables in schema Auth.");
+        });
+
         var foreignKeyCount = await context.Database.SqlQueryRaw<int>(
             """
             SELECT COUNT(*)::integer AS "Value"
