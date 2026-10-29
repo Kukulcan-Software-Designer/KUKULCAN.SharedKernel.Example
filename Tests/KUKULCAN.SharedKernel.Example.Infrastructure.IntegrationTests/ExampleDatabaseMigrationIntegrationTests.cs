@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
+using Npgsql;
 
 namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
 
@@ -374,6 +375,43 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
                 Is.Zero,
                 "Business foreign keys must restrict deletion to preserve historical commercial records.");
         });
+
+        // Exercise the database constraints themselves, not only their names/counts in the catalog.
+        var stockProductId = Guid.NewGuid();
+        var otherProductId = Guid.NewGuid();
+        var stockWarehouseId = Guid.NewGuid();
+        var otherWarehouseId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name")
+                VALUES ({stockProductId}, {tenantId}, {"MIGRATION-P1"}, {"Migration product 1"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name")
+                VALUES ({otherProductId}, {tenantId}, {"MIGRATION-P2"}, {"Migration product 2"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Warehouses" ("Id", "TenantId", "Name")
+                VALUES ({stockWarehouseId}, {tenantId}, {"Migration warehouse 1"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Warehouses" ("Id", "TenantId", "Name")
+                VALUES ({otherWarehouseId}, {tenantId}, {"Migration warehouse 2"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."WarehouseStocks" ("Id", "TenantId", "WarehouseId", "ProductId", "Quantity")
+                VALUES ({Guid.NewGuid()}, {tenantId}, {stockWarehouseId}, {stockProductId}, {1m})""");
+
+        var duplicateStockException = Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""INSERT INTO "Example"."WarehouseStocks" ("Id", "TenantId", "WarehouseId", "ProductId", "Quantity")
+                    VALUES ({Guid.NewGuid()}, {tenantId}, {stockWarehouseId}, {stockProductId}, {2m})"""));
+        Assert.That(duplicateStockException!.SqlState, Is.EqualTo("23505"),
+            "The database must enforce uniqueness of the warehouse/product stock pair.");
+
+        var crossTenantStockException = Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""INSERT INTO "Example"."WarehouseStocks" ("Id", "TenantId", "WarehouseId", "ProductId", "Quantity")
+                    VALUES ({Guid.NewGuid()}, {otherTenantId}, {otherWarehouseId}, {otherProductId}, {1m})"""));
+        Assert.That(crossTenantStockException!.SqlState, Is.EqualTo("23503"),
+            "Composite foreign keys must prevent a stock row from linking another tenant's warehouse/product.");
 
         var client = new Client
         {
