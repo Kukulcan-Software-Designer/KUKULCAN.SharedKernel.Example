@@ -856,6 +856,95 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
             "A purchase invoice cannot contain duplicate line numbers.");
     }
 
+
+    [Test]
+    public async Task PostgreSqlCommercialSnapshots_RemainUnchangedWhenMasterDataChanges()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
+            .WithDatabase("example_commercial_snapshots")
+            .WithUsername("postgres")
+            .WithPassword("example-commercial-snapshots-password")
+            .Build();
+        await postgres.StartAsync();
+
+        var tenantId = Guid.NewGuid();
+        await using var context = CreateContext(DatabaseProvider.PostgresSql, postgres.GetConnectionString(), tenantId);
+        await context.Database.MigrateAsync();
+
+        var clientId = Guid.NewGuid();
+        var providerId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+        var invoiceLineId = Guid.NewGuid();
+        var purchaseInvoiceId = Guid.NewGuid();
+        var purchaseInvoiceLineId = Guid.NewGuid();
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Clients" ("Id", "TenantId", "Name") VALUES ({clientId}, {tenantId}, {"Client at sale"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Providers" ("Id", "TenantId", "Name") VALUES ({providerId}, {tenantId}, {"Provider at purchase"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name") VALUES ({productId}, {tenantId}, {"SKU-ORIGINAL"}, {"Product at transaction"})""");
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."Invoices"
+                ("Id", "TenantId", "ClientId", "InvoiceNumber", "IssuedAt", "ClientName")
+             VALUES ({invoiceId}, {tenantId}, {clientId}, {"SNAPSHOT-INV-1"}, {DateTimeOffset.UtcNow}, {"Client at sale"})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."InvoiceLines"
+                ("Id", "TenantId", "InvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({invoiceLineId}, {tenantId}, {invoiceId}, {1}, {productId}, {"SKU-ORIGINAL"}, {"Product at transaction"}, {2m}, {10m})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."ProdInvoices"
+                ("Id", "TenantId", "ProviderId", "InvoiceNumber", "IssuedAt", "ProviderName")
+             VALUES ({purchaseInvoiceId}, {tenantId}, {providerId}, {"SNAPSHOT-PINV-1"}, {DateTimeOffset.UtcNow}, {"Provider at purchase"})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."ProdInvoiceLines"
+                ("Id", "TenantId", "ProdInvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({purchaseInvoiceLineId}, {tenantId}, {purchaseInvoiceId}, {1}, {productId}, {"SKU-ORIGINAL"}, {"Product at transaction"}, {3m}, {8m})
+             """);
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "Example"."Clients" SET "Name" = {"Renamed client"} WHERE "Id" = {clientId} AND "TenantId" = {tenantId}""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "Example"."Providers" SET "Name" = {"Renamed provider"} WHERE "Id" = {providerId} AND "TenantId" = {tenantId}""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "Example"."Products" SET "Code" = {"SKU-UPDATED"}, "Name" = {"Updated product"} WHERE "Id" = {productId} AND "TenantId" = {tenantId}""");
+
+        var historicalSnapshots = await context.Database.SqlQueryRaw<string>(
+            $"""
+             SELECT 'Invoices.ClientName=' || "ClientName" AS "Value"
+             FROM "Example"."Invoices" WHERE "Id" = '{invoiceId}'
+             UNION ALL
+             SELECT 'InvoiceLines.ProductCode=' || "ProductCode" || ';ProductName=' || "ProductName"
+             FROM "Example"."InvoiceLines" WHERE "Id" = '{invoiceLineId}'
+             UNION ALL
+             SELECT 'ProdInvoices.ProviderName=' || "ProviderName"
+             FROM "Example"."ProdInvoices" WHERE "Id" = '{purchaseInvoiceId}'
+             UNION ALL
+             SELECT 'ProdInvoiceLines.ProductCode=' || "ProductCode" || ';ProductName=' || "ProductName"
+             FROM "Example"."ProdInvoiceLines" WHERE "Id" = '{purchaseInvoiceLineId}'
+             """).ToArrayAsync();
+
+        Assert.That(
+            historicalSnapshots,
+            Is.EquivalentTo(new[]
+            {
+                "Invoices.ClientName=Client at sale",
+                "InvoiceLines.ProductCode=SKU-ORIGINAL;ProductName=Product at transaction",
+                "ProdInvoices.ProviderName=Provider at purchase",
+                "ProdInvoiceLines.ProductCode=SKU-ORIGINAL;ProductName=Product at transaction"
+            }),
+            "Commercial documents must retain the client, provider and product descriptions captured at transaction time.");
+    }
+
     private static ExampleDbContext CreateContext(
         DatabaseProvider provider,
         string connectionString,
