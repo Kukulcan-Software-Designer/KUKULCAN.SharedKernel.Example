@@ -85,7 +85,8 @@ public sealed class DatabaseConfigurationStartupTests
             {
                 // Isolate these startup tests from environment variables and appsettings
                 // so each case proves behavior for exactly the supplied configuration.
-                configuration.Sources.Clear();
+                // Add this provider last so explicit test values override environment variables
+                // and appsettings values without depending on CI machine configuration.
                 configuration.AddInMemoryCollection(settings);
             }));
 
