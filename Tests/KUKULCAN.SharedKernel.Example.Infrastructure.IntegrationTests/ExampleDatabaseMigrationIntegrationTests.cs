@@ -328,6 +328,80 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
         });
     }
 
+    [TestCase(
+        "KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL.ExampleDbContextFactory, KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL",
+        "PostgresSql",
+        "SqlServer")]
+    [TestCase(
+        "KUKULCAN.SharedKernel.Example.Migrations.SQLServer.ExampleDbContextFactory, KUKULCAN.SharedKernel.Example.Migrations.SQLServer",
+        "SqlServer",
+        "MySql")]
+    [TestCase(
+        "KUKULCAN.SharedKernel.Example.Migrations.MySQL.ExampleDbContextFactory, KUKULCAN.SharedKernel.Example.Migrations.MySQL",
+        "MySql",
+        "PostgresSql")]
+    public void DesignTimeMigrationFactory_RejectsMismatchedProvider(
+        string factoryTypeName,
+        string requiredProvider,
+        string configuredProvider)
+    {
+        var previousProvider = Environment.GetEnvironmentVariable("KUKULCAN__DATABASE__PROVIDER");
+        var previousConnectionString = Environment.GetEnvironmentVariable("KUKULCAN__DATABASE__CONNECTIONSTRING");
+
+        try
+        {
+            Environment.SetEnvironmentVariable("KUKULCAN__DATABASE__PROVIDER", configuredProvider);
+            Environment.SetEnvironmentVariable(
+                "KUKULCAN__DATABASE__CONNECTIONSTRING",
+                "Server=localhost;Database=ExampleMigrations;User Id=not-used;Password=not-used;");
+
+            var factoryType = Type.GetType(factoryTypeName, throwOnError: true)!;
+            var factory = (IDesignTimeDbContextFactory<ExampleDbContext>)Activator.CreateInstance(factoryType)!;
+
+            var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateDbContext([]));
+            Assert.That(exception!.Message, Does.Contain(requiredProvider));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("KUKULCAN__DATABASE__PROVIDER", previousProvider);
+            Environment.SetEnvironmentVariable("KUKULCAN__DATABASE__CONNECTIONSTRING", previousConnectionString);
+        }
+    }
+
+    [TestCase(
+        "KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL.ExampleDbContextFactory, KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL",
+        "PostgresSql")]
+    [TestCase(
+        "KUKULCAN.SharedKernel.Example.Migrations.SQLServer.ExampleDbContextFactory, KUKULCAN.SharedKernel.Example.Migrations.SQLServer",
+        "SqlServer")]
+    [TestCase(
+        "KUKULCAN.SharedKernel.Example.Migrations.MySQL.ExampleDbContextFactory, KUKULCAN.SharedKernel.Example.Migrations.MySQL",
+        "MySql")]
+    public void DesignTimeMigrationFactory_RejectsMissingConnectionString(
+        string factoryTypeName,
+        string requiredProvider)
+    {
+        var previousProvider = Environment.GetEnvironmentVariable("KUKULCAN__DATABASE__PROVIDER");
+        var previousConnectionString = Environment.GetEnvironmentVariable("KUKULCAN__DATABASE__CONNECTIONSTRING");
+
+        try
+        {
+            Environment.SetEnvironmentVariable("KUKULCAN__DATABASE__PROVIDER", requiredProvider);
+            Environment.SetEnvironmentVariable("KUKULCAN__DATABASE__CONNECTIONSTRING", null);
+
+            var factoryType = Type.GetType(factoryTypeName, throwOnError: true)!;
+            var factory = (IDesignTimeDbContextFactory<ExampleDbContext>)Activator.CreateInstance(factoryType)!;
+
+            var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateDbContext([]));
+            Assert.That(exception!.Message, Does.Contain("KUKULCAN__DATABASE__CONNECTIONSTRING"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("KUKULCAN__DATABASE__PROVIDER", previousProvider);
+            Environment.SetEnvironmentVariable("KUKULCAN__DATABASE__CONNECTIONSTRING", previousConnectionString);
+        }
+    }
+
     private static ExampleDbContext CreateContext(
         DatabaseProvider provider,
         string connectionString,
