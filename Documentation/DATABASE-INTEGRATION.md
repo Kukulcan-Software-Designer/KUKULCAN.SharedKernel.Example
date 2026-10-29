@@ -72,6 +72,17 @@ To add a later model change, add a **new** migration to each provider project th
 
 The shared Database package supports an optional startup migration switch, but the Example's production guidance is to keep `Kukulcan:Database:Migration:AutoMigrateOnStartup` disabled and apply migrations as an explicit deployment step after reviewing the migration and target database. `EnsureCreatedAsync` is used only by the isolated Issue #4 persistence demonstration, not as a substitute for migration history.
 
+### Migration security and database privileges
+
+Treat schema migration as a deployment operation, separate from the API's normal runtime identity:
+
+- Supply the migration connection string through the deployment secret store or protected environment configuration. Do not put credentials in source control or command logs.
+- Use a dedicated migration identity with only the provider-specific privileges required to create or alter the `Example` schema objects and maintain EF Core's migration-history table. Do not use a database superuser or server administrator as the routine migration identity.
+- Use a separate runtime identity for the Web API. It should not have schema-creation or schema-alteration privileges; grant only the data access required by the application.
+- Review the generated migration operations and the target environment before applying them, and retain a tested backup/restore path for production changes.
+- Exact grant statements differ by provider. SQL Server and MySQL grants must be determined and verified in their real-provider work for Issues #21 and #22; this document does not claim those permission sets or providers have been validated.
+- Keep automatic startup migration disabled in production. Apply migrations as a controlled deployment step and verify the resulting schema and migration history before releasing the application.
+
 The initial migrations and snapshots are checked against the current EF model for all three provider configurations. The real-container initialization and repeat-application test currently exercises PostgreSQL. SQL Server and MySQL are **not** declared validated until Issues #21 and #22 complete their provider-backed checks. MySQL uses database/catalog semantics for schema names; provisioning and validation of the `Example` catalog must be verified by Issue #22 rather than inferred from the PostgreSQL test.
 
 The provider packages for PostgreSQL, SQL Server, and MySQL are explicit Infrastructure dependencies. PostgreSQL has an automated real-provider persistence test in this integration issue. SQL Server and MySQL must not be represented as fully validated until their respective provider-specific integration issues run against real instances.
