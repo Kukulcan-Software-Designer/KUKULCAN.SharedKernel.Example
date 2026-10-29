@@ -19,7 +19,7 @@ public sealed class DatabaseConfigurationStartupTests
         using var factory = CreateFactory(new Dictionary<string, string?>
         {
             [ProviderKey] = "PostgresSql",
-            [ConnectionStringKey] = null,
+            [ConnectionStringKey] = string.Empty,
             [AutoMigrateKey] = "false",
             [SeedDataKey] = "false"
         });
@@ -34,7 +34,7 @@ public sealed class DatabaseConfigurationStartupTests
     {
         using var factory = CreateFactory(new Dictionary<string, string?>
         {
-            [ProviderKey] = null,
+            [ProviderKey] = string.Empty,
             [ConnectionStringKey] = "Host=localhost;Database=example-tests;Username=test;Password=test",
             [AutoMigrateKey] = "false",
             [SeedDataKey] = "false"
@@ -82,7 +82,12 @@ public sealed class DatabaseConfigurationStartupTests
         IDictionary<string, string?> settings) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.ConfigureAppConfiguration((_, configuration) =>
-                configuration.AddInMemoryCollection(settings)));
+            {
+                // Isolate these startup tests from environment variables and appsettings
+                // so each case proves behavior for exactly the supplied configuration.
+                configuration.Sources.Clear();
+                configuration.AddInMemoryCollection(settings);
+            }));
 
     private static string GetExceptionMessages(Exception? exception)
     {
