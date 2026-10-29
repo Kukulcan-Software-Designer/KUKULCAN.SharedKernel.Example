@@ -409,7 +409,7 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
                 VALUES ({Guid.NewGuid()}, {tenantId}, {stockWarehouseId}, {stockProductId}, {1m})
                 """);
 
-        var duplicateStockException = Assert.ThrowsAsync<PostgresException>(async () =>
+        var duplicateStockException = await Assert.ThrowsAsync<PostgresException>(async () =>
             await context.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                     INSERT INTO "Example"."WarehouseStocks" ("Id", "TenantId", "WarehouseId", "ProductId", "Quantity")
@@ -418,7 +418,7 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
         Assert.That(duplicateStockException!.SqlState, Is.EqualTo("23505"),
             "The database must enforce uniqueness of the warehouse/product stock pair.");
 
-        var crossTenantStockException = Assert.ThrowsAsync<PostgresException>(async () =>
+        var crossTenantStockException = await Assert.ThrowsAsync<PostgresException>(async () =>
             await context.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                     INSERT INTO "Example"."WarehouseStocks" ("Id", "TenantId", "WarehouseId", "ProductId", "Quantity")
