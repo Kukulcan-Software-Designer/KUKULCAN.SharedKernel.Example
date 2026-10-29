@@ -160,6 +160,63 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
                 "Example migrations must not recreate Auth-owned tables in schema Auth.");
         });
 
+        var historicalColumns = await context.Database.SqlQueryRaw<string>(
+            """
+            SELECT table_name || '.' || column_name AS "Value"
+            FROM information_schema.columns
+            WHERE table_schema = 'Example'
+              AND (table_name, column_name) IN (
+                ('Invoices', 'ClientName'),
+                ('InvoiceLines', 'ProductCode'),
+                ('InvoiceLines', 'ProductName'),
+                ('ProdInvoices', 'ProviderName'),
+                ('ProdInvoiceLines', 'ProductCode'),
+                ('ProdInvoiceLines', 'ProductName'),
+                ('Clients', 'IsDeleted'),
+                ('Clients', 'DeletedOn'),
+                ('Providers', 'IsDeleted'),
+                ('Providers', 'DeletedOn'))
+            """).ToArrayAsync();
+
+        var softDeleteDefaults = await context.Database.SqlQueryRaw<string>(
+            """
+            SELECT table_name || '.' || column_name || '=' || column_default AS "Value"
+            FROM information_schema.columns
+            WHERE table_schema = 'Example'
+              AND (table_name, column_name) IN (
+                ('Clients', 'IsDeleted'),
+                ('Providers', 'IsDeleted'))
+            ORDER BY table_name
+            """).ToArrayAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                historicalColumns,
+                Is.EquivalentTo(new[]
+                {
+                    "Invoices.ClientName",
+                    "InvoiceLines.ProductCode",
+                    "InvoiceLines.ProductName",
+                    "ProdInvoices.ProviderName",
+                    "ProdInvoiceLines.ProductCode",
+                    "ProdInvoiceLines.ProductName",
+                    "Clients.IsDeleted",
+                    "Clients.DeletedOn",
+                    "Providers.IsDeleted",
+                    "Providers.DeletedOn"
+                }),
+                "Migrations must preserve historical commercial descriptions and soft-delete metadata.");
+            Assert.That(
+                softDeleteDefaults,
+                Is.EquivalentTo(new[]
+                {
+                    "Clients.IsDeleted=false",
+                    "Providers.IsDeleted=false"
+                }),
+                "Client and Provider soft-delete flags must default to false.");
+        });
+
         var foreignKeyCount = await context.Database.SqlQueryRaw<int>(
             """
             SELECT COUNT(*)::integer AS "Value"
