@@ -90,6 +90,21 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
 
         await context.Database.MigrateAsync();
 
+        var appliedMigrationsAfterInitialMigration = await context.Database.GetAppliedMigrationsAsync();
+        var pendingMigrationsAfterInitialMigration = await context.Database.GetPendingMigrationsAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                appliedMigrationsAfterInitialMigration,
+                Does.Contain("20261022200000_InitialExampleSchema"),
+                "The initial migration must be recorded in __EFMigrationsHistory.");
+            Assert.That(
+                pendingMigrationsAfterInitialMigration,
+                Is.Empty,
+                "A fresh database must have no pending migrations after migration completes.");
+        });
+
         var expectedTables = await context.Database.SqlQueryRaw<int>(
             """
             SELECT COUNT(*)::integer AS "Value"
@@ -121,6 +136,26 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
         await context.SaveChangesAsync();
 
         await context.Database.MigrateAsync();
+
+        var appliedMigrationsAfterSecondMigration = await context.Database.GetAppliedMigrationsAsync();
+        var pendingMigrationsAfterSecondMigration = await context.Database.GetPendingMigrationsAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                appliedMigrationsAfterSecondMigration,
+                Does.Contain("20261022200000_InitialExampleSchema"),
+                "The applied migration must remain recorded in __EFMigrationsHistory after reapplying migrations.");
+            Assert.That(
+                appliedMigrationsAfterSecondMigration,
+                Is.EquivalentTo(appliedMigrationsAfterInitialMigration),
+                "Reapplying migrations must not add duplicate or unexpected history entries.");
+            Assert.That(
+                pendingMigrationsAfterSecondMigration,
+                Is.Empty,
+                "Reapplying migrations must leave no pending migrations.");
+        });
+
         context.ChangeTracker.Clear();
 
         var clientPreserved = await context.Clients.AsNoTracking().AnyAsync(entity => entity.Id == client.Id);
