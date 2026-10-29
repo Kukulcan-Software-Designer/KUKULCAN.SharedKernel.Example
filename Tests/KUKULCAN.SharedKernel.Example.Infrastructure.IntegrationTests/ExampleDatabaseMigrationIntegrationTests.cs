@@ -918,19 +918,19 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"""UPDATE "Example"."Products" SET "Code" = {"SKU-UPDATED"}, "Name" = {"Updated product"} WHERE "Id" = {productId} AND "TenantId" = {tenantId}""");
 
-        var historicalSnapshots = await context.Database.SqlQueryRaw<string>(
+        var historicalSnapshots = await context.Database.SqlQuery<string>(
             $"""
              SELECT 'Invoices.ClientName=' || "ClientName" AS "Value"
-             FROM "Example"."Invoices" WHERE "Id" = '{invoiceId}'
+             FROM "Example"."Invoices" WHERE "Id" = {invoiceId}
              UNION ALL
              SELECT 'InvoiceLines.ProductCode=' || "ProductCode" || ';ProductName=' || "ProductName"
-             FROM "Example"."InvoiceLines" WHERE "Id" = '{invoiceLineId}'
+             FROM "Example"."InvoiceLines" WHERE "Id" = {invoiceLineId}
              UNION ALL
              SELECT 'ProdInvoices.ProviderName=' || "ProviderName"
-             FROM "Example"."ProdInvoices" WHERE "Id" = '{purchaseInvoiceId}'
+             FROM "Example"."ProdInvoices" WHERE "Id" = {purchaseInvoiceId}
              UNION ALL
              SELECT 'ProdInvoiceLines.ProductCode=' || "ProductCode" || ';ProductName=' || "ProductName"
-             FROM "Example"."ProdInvoiceLines" WHERE "Id" = '{purchaseInvoiceLineId}'
+             FROM "Example"."ProdInvoiceLines" WHERE "Id" = {purchaseInvoiceLineId}
              """).ToArrayAsync();
 
         Assert.That(
