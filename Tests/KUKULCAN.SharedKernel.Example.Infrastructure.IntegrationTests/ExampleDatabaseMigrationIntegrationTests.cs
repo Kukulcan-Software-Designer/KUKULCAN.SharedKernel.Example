@@ -131,9 +131,14 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
         var expectedUniqueIndexes = await context.Database.SqlQueryRaw<int>(
             """
             SELECT COUNT(*)::integer AS "Value"
-            FROM pg_indexes
-            WHERE schemaname = 'Example'
-              AND indexname IN (
+            FROM pg_index AS index_info
+            INNER JOIN pg_class AS index_relation
+                ON index_relation.oid = index_info.indexrelid
+            INNER JOIN pg_namespace AS schema_info
+                ON schema_info.oid = index_relation.relnamespace
+            WHERE schema_info.nspname = 'Example'
+              AND index_info.indisunique
+              AND index_relation.relname IN (
                 'IX_Products_TenantId_Code',
                 'IX_WarehouseStocks_WarehouseId_ProductId',
                 'IX_Invoices_TenantId_InvoiceNumber',
