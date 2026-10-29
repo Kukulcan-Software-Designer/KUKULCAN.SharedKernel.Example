@@ -110,7 +110,7 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
         Assert.That(
             () => services.AddExampleDatabase(configuration),
             Throws.InvalidOperationException.With.Message.Contains(
-                $"{KukulcanDatabaseOptions.SectionKey}:ConnectionString"));
+                "KUKULCAN__DATABASE__CONNECTIONSTRING"));
     }
 
     private sealed class TestTenantContext(Guid tenantId) : ITenantContext

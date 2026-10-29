@@ -70,6 +70,9 @@
     <Project Path="Source/WebAPI/KUKULCAN.SharedKernel.Example.Application/KUKULCAN.SharedKernel.Example.Application.csproj" />
     <Project Path="Source/WebAPI/KUKULCAN.SharedKernel.Example.Domain/KUKULCAN.SharedKernel.Example.Domain.csproj" />
     <Project Path="Source/WebAPI/KUKULCAN.SharedKernel.Example.Infrastructure/KUKULCAN.SharedKernel.Example.Infrastructure.csproj" />
+    <Project Path="Source/WebAPI/KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL/KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL.csproj" />
+    <Project Path="Source/WebAPI/KUKULCAN.SharedKernel.Example.Migrations.SQLServer/KUKULCAN.SharedKernel.Example.Migrations.SQLServer.csproj" />
+    <Project Path="Source/WebAPI/KUKULCAN.SharedKernel.Example.Migrations.MySQL/KUKULCAN.SharedKernel.Example.Migrations.MySQL.csproj" />
     <Project Path="Source/WebAPI/KUKULCAN.SharedKernel.Example.WebApi/KUKULCAN.SharedKernel.Example.WebApi.csproj" />
   </Folder>
   <Folder Name="/Source/WebInterfaces/">
