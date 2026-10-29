@@ -606,13 +606,13 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
         Assert.That(deleteProductException!.SqlState, Is.EqualTo("23503"),
             "A product referenced by historical sales and purchase invoice lines must not be deleted.");
 
-        var persistedCommercialRows = await context.Database.SqlQueryRaw<int>(
-            """
+        var persistedCommercialRows = await context.Database.SqlQuery<int>(
+            $"""
             SELECT
-                (SELECT COUNT(*) FROM "Example"."Invoices" WHERE "Id" = '""" + invoiceId + """'::uuid)
-              + (SELECT COUNT(*) FROM "Example"."InvoiceLines" WHERE "Id" = '""" + invoiceLineId + """'::uuid)
-              + (SELECT COUNT(*) FROM "Example"."ProdInvoices" WHERE "Id" = '""" + prodInvoiceId + """'::uuid)
-              + (SELECT COUNT(*) FROM "Example"."ProdInvoiceLines" WHERE "Id" = '""" + prodInvoiceLineId + """'::uuid)
+                (SELECT COUNT(*) FROM "Example"."Invoices" WHERE "Id" = {invoiceId})
+              + (SELECT COUNT(*) FROM "Example"."InvoiceLines" WHERE "Id" = {invoiceLineId})
+              + (SELECT COUNT(*) FROM "Example"."ProdInvoices" WHERE "Id" = {prodInvoiceId})
+              + (SELECT COUNT(*) FROM "Example"."ProdInvoiceLines" WHERE "Id" = {prodInvoiceLineId})
                 AS "Value"
             """).SingleAsync();
 
