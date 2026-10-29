@@ -11,8 +11,8 @@ The Example must demonstrate reusable persistence capabilities from `KUKULCAN.Sh
 The agreed environment-variable names are:
 
 ```text
-Kukulcan__Database__Provider
-Kukulcan__Database__ConnectionString
+KUKULCAN__DATABASE__PROVIDER
+KUKULCAN__DATABASE__CONNECTIONSTRING
 ```
 
 The double underscore maps nested configuration keys in the standard .NET environment-variable configuration provider. Values must be provided through the deployment environment or a local secret store; never commit credentials to tracked configuration.
