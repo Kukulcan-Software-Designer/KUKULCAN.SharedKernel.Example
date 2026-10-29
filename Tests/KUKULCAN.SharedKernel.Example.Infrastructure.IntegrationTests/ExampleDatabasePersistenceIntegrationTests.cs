@@ -96,6 +96,55 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
     }
 
     [Test]
+    public async Task PostgreSqlConnectionFailure_IsNotReportedAsSuccessfulConnection()
+    {
+        const string passwordSentinel = "never-log-this-secret";
+        const string connectionString =
+            "Host=127.0.0.1;Port=1;Database=example-tests;Username=example-test-user;Password="
+            + passwordSentinel + ";Timeout=1";
+
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{KukulcanDatabaseOptions.SectionKey}:Provider"] = nameof(DatabaseProvider.PostgresSql),
+                [$"{KukulcanDatabaseOptions.SectionKey}:ConnectionString"] = connectionString,
+                [$"{KukulcanDatabaseOptions.SectionKey}:Pool:Enabled"] = "false",
+                [$"{KukulcanDatabaseOptions.SectionKey}:Migration:AutoMigrateOnStartup"] = "false",
+                [$"{KukulcanDatabaseOptions.SectionKey}:Migration:SeedDataOnStartup"] = "false"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IClock, TestClock>();
+        services.AddSingleton<IDomainEventDispatcher, TestDomainEventDispatcher>();
+        services.AddScoped<ITenantContext>(_ => new TestTenantContext(Guid.NewGuid()));
+        services.AddExampleDatabase(configuration);
+
+        await using var provider = services.BuildServiceProvider();
+        await using var scope = provider.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<ExampleDbContext>();
+        var configuredOptions = scope.ServiceProvider
+            .GetRequiredService<IOptions<KukulcanDatabaseOptions>>()
+            .Value;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(configuredOptions.Provider, Is.EqualTo(DatabaseProvider.PostgresSql));
+            Assert.That(configuredOptions.ConnectionString, Is.EqualTo(connectionString));
+        });
+
+        var exception = Assert.CatchAsync<Exception>(
+            async () => await context.Database.OpenConnectionAsync());
+
+        Assert.That(exception, Is.Not.Null, "A failed PostgreSQL connection must be reported as an error.");
+        Assert.That(
+            exception!.ToString(),
+            Does.Not.Contain(passwordSentinel),
+            "Connection failures must not expose the configured password in exception details.");
+    }
+
+    [Test]
     public void AddExampleDatabase_RequiresAnExternallyConfiguredConnectionString()
     {
         IConfiguration configuration = new ConfigurationBuilder()
