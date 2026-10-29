@@ -11,8 +11,8 @@ El Example debe demostrar las capacidades reutilizables de persistencia de `KUKU
 Los nombres de variables de entorno acordados son:
 
 ```text
-Kukulcan__Database__Provider
-Kukulcan__Database__ConnectionString
+KUKULCAN__DATABASE__PROVIDER
+KUKULCAN__DATABASE__CONNECTIONSTRING
 ```
 
 El doble guion bajo representa claves de configuración anidadas en el proveedor estándar de configuración de variables de entorno de .NET. Los valores deben suministrarse mediante el entorno de despliegue o un almacén local de secretos; nunca se deben confirmar credenciales en la configuración versionada.
