@@ -694,6 +694,168 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
         }
     }
 
+
+    [Test]
+    public async Task PostgreSqlBusinessConstraints_RejectMissingReferencesAndDuplicateCommercialKeys()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
+            .WithDatabase("example_business_constraints")
+            .WithUsername("postgres")
+            .WithPassword("example-business-constraints-password")
+            .Build();
+        await postgres.StartAsync();
+
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        await using var context = CreateContext(DatabaseProvider.PostgresSql, postgres.GetConnectionString(), tenantId);
+        await context.Database.MigrateAsync();
+
+        var clientId = Guid.NewGuid();
+        var providerId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var warehouseId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+        var purchaseInvoiceId = Guid.NewGuid();
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Clients" ("Id", "TenantId", "Name") VALUES ({clientId}, {tenantId}, {"Constraint client"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Providers" ("Id", "TenantId", "Name") VALUES ({providerId}, {tenantId}, {"Constraint provider"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name") VALUES ({productId}, {tenantId}, {"UNIQUE-P1"}, {"Constraint product"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Warehouses" ("Id", "TenantId", "Name") VALUES ({warehouseId}, {tenantId}, {"Constraint warehouse"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."Invoices"
+                ("Id", "TenantId", "ClientId", "InvoiceNumber", "IssuedAt", "ClientName")
+             VALUES ({invoiceId}, {tenantId}, {clientId}, {"UNIQUE-INV-1"}, {DateTimeOffset.UtcNow}, {"Constraint client snapshot"})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."ProdInvoices"
+                ("Id", "TenantId", "ProviderId", "InvoiceNumber", "IssuedAt", "ProviderName")
+             VALUES ({purchaseInvoiceId}, {tenantId}, {providerId}, {"UNIQUE-PINV-1"}, {DateTimeOffset.UtcNow}, {"Constraint provider snapshot"})
+             """);
+
+        var missingWarehouseException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."WarehouseStocks"
+                    ("Id", "TenantId", "WarehouseId", "ProductId", "Quantity")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {Guid.NewGuid()}, {productId}, {1m})
+                 """));
+        Assert.That(missingWarehouseException!.SqlState, Is.EqualTo("23503"),
+            "PostgreSQL must reject stock that references a warehouse that does not exist.");
+
+        var missingStockProductException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."WarehouseStocks"
+                    ("Id", "TenantId", "WarehouseId", "ProductId", "Quantity")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {warehouseId}, {Guid.NewGuid()}, {1m})
+                 """));
+        Assert.That(missingStockProductException!.SqlState, Is.EqualTo("23503"),
+            "PostgreSQL must reject stock that references a product that does not exist.");
+
+        var missingSalesLineProductException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."InvoiceLines"
+                    ("Id", "TenantId", "InvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {invoiceId}, {2}, {Guid.NewGuid()}, {"MISSING"}, {"Missing product"}, {1m}, {10m})
+                 """));
+        Assert.That(missingSalesLineProductException!.SqlState, Is.EqualTo("23503"),
+            "PostgreSQL must reject a sales invoice line that references a nonexistent product.");
+
+        var missingPurchaseLineProductException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."ProdInvoiceLines"
+                    ("Id", "TenantId", "ProdInvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {purchaseInvoiceId}, {2}, {Guid.NewGuid()}, {"MISSING"}, {"Missing product"}, {1m}, {10m})
+                 """));
+        Assert.That(missingPurchaseLineProductException!.SqlState, Is.EqualTo("23503"),
+            "PostgreSQL must reject a purchase invoice line that references a nonexistent product.");
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."WarehouseStocks"
+                ("Id", "TenantId", "WarehouseId", "ProductId", "Quantity")
+             VALUES ({Guid.NewGuid()}, {tenantId}, {warehouseId}, {productId}, {1m})
+             """);
+
+        var deleteWarehouseException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""DELETE FROM "Example"."Warehouses" WHERE "Id" = {warehouseId} AND "TenantId" = {tenantId}"""));
+        Assert.That(deleteWarehouseException!.SqlState, Is.EqualTo("23503"),
+            "A warehouse referenced by stock must not be deleted.");
+
+        var duplicateProductCodeException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name") VALUES ({Guid.NewGuid()}, {tenantId}, {"UNIQUE-P1"}, {"Duplicate code"})"""));
+        Assert.That(duplicateProductCodeException!.SqlState, Is.EqualTo("23505"),
+            "A product code must be unique within a tenant.");
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name") VALUES ({Guid.NewGuid()}, {otherTenantId}, {"UNIQUE-P1"}, {"Same code in another tenant"})""");
+
+        var duplicateSalesInvoiceNumberException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."Invoices"
+                    ("Id", "TenantId", "ClientId", "InvoiceNumber", "IssuedAt", "ClientName")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {clientId}, {"UNIQUE-INV-1"}, {DateTimeOffset.UtcNow}, {"Duplicate invoice"})
+                 """));
+        Assert.That(duplicateSalesInvoiceNumberException!.SqlState, Is.EqualTo("23505"),
+            "A sales invoice number must be unique within a tenant.");
+
+        var duplicatePurchaseInvoiceNumberException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."ProdInvoices"
+                    ("Id", "TenantId", "ProviderId", "InvoiceNumber", "IssuedAt", "ProviderName")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {providerId}, {"UNIQUE-PINV-1"}, {DateTimeOffset.UtcNow}, {"Duplicate purchase invoice"})
+                 """));
+        Assert.That(duplicatePurchaseInvoiceNumberException!.SqlState, Is.EqualTo("23505"),
+            "A purchase invoice number must be unique within a tenant.");
+
+        var salesLineId = Guid.NewGuid();
+        var purchaseLineId = Guid.NewGuid();
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."InvoiceLines"
+                ("Id", "TenantId", "InvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({salesLineId}, {tenantId}, {invoiceId}, {1}, {productId}, {"UNIQUE-P1"}, {"Constraint product snapshot"}, {1m}, {10m})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."ProdInvoiceLines"
+                ("Id", "TenantId", "ProdInvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({purchaseLineId}, {tenantId}, {purchaseInvoiceId}, {1}, {productId}, {"UNIQUE-P1"}, {"Constraint product snapshot"}, {1m}, {8m})
+             """);
+
+        var duplicateSalesLineNumberException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."InvoiceLines"
+                    ("Id", "TenantId", "InvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {invoiceId}, {1}, {productId}, {"UNIQUE-P1"}, {"Duplicate sales line"}, {1m}, {10m})
+                 """));
+        Assert.That(duplicateSalesLineNumberException!.SqlState, Is.EqualTo("23505"),
+            "A sales invoice cannot contain duplicate line numbers.");
+
+        var duplicatePurchaseLineNumberException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."ProdInvoiceLines"
+                    ("Id", "TenantId", "ProdInvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {purchaseInvoiceId}, {1}, {productId}, {"UNIQUE-P1"}, {"Duplicate purchase line"}, {1m}, {8m})
+                 """));
+        Assert.That(duplicatePurchaseLineNumberException!.SqlState, Is.EqualTo("23505"),
+            "A purchase invoice cannot contain duplicate line numbers.");
+    }
+
     private static ExampleDbContext CreateContext(
         DatabaseProvider provider,
         string connectionString,
