@@ -147,6 +147,68 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
                 'IX_ProdInvoiceLines_TenantId_ProdInvoiceId_LineNumber')
             """).SingleAsync();
 
+        var foreignKeyNames = await context.Database.SqlQueryRaw<string>(
+            """
+            SELECT constraint_info.conname AS "Value"
+            FROM pg_constraint AS constraint_info
+            INNER JOIN pg_namespace AS schema_info
+                ON schema_info.oid = constraint_info.connamespace
+            WHERE schema_info.nspname = 'Example'
+              AND constraint_info.contype = 'f'
+            ORDER BY constraint_info.conname
+            """).ToArrayAsync();
+
+        var primaryKeyCount = await context.Database.SqlQueryRaw<int>(
+            """
+            SELECT COUNT(*)::integer AS "Value"
+            FROM pg_constraint AS constraint_info
+            INNER JOIN pg_namespace AS schema_info
+                ON schema_info.oid = constraint_info.connamespace
+            WHERE schema_info.nspname = 'Example'
+              AND constraint_info.contype = 'p'
+            """).SingleAsync();
+
+        var alternateKeyCount = await context.Database.SqlQueryRaw<int>(
+            """
+            SELECT COUNT(*)::integer AS "Value"
+            FROM pg_constraint AS constraint_info
+            INNER JOIN pg_namespace AS schema_info
+                ON schema_info.oid = constraint_info.connamespace
+            WHERE schema_info.nspname = 'Example'
+              AND constraint_info.contype = 'u'
+            """).SingleAsync();
+
+        var expectedIndexes = await context.Database.SqlQueryRaw<string>(
+            """
+            SELECT index_relation.relname AS "Value"
+            FROM pg_index AS index_info
+            INNER JOIN pg_class AS index_relation
+                ON index_relation.oid = index_info.indexrelid
+            INNER JOIN pg_namespace AS schema_info
+                ON schema_info.oid = index_relation.relnamespace
+            WHERE schema_info.nspname = 'Example'
+              AND index_relation.relname IN (
+                'IX_Clients_TenantId_Name',
+                'IX_Clients_TenantId_City_State_PostalCode',
+                'IX_Providers_TenantId_Name',
+                'IX_Providers_TenantId_City_State_PostalCode',
+                'IX_Products_TenantId_Code',
+                'IX_Products_TenantId_Name',
+                'IX_Warehouses_TenantId_Name',
+                'IX_WarehouseStocks_WarehouseId_ProductId',
+                'IX_WarehouseStocks_TenantId_ProductId',
+                'IX_WarehouseStocks_TenantId_WarehouseId',
+                'IX_Invoices_TenantId_InvoiceNumber',
+                'IX_Invoices_TenantId_ClientId_IssuedAt',
+                'IX_InvoiceLines_TenantId_InvoiceId_LineNumber',
+                'IX_InvoiceLines_TenantId_ProductId',
+                'IX_ProdInvoices_TenantId_InvoiceNumber',
+                'IX_ProdInvoices_TenantId_ProviderId_IssuedAt',
+                'IX_ProdInvoiceLines_TenantId_ProdInvoiceId_LineNumber',
+                'IX_ProdInvoiceLines_TenantId_ProductId')
+            ORDER BY index_relation.relname
+            """).ToArrayAsync();
+
         var foreignKeysWithUnexpectedDeleteBehavior = await context.Database.SqlQueryRaw<int>(
             """
             SELECT COUNT(*)::integer AS "Value"
@@ -164,6 +226,46 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
                 foreignKeyCount,
                 Is.EqualTo(8),
                 "The migrated Example schema must contain all eight documented business foreign keys.");
+            Assert.That(
+                foreignKeyNames,
+                Is.EquivalentTo(new[]
+                {
+                    "FK_Invoices_Clients_TenantId_ClientId",
+                    "FK_InvoiceLines_Invoices_TenantId_InvoiceId",
+                    "FK_InvoiceLines_Products_TenantId_ProductId",
+                    "FK_ProdInvoices_Providers_TenantId_ProviderId",
+                    "FK_ProdInvoiceLines_ProdInvoices_TenantId_ProdInvoiceId",
+                    "FK_ProdInvoiceLines_Products_TenantId_ProductId",
+                    "FK_WarehouseStocks_Products_TenantId_ProductId",
+                    "FK_WarehouseStocks_Warehouses_TenantId_WarehouseId"
+                }),
+                "The migrated foreign keys must connect the intended tenant-scoped business entities.");
+            Assert.That(primaryKeyCount, Is.EqualTo(10), "Every Example-owned table must have a primary key.");
+            Assert.That(alternateKeyCount, Is.EqualTo(6), "Tenant-scoped alternate keys must be materialized.");
+            Assert.That(
+                expectedIndexes,
+                Is.EquivalentTo(new[]
+                {
+                    "IX_Clients_TenantId_Name",
+                    "IX_Clients_TenantId_City_State_PostalCode",
+                    "IX_Providers_TenantId_Name",
+                    "IX_Providers_TenantId_City_State_PostalCode",
+                    "IX_Products_TenantId_Code",
+                    "IX_Products_TenantId_Name",
+                    "IX_Warehouses_TenantId_Name",
+                    "IX_WarehouseStocks_WarehouseId_ProductId",
+                    "IX_WarehouseStocks_TenantId_ProductId",
+                    "IX_WarehouseStocks_TenantId_WarehouseId",
+                    "IX_Invoices_TenantId_InvoiceNumber",
+                    "IX_Invoices_TenantId_ClientId_IssuedAt",
+                    "IX_InvoiceLines_TenantId_InvoiceId_LineNumber",
+                    "IX_InvoiceLines_TenantId_ProductId",
+                    "IX_ProdInvoices_TenantId_InvoiceNumber",
+                    "IX_ProdInvoices_TenantId_ProviderId_IssuedAt",
+                    "IX_ProdInvoiceLines_TenantId_ProdInvoiceId_LineNumber",
+                    "IX_ProdInvoiceLines_TenantId_ProductId"
+                }),
+                "The migration must materialize all expected business indexes.");
             Assert.That(
                 expectedUniqueIndexes,
                 Is.EqualTo(6),
