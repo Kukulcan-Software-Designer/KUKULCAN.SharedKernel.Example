@@ -463,8 +463,8 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
 
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"""DELETE FROM "Example"."Products" WHERE "Id" = {disposableProductId} AND "TenantId" = {tenantId}""");
-        var deletedProductCount = await context.Database.SqlQueryRaw<int>(
-            $"""SELECT COUNT(*)::integer AS "Value" FROM "Example"."Products" WHERE "Id" = '{disposableProductId}'""")
+        var deletedProductCount = await context.Database.SqlQuery<int>(
+            $"""SELECT COUNT(*)::integer AS "Value" FROM "Example"."Products" WHERE "Id" = {disposableProductId}""")
             .SingleAsync();
 
         Assert.That(deletedProductCount, Is.Zero,
