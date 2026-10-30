@@ -165,9 +165,9 @@ public sealed class JsonEngineQueryServiceTests
     [Test]
     public void Execute_WhenDocumentExceedsMaximumSize_ThrowsValidationException()
     {
-        string json = "{\\"value\\":\\"" +
+        string json = "{\"value\":\"" +
                       new string('x', JsonEngineQueryService.MaxDocumentSizeBytes) +
-                      "\\"}";
+                      "\"}";
         using JsonDocument document = CreateDocument(json);
         var engine = new StubJsonSqlEngine();
         var service = new JsonEngineQueryService(engine);
