@@ -1,4 +1,3 @@
-using System.Data.Common;
 using System.Reflection;
 using KUKULCAN.SharedKernel.Abstractions;
 using KUKULCAN.SharedKernel.Auth.Persistence;
