@@ -1,4 +1,3 @@
-using System.Data.Common;
 using KUKULCAN.SharedKernel.Abstractions;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
@@ -92,9 +91,8 @@ public sealed class SqlServerAtlasMigrationIntegrationTests
                 "Rerunning migrations must not recreate, remove or rename Example tables.");
         });
 
-        // Keep the earlier history read meaningful: existing applied migrations must remain applied.
-        Assert.That(appliedAfterSecondMigration, Does.Contain(
-            Is.SubsetOf(appliedBeforeMigration.Concat(appliedAfterFirstMigration).ToArray())));
+        Assert.That(appliedAfterFirstMigration, Is.SupersetOf(appliedBeforeMigration),
+            "Migrations that were already applied must remain in the migration history.");
     }
 
     private static async Task<HashSet<string>> ReadTablesInExampleSchemaAsync(ExampleDbContext context)
