@@ -8,7 +8,7 @@
   <ItemGroup>
     <PackageReference Include="KUKULCAN.SharedKernel" Version="1.0.0" />
     <PackageReference Include="KUKULCAN.SharedKernel.Auth" Version="1.1.6" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.13" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.14" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Application\KUKULCAN.SharedKernel.Example.Application.csproj" />
     <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Infrastructure\KUKULCAN.SharedKernel.Example.Infrastructure.csproj" />

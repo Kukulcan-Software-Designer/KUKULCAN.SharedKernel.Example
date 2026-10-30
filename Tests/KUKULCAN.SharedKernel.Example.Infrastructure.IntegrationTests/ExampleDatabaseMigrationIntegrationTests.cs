@@ -479,6 +479,147 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
         });
     }
 
+
+    [Test]
+    public async Task PostgreSqlCommercialRelationships_EnforceForeignKeysAndRestrictHistoricalDeletes()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
+            .WithDatabase("example_referential_integrity")
+            .WithUsername("postgres")
+            .WithPassword("example-referential-integrity-password")
+            .Build();
+        await postgres.StartAsync();
+
+        var tenantId = Guid.NewGuid();
+        await using var context = CreateContext(DatabaseProvider.PostgresSql, postgres.GetConnectionString(), tenantId);
+        await context.Database.MigrateAsync();
+
+        var clientId = Guid.NewGuid();
+        var providerId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+        var invoiceLineId = Guid.NewGuid();
+        var prodInvoiceId = Guid.NewGuid();
+        var prodInvoiceLineId = Guid.NewGuid();
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Clients" ("Id", "TenantId", "Name") VALUES ({clientId}, {tenantId}, {"FK client"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Providers" ("Id", "TenantId", "Name") VALUES ({providerId}, {tenantId}, {"FK provider"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name") VALUES ({productId}, {tenantId}, {"FK-P1"}, {"FK product"})""");
+
+        var missingClientException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."Invoices"
+                    ("Id", "TenantId", "ClientId", "InvoiceNumber", "IssuedAt", "ClientName")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {Guid.NewGuid()}, {"INV-MISSING-CLIENT"},
+                    {DateTimeOffset.UtcNow}, {"Missing client"})
+                 """));
+        Assert.That(missingClientException!.SqlState, Is.EqualTo("23503"),
+            "PostgreSQL must reject a sales invoice referencing a client that does not exist.");
+
+        var missingProviderException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."ProdInvoices"
+                    ("Id", "TenantId", "ProviderId", "InvoiceNumber", "IssuedAt", "ProviderName")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {Guid.NewGuid()}, {"PINV-MISSING-PROVIDER"},
+                    {DateTimeOffset.UtcNow}, {"Missing provider"})
+                 """));
+        Assert.That(missingProviderException!.SqlState, Is.EqualTo("23503"),
+            "PostgreSQL must reject a purchase invoice referencing a provider that does not exist.");
+
+        var missingInvoiceLineException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."InvoiceLines"
+                    ("Id", "TenantId", "InvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {Guid.NewGuid()}, {1}, {productId}, {"FK-P1"}, {"FK product"}, {1m}, {10m})
+                 """));
+        Assert.That(missingInvoiceLineException!.SqlState, Is.EqualTo("23503"),
+            "PostgreSQL must reject a sales invoice line referencing a nonexistent invoice.");
+
+        var missingPurchaseLineException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."ProdInvoiceLines"
+                    ("Id", "TenantId", "ProdInvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {Guid.NewGuid()}, {1}, {productId}, {"FK-P1"}, {"FK product"}, {1m}, {10m})
+                 """));
+        Assert.That(missingPurchaseLineException!.SqlState, Is.EqualTo("23503"),
+            "PostgreSQL must reject a purchase invoice line referencing a nonexistent purchase invoice.");
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."Invoices"
+                ("Id", "TenantId", "ClientId", "InvoiceNumber", "IssuedAt", "ClientName")
+             VALUES ({invoiceId}, {tenantId}, {clientId}, {"INV-FK-VALID"}, {DateTimeOffset.UtcNow}, {"FK client snapshot"})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."InvoiceLines"
+                ("Id", "TenantId", "InvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({invoiceLineId}, {tenantId}, {invoiceId}, {1}, {productId}, {"FK-P1"}, {"FK product snapshot"}, {2m}, {10m})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."ProdInvoices"
+                ("Id", "TenantId", "ProviderId", "InvoiceNumber", "IssuedAt", "ProviderName")
+             VALUES ({prodInvoiceId}, {tenantId}, {providerId}, {"PINV-FK-VALID"}, {DateTimeOffset.UtcNow}, {"FK provider snapshot"})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."ProdInvoiceLines"
+                ("Id", "TenantId", "ProdInvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({prodInvoiceLineId}, {tenantId}, {prodInvoiceId}, {1}, {productId}, {"FK-P1"}, {"FK product snapshot"}, {3m}, {8m})
+             """);
+
+        var deleteClientException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""DELETE FROM "Example"."Clients" WHERE "Id" = {clientId} AND "TenantId" = {tenantId}"""));
+        Assert.That(deleteClientException!.SqlState, Is.EqualTo("23503"),
+            "A client referenced by a sales invoice must not be deleted.");
+
+        var deleteProviderException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""DELETE FROM "Example"."Providers" WHERE "Id" = {providerId} AND "TenantId" = {tenantId}"""));
+        Assert.That(deleteProviderException!.SqlState, Is.EqualTo("23503"),
+            "A provider referenced by a purchase invoice must not be deleted.");
+
+        var deleteInvoiceException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""DELETE FROM "Example"."Invoices" WHERE "Id" = {invoiceId} AND "TenantId" = {tenantId}"""));
+        Assert.That(deleteInvoiceException!.SqlState, Is.EqualTo("23503"),
+            "A sales invoice with lines must not be deleted.");
+
+        var deletePurchaseInvoiceException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""DELETE FROM "Example"."ProdInvoices" WHERE "Id" = {prodInvoiceId} AND "TenantId" = {tenantId}"""));
+        Assert.That(deletePurchaseInvoiceException!.SqlState, Is.EqualTo("23503"),
+            "A purchase invoice with lines must not be deleted.");
+
+        var deleteProductException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""DELETE FROM "Example"."Products" WHERE "Id" = {productId} AND "TenantId" = {tenantId}"""));
+        Assert.That(deleteProductException!.SqlState, Is.EqualTo("23503"),
+            "A product referenced by historical sales and purchase invoice lines must not be deleted.");
+
+        var persistedCommercialRows = await context.Database.SqlQuery<int>(
+            $"""
+            SELECT
+                (SELECT COUNT(*) FROM "Example"."Invoices" WHERE "Id" = {invoiceId})
+              + (SELECT COUNT(*) FROM "Example"."InvoiceLines" WHERE "Id" = {invoiceLineId})
+              + (SELECT COUNT(*) FROM "Example"."ProdInvoices" WHERE "Id" = {prodInvoiceId})
+              + (SELECT COUNT(*) FROM "Example"."ProdInvoiceLines" WHERE "Id" = {prodInvoiceLineId})
+                AS "Value"
+            """).SingleAsync();
+
+        Assert.That(persistedCommercialRows, Is.EqualTo(4),
+            "Valid sales and purchase invoice records and their lines must persist in PostgreSQL.");
+    }
+
     [TestCase(
         "KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL.ExampleDbContextFactory, KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL",
         "PostgresSql",
@@ -551,6 +692,257 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
             Environment.SetEnvironmentVariable("KUKULCAN__DATABASE__PROVIDER", previousProvider);
             Environment.SetEnvironmentVariable("KUKULCAN__DATABASE__CONNECTIONSTRING", previousConnectionString);
         }
+    }
+
+
+    [Test]
+    public async Task PostgreSqlBusinessConstraints_RejectMissingReferencesAndDuplicateCommercialKeys()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
+            .WithDatabase("example_business_constraints")
+            .WithUsername("postgres")
+            .WithPassword("example-business-constraints-password")
+            .Build();
+        await postgres.StartAsync();
+
+        var tenantId = Guid.NewGuid();
+        var otherTenantId = Guid.NewGuid();
+        await using var context = CreateContext(DatabaseProvider.PostgresSql, postgres.GetConnectionString(), tenantId);
+        await context.Database.MigrateAsync();
+
+        var clientId = Guid.NewGuid();
+        var providerId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var warehouseId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+        var purchaseInvoiceId = Guid.NewGuid();
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Clients" ("Id", "TenantId", "Name") VALUES ({clientId}, {tenantId}, {"Constraint client"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Providers" ("Id", "TenantId", "Name") VALUES ({providerId}, {tenantId}, {"Constraint provider"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name") VALUES ({productId}, {tenantId}, {"UNIQUE-P1"}, {"Constraint product"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Warehouses" ("Id", "TenantId", "Name") VALUES ({warehouseId}, {tenantId}, {"Constraint warehouse"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."Invoices"
+                ("Id", "TenantId", "ClientId", "InvoiceNumber", "IssuedAt", "ClientName")
+             VALUES ({invoiceId}, {tenantId}, {clientId}, {"UNIQUE-INV-1"}, {DateTimeOffset.UtcNow}, {"Constraint client snapshot"})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."ProdInvoices"
+                ("Id", "TenantId", "ProviderId", "InvoiceNumber", "IssuedAt", "ProviderName")
+             VALUES ({purchaseInvoiceId}, {tenantId}, {providerId}, {"UNIQUE-PINV-1"}, {DateTimeOffset.UtcNow}, {"Constraint provider snapshot"})
+             """);
+
+        var missingWarehouseException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."WarehouseStocks"
+                    ("Id", "TenantId", "WarehouseId", "ProductId", "Quantity")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {Guid.NewGuid()}, {productId}, {1m})
+                 """));
+        Assert.That(missingWarehouseException!.SqlState, Is.EqualTo("23503"),
+            "PostgreSQL must reject stock that references a warehouse that does not exist.");
+
+        var missingStockProductException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."WarehouseStocks"
+                    ("Id", "TenantId", "WarehouseId", "ProductId", "Quantity")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {warehouseId}, {Guid.NewGuid()}, {1m})
+                 """));
+        Assert.That(missingStockProductException!.SqlState, Is.EqualTo("23503"),
+            "PostgreSQL must reject stock that references a product that does not exist.");
+
+        var missingSalesLineProductException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."InvoiceLines"
+                    ("Id", "TenantId", "InvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {invoiceId}, {2}, {Guid.NewGuid()}, {"MISSING"}, {"Missing product"}, {1m}, {10m})
+                 """));
+        Assert.That(missingSalesLineProductException!.SqlState, Is.EqualTo("23503"),
+            "PostgreSQL must reject a sales invoice line that references a nonexistent product.");
+
+        var missingPurchaseLineProductException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."ProdInvoiceLines"
+                    ("Id", "TenantId", "ProdInvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {purchaseInvoiceId}, {2}, {Guid.NewGuid()}, {"MISSING"}, {"Missing product"}, {1m}, {10m})
+                 """));
+        Assert.That(missingPurchaseLineProductException!.SqlState, Is.EqualTo("23503"),
+            "PostgreSQL must reject a purchase invoice line that references a nonexistent product.");
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."WarehouseStocks"
+                ("Id", "TenantId", "WarehouseId", "ProductId", "Quantity")
+             VALUES ({Guid.NewGuid()}, {tenantId}, {warehouseId}, {productId}, {1m})
+             """);
+
+        var deleteWarehouseException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""DELETE FROM "Example"."Warehouses" WHERE "Id" = {warehouseId} AND "TenantId" = {tenantId}"""));
+        Assert.That(deleteWarehouseException!.SqlState, Is.EqualTo("23503"),
+            "A warehouse referenced by stock must not be deleted.");
+
+        var duplicateProductCodeException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name") VALUES ({Guid.NewGuid()}, {tenantId}, {"UNIQUE-P1"}, {"Duplicate code"})"""));
+        Assert.That(duplicateProductCodeException!.SqlState, Is.EqualTo("23505"),
+            "A product code must be unique within a tenant.");
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name") VALUES ({Guid.NewGuid()}, {otherTenantId}, {"UNIQUE-P1"}, {"Same code in another tenant"})""");
+
+        var duplicateSalesInvoiceNumberException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."Invoices"
+                    ("Id", "TenantId", "ClientId", "InvoiceNumber", "IssuedAt", "ClientName")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {clientId}, {"UNIQUE-INV-1"}, {DateTimeOffset.UtcNow}, {"Duplicate invoice"})
+                 """));
+        Assert.That(duplicateSalesInvoiceNumberException!.SqlState, Is.EqualTo("23505"),
+            "A sales invoice number must be unique within a tenant.");
+
+        var duplicatePurchaseInvoiceNumberException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."ProdInvoices"
+                    ("Id", "TenantId", "ProviderId", "InvoiceNumber", "IssuedAt", "ProviderName")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {providerId}, {"UNIQUE-PINV-1"}, {DateTimeOffset.UtcNow}, {"Duplicate purchase invoice"})
+                 """));
+        Assert.That(duplicatePurchaseInvoiceNumberException!.SqlState, Is.EqualTo("23505"),
+            "A purchase invoice number must be unique within a tenant.");
+
+        var salesLineId = Guid.NewGuid();
+        var purchaseLineId = Guid.NewGuid();
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."InvoiceLines"
+                ("Id", "TenantId", "InvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({salesLineId}, {tenantId}, {invoiceId}, {1}, {productId}, {"UNIQUE-P1"}, {"Constraint product snapshot"}, {1m}, {10m})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."ProdInvoiceLines"
+                ("Id", "TenantId", "ProdInvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({purchaseLineId}, {tenantId}, {purchaseInvoiceId}, {1}, {productId}, {"UNIQUE-P1"}, {"Constraint product snapshot"}, {1m}, {8m})
+             """);
+
+        var duplicateSalesLineNumberException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."InvoiceLines"
+                    ("Id", "TenantId", "InvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {invoiceId}, {1}, {productId}, {"UNIQUE-P1"}, {"Duplicate sales line"}, {1m}, {10m})
+                 """));
+        Assert.That(duplicateSalesLineNumberException!.SqlState, Is.EqualTo("23505"),
+            "A sales invoice cannot contain duplicate line numbers.");
+
+        var duplicatePurchaseLineNumberException = await Assert.ThrowsAsync<PostgresException>(async () =>
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 INSERT INTO "Example"."ProdInvoiceLines"
+                    ("Id", "TenantId", "ProdInvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+                 VALUES ({Guid.NewGuid()}, {tenantId}, {purchaseInvoiceId}, {1}, {productId}, {"UNIQUE-P1"}, {"Duplicate purchase line"}, {1m}, {8m})
+                 """));
+        Assert.That(duplicatePurchaseLineNumberException!.SqlState, Is.EqualTo("23505"),
+            "A purchase invoice cannot contain duplicate line numbers.");
+    }
+
+
+    [Test]
+    public async Task PostgreSqlCommercialSnapshots_RemainUnchangedWhenMasterDataChanges()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
+            .WithDatabase("example_commercial_snapshots")
+            .WithUsername("postgres")
+            .WithPassword("example-commercial-snapshots-password")
+            .Build();
+        await postgres.StartAsync();
+
+        var tenantId = Guid.NewGuid();
+        await using var context = CreateContext(DatabaseProvider.PostgresSql, postgres.GetConnectionString(), tenantId);
+        await context.Database.MigrateAsync();
+
+        var clientId = Guid.NewGuid();
+        var providerId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+        var invoiceLineId = Guid.NewGuid();
+        var purchaseInvoiceId = Guid.NewGuid();
+        var purchaseInvoiceLineId = Guid.NewGuid();
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Clients" ("Id", "TenantId", "Name") VALUES ({clientId}, {tenantId}, {"Client at sale"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Providers" ("Id", "TenantId", "Name") VALUES ({providerId}, {tenantId}, {"Provider at purchase"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name") VALUES ({productId}, {tenantId}, {"SKU-ORIGINAL"}, {"Product at transaction"})""");
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."Invoices"
+                ("Id", "TenantId", "ClientId", "InvoiceNumber", "IssuedAt", "ClientName")
+             VALUES ({invoiceId}, {tenantId}, {clientId}, {"SNAPSHOT-INV-1"}, {DateTimeOffset.UtcNow}, {"Client at sale"})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."InvoiceLines"
+                ("Id", "TenantId", "InvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({invoiceLineId}, {tenantId}, {invoiceId}, {1}, {productId}, {"SKU-ORIGINAL"}, {"Product at transaction"}, {2m}, {10m})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."ProdInvoices"
+                ("Id", "TenantId", "ProviderId", "InvoiceNumber", "IssuedAt", "ProviderName")
+             VALUES ({purchaseInvoiceId}, {tenantId}, {providerId}, {"SNAPSHOT-PINV-1"}, {DateTimeOffset.UtcNow}, {"Provider at purchase"})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."ProdInvoiceLines"
+                ("Id", "TenantId", "ProdInvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({purchaseInvoiceLineId}, {tenantId}, {purchaseInvoiceId}, {1}, {productId}, {"SKU-ORIGINAL"}, {"Product at transaction"}, {3m}, {8m})
+             """);
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "Example"."Clients" SET "Name" = {"Renamed client"} WHERE "Id" = {clientId} AND "TenantId" = {tenantId}""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "Example"."Providers" SET "Name" = {"Renamed provider"} WHERE "Id" = {providerId} AND "TenantId" = {tenantId}""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "Example"."Products" SET "Code" = {"SKU-UPDATED"}, "Name" = {"Updated product"} WHERE "Id" = {productId} AND "TenantId" = {tenantId}""");
+
+        var historicalSnapshots = await context.Database.SqlQuery<string>(
+            $"""
+             SELECT 'Invoices.ClientName=' || "ClientName" AS "Value"
+             FROM "Example"."Invoices" WHERE "Id" = {invoiceId}
+             UNION ALL
+             SELECT 'InvoiceLines.ProductCode=' || "ProductCode" || ';ProductName=' || "ProductName"
+             FROM "Example"."InvoiceLines" WHERE "Id" = {invoiceLineId}
+             UNION ALL
+             SELECT 'ProdInvoices.ProviderName=' || "ProviderName"
+             FROM "Example"."ProdInvoices" WHERE "Id" = {purchaseInvoiceId}
+             UNION ALL
+             SELECT 'ProdInvoiceLines.ProductCode=' || "ProductCode" || ';ProductName=' || "ProductName"
+             FROM "Example"."ProdInvoiceLines" WHERE "Id" = {purchaseInvoiceLineId}
+             """).ToArrayAsync();
+
+        Assert.That(
+            historicalSnapshots,
+            Is.EquivalentTo(new[]
+            {
+                "Invoices.ClientName=Client at sale",
+                "InvoiceLines.ProductCode=SKU-ORIGINAL;ProductName=Product at transaction",
+                "ProdInvoices.ProviderName=Provider at purchase",
+                "ProdInvoiceLines.ProductCode=SKU-ORIGINAL;ProductName=Product at transaction"
+            }),
+            "Commercial documents must retain the client, provider and product descriptions captured at transaction time.");
     }
 
     private static ExampleDbContext CreateContext(
