@@ -477,6 +477,149 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             "Updating master data or deleting an unrelated product must not remove persisted invoice lines.");
     }
 
+
+    [Test]
+    public async Task PostgreSqlSoftDelete_PreservesSalesAndPurchaseDocumentsAndHistoricalSnapshots()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
+            .WithDatabase("example_commercial_history_soft_delete")
+            .WithUsername("postgres")
+            .WithPassword("example-commercial-history-soft-delete-password")
+            .Build();
+        await postgres.StartAsync();
+
+        var tenantId = Guid.NewGuid();
+        await using var context = CreateContext(postgres.GetConnectionString(), tenantId);
+        await context.Database.MigrateAsync();
+
+        var client = new KUKULCAN.SharedKernel.Example.Domain.Entities.Client
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Historical sales client"
+        };
+        var provider = new KUKULCAN.SharedKernel.Example.Domain.Entities.Provider
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Historical purchase provider"
+        };
+        var product = new KUKULCAN.SharedKernel.Example.Domain.Entities.Product
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Code = "HISTORY-PRODUCT-01",
+            Name = "Historical product name"
+        };
+
+        context.Clients.Add(client);
+        context.Providers.Add(provider);
+        context.Products.Add(product);
+        await context.SaveChangesAsync();
+
+        var salesInvoiceId = Guid.NewGuid();
+        var salesLineId = Guid.NewGuid();
+        var purchaseInvoiceId = Guid.NewGuid();
+        var purchaseLineId = Guid.NewGuid();
+        var issuedAt = DateTimeOffset.UtcNow;
+        const string salesClientSnapshot = "Historical sales client";
+        const string purchaseProviderSnapshot = "Historical purchase provider";
+        const string productCodeSnapshot = "HISTORY-PRODUCT-01";
+        const string productNameSnapshot = "Historical product name";
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."Invoices"
+                ("Id", "TenantId", "ClientId", "InvoiceNumber", "IssuedAt", "ClientName")
+             VALUES ({salesInvoiceId}, {tenantId}, {client.Id}, {"HIST-SALE-001"}, {issuedAt}, {salesClientSnapshot})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."InvoiceLines"
+                ("Id", "TenantId", "InvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({salesLineId}, {tenantId}, {salesInvoiceId}, {1}, {product.Id}, {productCodeSnapshot}, {productNameSnapshot}, {2.5m}, {12.75m})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."ProdInvoices"
+                ("Id", "TenantId", "ProviderId", "InvoiceNumber", "IssuedAt", "ProviderName")
+             VALUES ({purchaseInvoiceId}, {tenantId}, {provider.Id}, {"HIST-PURCHASE-001"}, {issuedAt}, {purchaseProviderSnapshot})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."ProdInvoiceLines"
+                ("Id", "TenantId", "ProdInvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({purchaseLineId}, {tenantId}, {purchaseInvoiceId}, {1}, {product.Id}, {productCodeSnapshot}, {productNameSnapshot}, {5.0m}, {8.25m})
+             """);
+
+        context.ChangeTracker.Clear();
+        var clientToDelete = await context.Clients.SingleAsync(entity => entity.Id == client.Id);
+        var providerToDelete = await context.Providers.SingleAsync(entity => entity.Id == provider.Id);
+        context.Clients.Remove(clientToDelete);
+        context.Providers.Remove(providerToDelete);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var visibleClient = await context.Clients
+            .AsNoTracking()
+            .SingleOrDefaultAsync(entity => entity.Id == client.Id);
+        var visibleProvider = await context.Providers
+            .AsNoTracking()
+            .SingleOrDefaultAsync(entity => entity.Id == provider.Id);
+
+        var salesInvoiceCount = await context.Database.SqlQuery<int>(
+            $"""SELECT COUNT(*)::integer AS "Value" FROM "Example"."Invoices" WHERE "Id" = {salesInvoiceId}""")
+            .SingleAsync();
+        var salesLineCount = await context.Database.SqlQuery<int>(
+            $"""SELECT COUNT(*)::integer AS "Value" FROM "Example"."InvoiceLines" WHERE "Id" = {salesLineId}""")
+            .SingleAsync();
+        var purchaseInvoiceCount = await context.Database.SqlQuery<int>(
+            $"""SELECT COUNT(*)::integer AS "Value" FROM "Example"."ProdInvoices" WHERE "Id" = {purchaseInvoiceId}""")
+            .SingleAsync();
+        var purchaseLineCount = await context.Database.SqlQuery<int>(
+            $"""SELECT COUNT(*)::integer AS "Value" FROM "Example"."ProdInvoiceLines" WHERE "Id" = {purchaseLineId}""")
+            .SingleAsync();
+
+        var salesSnapshots = await context.Database.SqlQuery<string>(
+            $"""
+             SELECT i."ClientName" || '|' || line."ProductCode" || '|' || line."ProductName" AS "Value"
+             FROM "Example"."Invoices" AS i
+             INNER JOIN "Example"."InvoiceLines" AS line
+                ON line."TenantId" = i."TenantId" AND line."InvoiceId" = i."Id"
+             WHERE i."Id" = {salesInvoiceId} AND line."Id" = {salesLineId}
+             """).SingleAsync();
+        var purchaseSnapshots = await context.Database.SqlQuery<string>(
+            $"""
+             SELECT i."ProviderName" || '|' || line."ProductCode" || '|' || line."ProductName" AS "Value"
+             FROM "Example"."ProdInvoices" AS i
+             INNER JOIN "Example"."ProdInvoiceLines" AS line
+                ON line."TenantId" = i."TenantId" AND line."ProdInvoiceId" = i."Id"
+             WHERE i."Id" = {purchaseInvoiceId} AND line."Id" = {purchaseLineId}
+             """).SingleAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(visibleClient, Is.Null,
+                "Ordinary client queries must hide a logically deleted client.");
+            Assert.That(visibleProvider, Is.Null,
+                "Ordinary provider queries must hide a logically deleted provider.");
+            Assert.That(salesInvoiceCount, Is.EqualTo(1),
+                "The sales invoice must remain stored after the client is logically deleted.");
+            Assert.That(salesLineCount, Is.EqualTo(1),
+                "The sales invoice line must remain stored after the client is logically deleted.");
+            Assert.That(purchaseInvoiceCount, Is.EqualTo(1),
+                "The purchase invoice must remain stored after the provider is logically deleted.");
+            Assert.That(purchaseLineCount, Is.EqualTo(1),
+                "The purchase invoice line must remain stored after the provider is logically deleted.");
+            Assert.That(salesSnapshots,
+                Is.EqualTo($"{salesClientSnapshot}|{productCodeSnapshot}|{productNameSnapshot}"),
+                "The sales document and product snapshots must retain their original values.");
+            Assert.That(purchaseSnapshots,
+                Is.EqualTo($"{purchaseProviderSnapshot}|{productCodeSnapshot}|{productNameSnapshot}"),
+                "The purchase document and product snapshots must retain their original values.");
+        });
+    }
+
     private static ExampleDbContext CreateContext(string connectionString, Guid tenantId)
         => new(
             Options.Create(new KukulcanDatabaseOptions
