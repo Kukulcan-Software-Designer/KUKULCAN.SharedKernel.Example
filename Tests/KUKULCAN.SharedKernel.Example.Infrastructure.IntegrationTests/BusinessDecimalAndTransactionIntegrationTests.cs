@@ -198,21 +198,26 @@ public sealed class BusinessDecimalAndTransactionIntegrationTests
                     "ProdInvoiceLines.UnitPrice must be stored as numeric(18,2).");
             });
 
-            await using var transaction = await reopenedContext.Database.BeginTransactionAsync();
-            persistedStock.Quantity = 999.999m;
-            reopenedContext.WarehouseStocks.Update(persistedStock);
-            reopenedContext.Invoices.Add(new Invoice
+            var executionStrategy = reopenedContext.Database.CreateExecutionStrategy();
+            await executionStrategy.ExecuteAsync(async () =>
             {
-                Id = rolledBackInvoiceId,
-                TenantId = tenantId,
-                ClientId = clientId,
-                InvoiceNumber = "DECIMAL-ROLLBACK-SALE",
-                IssuedAt = new DateTimeOffset(2026, 10, 30, 13, 0, 0, TimeSpan.Zero),
-                ClientName = "Decimal Precision Client"
-            });
+                await using var transaction = await reopenedContext.Database.BeginTransactionAsync();
+                persistedStock.Quantity = 999.999m;
+                reopenedContext.WarehouseStocks.Update(persistedStock);
+                reopenedContext.Invoices.Add(new Invoice
+                {
+                    Id = rolledBackInvoiceId,
+                    TenantId = tenantId,
+                    ClientId = clientId,
+                    InvoiceNumber = "DECIMAL-ROLLBACK-SALE",
+                    IssuedAt = new DateTimeOffset(2026, 10, 30, 13, 0, 0, TimeSpan.Zero),
+                    ClientName = "Decimal Precision Client"
+                });
 
-            await reopenedContext.SaveChangesAsync();
-            await transaction.RollbackAsync();
+                await reopenedContext.SaveChangesAsync();
+                await transaction.RollbackAsync();
+                reopenedContext.ChangeTracker.Clear();
+            });
         }
 
         // A new context verifies the transaction did not leave any partial database changes.
