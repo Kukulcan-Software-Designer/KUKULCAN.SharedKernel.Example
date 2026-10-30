@@ -69,13 +69,16 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
+        var disposableProductExists = await context.Products.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(entity => entity.Id == disposableProduct.Id);
+        var disposableWarehouseExists = await context.Warehouses.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(entity => entity.Id == disposableWarehouse.Id);
+
         Assert.Multiple(() =>
         {
-            Assert.That(context.Products.IgnoreQueryFilters().AsNoTracking()
-                .AnyAsync(entity => entity.Id == disposableProduct.Id).GetAwaiter().GetResult(), Is.False,
+            Assert.That(disposableProductExists, Is.False,
                 "An unreferenced product must be physically deletable.");
-            Assert.That(context.Warehouses.IgnoreQueryFilters().AsNoTracking()
-                .AnyAsync(entity => entity.Id == disposableWarehouse.Id).GetAwaiter().GetResult(), Is.False,
+            Assert.That(disposableWarehouseExists, Is.False,
                 "An unreferenced warehouse must be physically deletable.");
         });
 
