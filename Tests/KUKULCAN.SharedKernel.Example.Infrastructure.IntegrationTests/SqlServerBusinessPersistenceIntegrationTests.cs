@@ -184,12 +184,12 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
             IssuedAt = DateTimeOffset.UtcNow,
             ClientName = "Missing client"
         });
-        Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
             "SQL Server must reject a document that references a nonexistent client.");
         context.ChangeTracker.Clear();
 
         context.Products.Add(new Product { TenantId = tenantId, Code = "UNIQUE-SKU", Name = "Duplicate code" });
-        Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
             "A product code must be unique within a tenant.");
         context.ChangeTracker.Clear();
 
@@ -202,7 +202,7 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
         {
             TenantId = tenantId, WarehouseId = warehouse.Id, ProductId = product.Id, Quantity = 2m
         });
-        Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
             "A warehouse must not contain duplicate stock rows for the same product.");
         context.ChangeTracker.Clear();
 
@@ -211,7 +211,7 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
             TenantId = tenantId, ClientId = client.Id, InvoiceNumber = "UNIQUE-SALE",
             IssuedAt = DateTimeOffset.UtcNow, ClientName = client.Name
         });
-        Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
             "Sales invoice numbers must be unique within a tenant.");
     }
 
