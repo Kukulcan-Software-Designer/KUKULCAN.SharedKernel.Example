@@ -225,12 +225,14 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             Value = "must-not-survive-rollback"
         };
 
-        await using (var transaction = await context.Database.BeginTransactionAsync())
+        var strategy = context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
+            await using var transaction = await context.Database.BeginTransactionAsync();
             context.DatabaseIntegrationRecords.Add(record);
             await context.SaveChangesAsync();
             await transaction.RollbackAsync();
-        }
+        });
 
         context.ChangeTracker.Clear();
         var persisted = await context.DatabaseIntegrationRecords
