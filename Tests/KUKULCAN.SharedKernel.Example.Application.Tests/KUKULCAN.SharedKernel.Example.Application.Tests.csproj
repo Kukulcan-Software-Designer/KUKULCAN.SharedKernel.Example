@@ -26,4 +26,8 @@
         <Using Include="NUnit.Framework"/>
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\..\Source\WebAPI\KUKULCAN.SharedKernel.Example.Application\KUKULCAN.SharedKernel.Example.Application.csproj" />
+    </ItemGroup>
+
 </Project>
