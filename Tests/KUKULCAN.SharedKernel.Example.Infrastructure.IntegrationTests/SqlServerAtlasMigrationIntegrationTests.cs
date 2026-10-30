@@ -38,12 +38,12 @@ public sealed class SqlServerAtlasMigrationIntegrationTests
         Assert.That(provider, Is.EqualTo("SqlServer"),
             $"{ProviderEnvironmentVariable} must be set to SqlServer for this test.");
 
-        var connectionStringBuilder = new SqlConnectionStringBuilder(connectionString);
+        var connectionStringBuilder = new SqlConnectionStringBuilder(connectionString!);
         Assert.That(connectionStringBuilder.InitialCatalog, Is.EqualTo(ExpectedDatabaseName),
             $"The configured SQL Server database must be '{ExpectedDatabaseName}'. " +
             "The test refuses to apply migrations to another database.");
 
-        await using var context = CreateContext(connectionString);
+        await using var context = CreateContext(connectionString!);
 
         // Verify the configured instance/database is reachable before testing migrations.
         await context.Database.OpenConnectionAsync();
