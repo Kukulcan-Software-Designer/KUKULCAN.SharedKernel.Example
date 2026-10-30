@@ -186,21 +186,49 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
         context.Clients.Add(client);
         await context.SaveChangesAsync();
 
+        var provider = new KUKULCAN.SharedKernel.Example.Domain.Entities.Provider
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Provider retained for history"
+        };
+        context.Providers.Add(provider);
+        await context.SaveChangesAsync();
+
         context.Clients.Remove(client);
+        context.Providers.Remove(provider);
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
-        var persisted = await context.Clients
+        var visibleClient = await context.Clients
+            .AsNoTracking()
+            .SingleOrDefaultAsync(entity => entity.Id == client.Id);
+        var visibleProvider = await context.Providers
+            .AsNoTracking()
+            .SingleOrDefaultAsync(entity => entity.Id == provider.Id);
+        var persistedClient = await context.Clients
             .IgnoreQueryFilters()
             .AsNoTracking()
             .SingleAsync(entity => entity.Id == client.Id);
+        var persistedProvider = await context.Providers
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .SingleAsync(entity => entity.Id == provider.Id);
 
         Assert.Multiple(() =>
         {
-            Assert.That(persisted.IsDeleted, Is.True,
-                "Removing a soft-deletable client must mark it as deleted instead of physically deleting it.");
-            Assert.That(persisted.DeletedOn, Is.Not.Null,
-                "Soft deletion must record when the client was deleted.");
+            Assert.That(visibleClient, Is.Null,
+                "Default client queries must exclude soft-deleted records.");
+            Assert.That(visibleProvider, Is.Null,
+                "Default provider queries must exclude soft-deleted records.");
+            Assert.That(persistedClient.IsDeleted, Is.True,
+                "Removing a client must mark it as deleted instead of physically deleting it.");
+            Assert.That(persistedClient.DeletedOn, Is.Not.Null,
+                "Client soft deletion must record when the client was deleted.");
+            Assert.That(persistedProvider.IsDeleted, Is.True,
+                "Removing a provider must mark it as deleted instead of physically deleting it.");
+            Assert.That(persistedProvider.DeletedOn, Is.Not.Null,
+                "Provider soft deletion must record when the provider was deleted.");
         });
     }
 
