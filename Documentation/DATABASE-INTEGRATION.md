@@ -86,3 +86,28 @@ Treat schema migration as a deployment operation, separate from the API's normal
 The initial migrations and snapshots are checked against the current EF model for all three provider configurations. The real-container initialization and repeat-application test currently exercises PostgreSQL. SQL Server and MySQL are **not** declared validated until Issues #21 and #22 complete their provider-backed checks. MySQL uses database/catalog semantics for schema names; provisioning and validation of the `Example` catalog must be verified by Issue #22 rather than inferred from the PostgreSQL test.
 
 The provider packages for PostgreSQL, SQL Server, and MySQL are explicit Infrastructure dependencies. PostgreSQL has an automated real-provider persistence test in this integration issue. SQL Server and MySQL must not be represented as fully validated until their respective provider-specific integration issues run against real instances.
+
+## PostgreSQL integration-test prerequisites and commands
+
+The provider-backed integration tests use **PostgreSQL 16**, pinned through the Testcontainers image `postgres:16-alpine`. This identifies the PostgreSQL version exercised by the current automated suite; it is not a claim that other PostgreSQL versions have been validated.
+
+A running Docker daemon is required. The tests start disposable PostgreSQL containers, initialize an isolated test database, apply the Example EF Core migrations where required, and dispose of the containers when the tests finish. You do not need to start a separate PostgreSQL container manually for these Testcontainers tests.
+
+Run the complete infrastructure integration-test project from the repository root:
+
+```bash
+dotnet test Tests/KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests/KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests.csproj \
+  --configuration Release
+```
+
+To run only the business-search integration test:
+
+```bash
+dotnet test Tests/KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests/KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests.csproj \
+  --configuration Release \
+  --filter "FullyQualifiedName~PostgreSqlBusinessSearchIntegrationTests" \
+  --logger "console;verbosity=detailed"
+```
+
+These Testcontainers tests use disposable test-only credentials defined by the test fixture. They do not require the application environment variables `KUKULCAN__DATABASE__PROVIDER` or `KUKULCAN__DATABASE__CONNECTIONSTRING`; configure those variables when running the application or the provider-specific EF Core migration commands described above. Never put real database credentials in source control.
+
