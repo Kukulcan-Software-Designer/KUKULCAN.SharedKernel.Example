@@ -51,10 +51,33 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
             ProductCode = product.Code, ProductName = product.Name, Quantity = 5.000m, UnitPrice = 11.25m
         };
 
-        context.AddRange(client, provider, product, warehouse, stock, invoice, invoiceLine, purchase, purchaseLine);
-        Assert.That(await context.SaveChangesAsync(), Is.GreaterThanOrEqualTo(9));
+        var disposableProduct = new Product
+        {
+            TenantId = tenantId, Code = "DELETE-SKU", Name = "Temporary product"
+        };
+        var disposableWarehouse = new Warehouse
+        {
+            TenantId = tenantId, Name = "Temporary warehouse"
+        };
 
+        context.AddRange(
+            client, provider, product, warehouse, stock, invoice, invoiceLine, purchase, purchaseLine,
+            disposableProduct, disposableWarehouse);
+        Assert.That(await context.SaveChangesAsync(), Is.GreaterThanOrEqualTo(11));
+
+        context.RemoveRange(disposableProduct, disposableWarehouse);
+        await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(context.Products.IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(entity => entity.Id == disposableProduct.Id).GetAwaiter().GetResult(), Is.False,
+                "An unreferenced product must be physically deletable.");
+            Assert.That(context.Warehouses.IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(entity => entity.Id == disposableWarehouse.Id).GetAwaiter().GetResult(), Is.False,
+                "An unreferenced warehouse must be physically deletable.");
+        });
 
         var persistedStock = await context.WarehouseStocks
             .Include(entity => entity.Warehouse)
