@@ -161,4 +161,141 @@ public sealed class JsonEngineQueryServiceTests
             Assert.That(result.Rows, Is.Empty);
         });
     }
+
+    [Test]
+    public void Execute_WhenDocumentExceedsMaximumSize_ThrowsValidationException()
+    {
+        string json = "{\\"value\\":\\"" +
+                      new string('x', JsonEngineQueryService.MaxDocumentSizeBytes) +
+                      "\\"}";
+        using JsonDocument document = CreateDocument(json);
+        var engine = new StubJsonSqlEngine();
+        var service = new JsonEngineQueryService(engine);
+
+        JsonEngineQueryValidationException exception =
+            Assert.Throws<JsonEngineQueryValidationException>(
+                () => service.Execute(document.RootElement, "SELECT * FROM items LIMIT 1"))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.FieldName, Is.EqualTo("document"));
+            Assert.That(engine.ExecuteCalls, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void Execute_WhenQueryExceedsMaximumLength_ThrowsValidationException()
+    {
+        string query = "SELECT " +
+                       new string('x', JsonEngineQueryService.MaxQueryLength) +
+                       " FROM items LIMIT 1";
+        using JsonDocument document = CreateDocument("""{"id":1}""");
+        var engine = new StubJsonSqlEngine();
+        var service = new JsonEngineQueryService(engine);
+
+        JsonEngineQueryValidationException exception =
+            Assert.Throws<JsonEngineQueryValidationException>(
+                () => service.Execute(document.RootElement, query))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.FieldName, Is.EqualTo("query"));
+            Assert.That(engine.ExecuteCalls, Is.Zero);
+        });
+    }
+
+    [TestCase(1)]
+    [TestCase(100)]
+    public void Execute_WhenLimitIsAtValidBoundary_CallsEngine(int limit)
+    {
+        using JsonDocument document = CreateDocument("""{"id":1}""");
+        var engine = new StubJsonSqlEngine();
+        var service = new JsonEngineQueryService(engine);
+
+        service.Execute(document.RootElement, $"SELECT * FROM items LIMIT {limit}");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(engine.ExecuteCalls, Is.EqualTo(1));
+            Assert.That(engine.ReceivedSql, Is.EqualTo($"SELECT * FROM items LIMIT {limit}"));
+        });
+    }
+
+    [TestCase("SELECT * FROM items LIMIT 1 ORDER BY id")]
+    [TestCase("SELECT * FROM items LIMIT 1; LIMIT 2")]
+    public void Execute_WhenLimitIsNotTheOnlyFinalClause_ThrowsValidationException(
+        string query)
+    {
+        using JsonDocument document = CreateDocument("""{"id":1}""");
+        var engine = new StubJsonSqlEngine();
+        var service = new JsonEngineQueryService(engine);
+
+        JsonEngineQueryValidationException exception =
+            Assert.Throws<JsonEngineQueryValidationException>(
+                () => service.Execute(document.RootElement, query))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.FieldName, Is.EqualTo("query"));
+            Assert.That(engine.ExecuteCalls, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void Execute_WhenEngineReturnsRows_MapsValuesAndNullsToJsonElements()
+    {
+        using JsonDocument document = CreateDocument("""{"id":1}""");
+
+        var row = new JsonSqlRow
+        {
+            ["name"] = System.Text.Json.Nodes.JsonValue.Create("Alice"),
+            ["age"] = System.Text.Json.Nodes.JsonValue.Create(42),
+            ["optional"] = null
+        };
+
+        var engine = new StubJsonSqlEngine
+        {
+            Rows = [row]
+        };
+        var service = new JsonEngineQueryService(engine);
+
+        JsonEngineQueryResult result =
+            service.Execute(document.RootElement, "SELECT * FROM items LIMIT 1");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.ResultCount, Is.EqualTo(1));
+            Assert.That(result.Rows, Has.Count.EqualTo(1));
+            Assert.That(result.Rows[0]["name"]!.Value.GetString(), Is.EqualTo("Alice"));
+            Assert.That(result.Rows[0]["age"]!.Value.GetInt32(), Is.EqualTo(42));
+            Assert.That(result.Rows[0]["optional"], Is.Null);
+        });
+    }
+
+    [Test]
+    public void Execute_WhenEngineReturnsRows_ReturnsDetachedJsonValues()
+    {
+        using JsonDocument document = CreateDocument("""{"id":1}""");
+
+        var row = new JsonSqlRow
+        {
+            ["name"] = System.Text.Json.Nodes.JsonValue.Create("Original")
+        };
+        var engine = new StubJsonSqlEngine
+        {
+            Rows = [row]
+        };
+        var service = new JsonEngineQueryService(engine);
+
+        JsonEngineQueryResult result =
+            service.Execute(document.RootElement, "SELECT * FROM items LIMIT 1");
+
+        row["name"] = System.Text.Json.Nodes.JsonValue.Create("Changed");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Rows[0]["name"]!.Value.GetString(), Is.EqualTo("Original"));
+            Assert.That(result.Rows[0]["name"]!.Value.ValueKind, Is.EqualTo(JsonValueKind.String));
+        });
+    }
 }
