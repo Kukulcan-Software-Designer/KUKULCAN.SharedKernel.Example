@@ -168,12 +168,28 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
         var client = new Client { TenantId = tenantId, Name = "Constraint Client" };
         var product = new Product { TenantId = tenantId, Code = "UNIQUE-SKU", Name = "Constraint Product" };
         var warehouse = new Warehouse { TenantId = tenantId, Name = "Constraint Warehouse" };
+        var provider = new Provider { TenantId = tenantId, Name = "Constraint Provider" };
         var invoice = new Invoice
         {
             TenantId = tenantId, Client = client, InvoiceNumber = "UNIQUE-SALE",
             IssuedAt = DateTimeOffset.UtcNow, ClientName = client.Name
         };
-        context.AddRange(client, product, warehouse, invoice);
+        var purchaseInvoice = new ProdInvoice
+        {
+            TenantId = tenantId, Provider = provider, InvoiceNumber = "UNIQUE-PURCHASE",
+            IssuedAt = DateTimeOffset.UtcNow, ProviderName = provider.Name
+        };
+        var salesLine = new InvoiceLine
+        {
+            TenantId = tenantId, Invoice = invoice, LineNumber = 1, Product = product,
+            ProductCode = product.Code, ProductName = product.Name, Quantity = 1m, UnitPrice = 2m
+        };
+        var purchaseLine = new ProdInvoiceLine
+        {
+            TenantId = tenantId, ProdInvoice = purchaseInvoice, LineNumber = 1, Product = product,
+            ProductCode = product.Code, ProductName = product.Name, Quantity = 1m, UnitPrice = 1m
+        };
+        context.AddRange(client, product, warehouse, provider, invoice, purchaseInvoice, salesLine, purchaseLine);
         await context.SaveChangesAsync();
 
         context.Invoices.Add(new Invoice
@@ -213,6 +229,45 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
         });
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
             "Sales invoice numbers must be unique within a tenant.");
+        context.ChangeTracker.Clear();
+
+        context.ProdInvoices.Add(new ProdInvoice
+        {
+            TenantId = tenantId, ProviderId = provider.Id, InvoiceNumber = "UNIQUE-PURCHASE",
+            IssuedAt = DateTimeOffset.UtcNow, ProviderName = provider.Name
+        });
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
+            "Purchase invoice numbers must be unique within a tenant.");
+        context.ChangeTracker.Clear();
+
+        context.InvoiceLines.Add(new InvoiceLine
+        {
+            TenantId = tenantId, InvoiceId = invoice.Id, ProductId = product.Id, LineNumber = 1,
+            ProductCode = product.Code, ProductName = product.Name, Quantity = 1m, UnitPrice = 2m
+        });
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
+            "Sales line numbers must be unique within an invoice.");
+        context.ChangeTracker.Clear();
+
+        context.ProdInvoiceLines.Add(new ProdInvoiceLine
+        {
+            TenantId = tenantId, ProdInvoiceId = purchaseInvoice.Id, ProductId = product.Id, LineNumber = 1,
+            ProductCode = product.Code, ProductName = product.Name, Quantity = 1m, UnitPrice = 1m
+        });
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
+            "Purchase line numbers must be unique within an invoice.");
+        context.ChangeTracker.Clear();
+
+        var referencedWarehouse = await context.Warehouses.SingleAsync(entity => entity.Id == warehouse.Id);
+        context.Warehouses.Remove(referencedWarehouse);
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
+            "A warehouse referenced by stock must not be physically deleted.");
+        context.ChangeTracker.Clear();
+
+        var referencedProduct = await context.Products.SingleAsync(entity => entity.Id == product.Id);
+        context.Products.Remove(referencedProduct);
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(),
+            "A product referenced by stock and document lines must not be physically deleted.");
     }
 
     private static async Task<Testcontainers.MsSql.MsSqlContainer> CreateSqlServerAsync()
