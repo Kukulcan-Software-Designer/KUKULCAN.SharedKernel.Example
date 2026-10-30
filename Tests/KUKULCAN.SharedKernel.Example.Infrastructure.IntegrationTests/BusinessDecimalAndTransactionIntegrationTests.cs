@@ -55,6 +55,9 @@ public sealed class BusinessDecimalAndTransactionIntegrationTests
         var stockId = Guid.NewGuid();
         var invoiceId = Guid.NewGuid();
         var lineId = Guid.NewGuid();
+        var providerId = Guid.NewGuid();
+        var purchaseInvoiceId = Guid.NewGuid();
+        var purchaseLineId = Guid.NewGuid();
         var rolledBackInvoiceId = Guid.NewGuid();
 
         await using (var context = CreateContext(provider, connectionString, tenantId))
@@ -109,8 +112,37 @@ public sealed class BusinessDecimalAndTransactionIntegrationTests
                 Quantity = 123.456m,
                 UnitPrice = 9876.54m
             };
+            var providerEntity = new Provider
+            {
+                Id = providerId,
+                TenantId = tenantId,
+                Name = "Decimal Precision Provider"
+            };
+            var purchaseInvoice = new ProdInvoice
+            {
+                Id = purchaseInvoiceId,
+                TenantId = tenantId,
+                Provider = providerEntity,
+                InvoiceNumber = "DECIMAL-PURCHASE-001",
+                IssuedAt = new DateTimeOffset(2026, 10, 30, 12, 30, 0, TimeSpan.Zero),
+                ProviderName = providerEntity.Name
+            };
+            var purchaseLine = new ProdInvoiceLine
+            {
+                Id = purchaseLineId,
+                TenantId = tenantId,
+                ProdInvoice = purchaseInvoice,
+                LineNumber = 1,
+                Product = product,
+                ProductCode = product.Code,
+                ProductName = product.Name,
+                Quantity = 45.678m,
+                UnitPrice = 123.45m
+            };
 
-            context.AddRange(client, product, warehouse, stock, invoice, line);
+            context.AddRange(
+                client, product, warehouse, stock, invoice, line,
+                providerEntity, purchaseInvoice, purchaseLine);
             await context.SaveChangesAsync();
         }
 
@@ -123,15 +155,22 @@ public sealed class BusinessDecimalAndTransactionIntegrationTests
             var persistedLine = await reopenedContext.InvoiceLines
                 .AsNoTracking()
                 .SingleAsync(entity => entity.Id == lineId);
+            var persistedPurchaseLine = await reopenedContext.ProdInvoiceLines
+                .AsNoTracking()
+                .SingleAsync(entity => entity.Id == purchaseLineId);
 
             Assert.Multiple(() =>
             {
                 Assert.That(persistedStock.Quantity, Is.EqualTo(1234.567m),
                     "Warehouse quantities must survive a database write/read cycle without losing decimal places.");
                 Assert.That(persistedLine.Quantity, Is.EqualTo(123.456m),
-                    "Invoice quantities must preserve their configured scale.");
+                    "Sales quantities must preserve their configured scale.");
                 Assert.That(persistedLine.UnitPrice, Is.EqualTo(9876.54m),
-                    "Unit prices must preserve cents exactly.");
+                    "Sales unit prices must preserve cents exactly.");
+                Assert.That(persistedPurchaseLine.Quantity, Is.EqualTo(45.678m),
+                    "Purchase quantities must preserve their configured scale.");
+                Assert.That(persistedPurchaseLine.UnitPrice, Is.EqualTo(123.45m),
+                    "Purchase unit prices must preserve cents exactly.");
             });
 
             var quantityPrecision = await ReadDecimalPrecisionAsync(
@@ -140,6 +179,10 @@ public sealed class BusinessDecimalAndTransactionIntegrationTests
                 reopenedContext, "InvoiceLines", "Quantity");
             var unitPricePrecision = await ReadDecimalPrecisionAsync(
                 reopenedContext, "InvoiceLines", "UnitPrice");
+            var purchaseQuantityPrecision = await ReadDecimalPrecisionAsync(
+                reopenedContext, "ProdInvoiceLines", "Quantity");
+            var purchaseUnitPricePrecision = await ReadDecimalPrecisionAsync(
+                reopenedContext, "ProdInvoiceLines", "UnitPrice");
 
             Assert.Multiple(() =>
             {
@@ -149,6 +192,10 @@ public sealed class BusinessDecimalAndTransactionIntegrationTests
                     "InvoiceLines.Quantity must be stored as numeric(18,3).");
                 Assert.That(unitPricePrecision, Is.EqualTo((18, 2)),
                     "InvoiceLines.UnitPrice must be stored as numeric(18,2).");
+                Assert.That(purchaseQuantityPrecision, Is.EqualTo((18, 3)),
+                    "ProdInvoiceLines.Quantity must be stored as numeric(18,3).");
+                Assert.That(purchaseUnitPricePrecision, Is.EqualTo((18, 2)),
+                    "ProdInvoiceLines.UnitPrice must be stored as numeric(18,2).");
             });
 
             await using var transaction = await reopenedContext.Database.BeginTransactionAsync();
