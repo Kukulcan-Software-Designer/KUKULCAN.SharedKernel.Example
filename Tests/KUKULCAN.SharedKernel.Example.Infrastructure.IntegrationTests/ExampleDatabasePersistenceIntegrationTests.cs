@@ -313,6 +313,170 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             "Business queries must not return clients belonging to a different tenant.");
     }
 
+
+    [Test]
+    public async Task PostgreSqlDecimalColumns_UseExpectedSqlPrecisionAndRoundTripWithoutUnexpectedLoss()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
+            .WithDatabase("example_decimal_precision_integration")
+            .WithUsername("postgres")
+            .WithPassword("example-decimal-precision-integration-password")
+            .Build();
+        await postgres.StartAsync();
+
+        var tenantId = Guid.NewGuid();
+        await using var context = CreateContext(postgres.GetConnectionString(), tenantId);
+        await context.Database.MigrateAsync();
+
+        var actualDecimalColumns = await context.Database.SqlQueryRaw<string>(
+            """
+            SELECT table_name || '.' || column_name || '=' || data_type || '('
+                || numeric_precision::text || ',' || numeric_scale::text || ')' AS "Value"
+            FROM information_schema.columns
+            WHERE table_schema = 'Example'
+              AND (table_name, column_name) IN (
+                ('WarehouseStocks', 'Quantity'),
+                ('InvoiceLines', 'Quantity'),
+                ('InvoiceLines', 'UnitPrice'),
+                ('ProdInvoiceLines', 'Quantity'),
+                ('ProdInvoiceLines', 'UnitPrice'))
+            ORDER BY table_name, column_name
+            """).ToArrayAsync();
+
+        Assert.That(actualDecimalColumns, Is.EquivalentTo(new[]
+        {
+            "WarehouseStocks.Quantity=numeric(18,3)",
+            "InvoiceLines.Quantity=numeric(18,3)",
+            "InvoiceLines.UnitPrice=numeric(18,2)",
+            "ProdInvoiceLines.Quantity=numeric(18,3)",
+            "ProdInvoiceLines.UnitPrice=numeric(18,2)"
+        }), "PostgreSQL must materialize the approved decimal precision and scale from the model.");
+
+        var clientId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+        var lineId = Guid.NewGuid();
+        const decimal expectedQuantity = 123456789012345.678m;
+        const decimal expectedUnitPrice = 1234567890123456.78m;
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Clients" ("Id", "TenantId", "Name") VALUES ({clientId}, {tenantId}, {"Precision client"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name") VALUES ({productId}, {tenantId}, {"PRECISION-1"}, {"Precision product"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."Invoices"
+                ("Id", "TenantId", "ClientId", "InvoiceNumber", "IssuedAt", "ClientName")
+             VALUES ({invoiceId}, {tenantId}, {clientId}, {"PRECISION-INV-1"}, {DateTimeOffset.UtcNow}, {"Precision client snapshot"})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."InvoiceLines"
+                ("Id", "TenantId", "InvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({lineId}, {tenantId}, {invoiceId}, {1}, {productId}, {"PRECISION-1"}, {"Precision product snapshot"}, {expectedQuantity}, {expectedUnitPrice})
+             """);
+
+        context.ChangeTracker.Clear();
+        var persistedQuantity = await context.Database.SqlQuery<decimal>(
+            $"""SELECT "Quantity" AS "Value" FROM "Example"."InvoiceLines" WHERE "Id" = {lineId}""")
+            .SingleAsync();
+        var persistedUnitPrice = await context.Database.SqlQuery<decimal>(
+            $"""SELECT "UnitPrice" AS "Value" FROM "Example"."InvoiceLines" WHERE "Id" = {lineId}""")
+            .SingleAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(persistedQuantity, Is.EqualTo(expectedQuantity),
+                "A decimal quantity must round-trip through PostgreSQL without losing its configured scale.");
+            Assert.That(persistedUnitPrice, Is.EqualTo(expectedUnitPrice),
+                "A monetary amount must round-trip through PostgreSQL without losing its configured scale.");
+        });
+    }
+
+    [Test]
+    public async Task PostgreSqlBusinessPersistence_SupportsCrudAndQueriesAcrossCommercialRelationships()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
+            .WithDatabase("example_business_crud_integration")
+            .WithUsername("postgres")
+            .WithPassword("example-business-crud-integration-password")
+            .Build();
+        await postgres.StartAsync();
+
+        var tenantId = Guid.NewGuid();
+        await using var context = CreateContext(postgres.GetConnectionString(), tenantId);
+        await context.Database.MigrateAsync();
+
+        var clientId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+        var lineId = Guid.NewGuid();
+        var disposableProductId = Guid.NewGuid();
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Clients" ("Id", "TenantId", "Name") VALUES ({clientId}, {tenantId}, {"CRUD client"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name") VALUES ({productId}, {tenantId}, {"CRUD-P1"}, {"Original product"})""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."Invoices"
+                ("Id", "TenantId", "ClientId", "InvoiceNumber", "IssuedAt", "ClientName")
+             VALUES ({invoiceId}, {tenantId}, {clientId}, {"CRUD-INV-1"}, {DateTimeOffset.UtcNow}, {"Client at sale"})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO "Example"."InvoiceLines"
+                ("Id", "TenantId", "InvoiceId", "LineNumber", "ProductId", "ProductCode", "ProductName", "Quantity", "UnitPrice")
+             VALUES ({lineId}, {tenantId}, {invoiceId}, {1}, {productId}, {"CRUD-P1"}, {"Product at sale"}, {2.125m}, {19.95m})
+             """);
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""INSERT INTO "Example"."Products" ("Id", "TenantId", "Code", "Name") VALUES ({disposableProductId}, {tenantId}, {"CRUD-DELETE"}, {"Temporary product"})""");
+
+        var initiallyReadName = await context.Database.SqlQuery<string>(
+            $"""SELECT "Name" AS "Value" FROM "Example"."Products" WHERE "Id" = {productId}""")
+            .SingleAsync();
+        Assert.That(initiallyReadName, Is.EqualTo("Original product"),
+            "A newly inserted product must be readable from PostgreSQL.");
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "Example"."Products" SET "Code" = {"CRUD-P1-UPDATED"}, "Name" = {"Updated product"} WHERE "Id" = {productId} AND "TenantId" = {tenantId}""");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""UPDATE "Example"."Clients" SET "Name" = {"Updated client"} WHERE "Id" = {clientId} AND "TenantId" = {tenantId}""");
+
+        var joinedCommercialData = await context.Database.SqlQuery<string>(
+            $"""
+             SELECT c."Name" || '|' || p."Code" || '|' || p."Name" || '|'
+                    || i."ClientName" || '|' || il."ProductCode" || '|' || il."ProductName" AS "Value"
+             FROM "Example"."Invoices" AS i
+             INNER JOIN "Example"."Clients" AS c
+                ON c."TenantId" = i."TenantId" AND c."Id" = i."ClientId"
+             INNER JOIN "Example"."InvoiceLines" AS il
+                ON il."TenantId" = i."TenantId" AND il."InvoiceId" = i."Id"
+             INNER JOIN "Example"."Products" AS p
+                ON p."TenantId" = il."TenantId" AND p."Id" = il."ProductId"
+             WHERE i."Id" = {invoiceId}
+             """).SingleAsync();
+
+        Assert.That(joinedCommercialData,
+            Is.EqualTo("Updated client|CRUD-P1-UPDATED|Updated product|Client at sale|CRUD-P1|Product at sale"),
+            "Relational queries must resolve current master data while retaining the invoice's historical snapshots.");
+
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"""DELETE FROM "Example"."Products" WHERE "Id" = {disposableProductId} AND "TenantId" = {tenantId}""");
+        var deletedProductCount = await context.Database.SqlQueryRaw<int>(
+            $"""SELECT COUNT(*)::integer AS "Value" FROM "Example"."Products" WHERE "Id" = '{disposableProductId}'""")
+            .SingleAsync();
+
+        Assert.That(deletedProductCount, Is.Zero,
+            "A product without dependent commercial records must be physically removable.");
+
+        var retainedInvoiceLineCount = await context.Database.SqlQuery<int>(
+            $"""SELECT COUNT(*)::integer AS "Value" FROM "Example"."InvoiceLines" WHERE "Id" = {lineId}""")
+            .SingleAsync();
+        Assert.That(retainedInvoiceLineCount, Is.EqualTo(1),
+            "Updating master data or deleting an unrelated product must not remove persisted invoice lines.");
+    }
+
     private static ExampleDbContext CreateContext(string connectionString, Guid tenantId)
         => new(
             Options.Create(new KukulcanDatabaseOptions
