@@ -146,13 +146,13 @@ public sealed class SqlServerBusinessSoftDeleteIntegrationTests
         // ExecuteDelete bypasses EF's soft-delete SaveChanges behavior and exercises
         // the real SQL Server foreign-key restrictions protecting historical records.
         await using var physicalDeleteContext = CreateContext(tenantId, sqlServer.GetConnectionString());
-        Assert.ThrowsAsync<SqlException>(() => physicalDeleteContext.Clients
+        await Assert.ThrowsAsync<SqlException>(() => physicalDeleteContext.Clients
                 .IgnoreQueryFilters()
                 .Where(entity => entity.Id == client.Id)
                 .ExecuteDeleteAsync(),
             "A physical delete must be rejected while a sales invoice references the client.");
 
-        Assert.ThrowsAsync<SqlException>(() => physicalDeleteContext.Providers
+        await Assert.ThrowsAsync<SqlException>(() => physicalDeleteContext.Providers
                 .IgnoreQueryFilters()
                 .Where(entity => entity.Id == provider.Id)
                 .ExecuteDeleteAsync(),
