@@ -1,8 +1,8 @@
 # Example Application Architecture
 
-**Status:** Architecture and executable .NET 10 Web API baseline (Issue #1), SharedKernel Result integration (Issue #2), authentication/current-user/administrator-bootstrap behavior (Issue #3), initial Database package integration (Issue #4), JsonEngine query integration (Issue #5), outbound I18N HTTP integration (Issue #6), and Sample domain entities/EF Core mappings (Issue #7) implemented and under automated verification  
+**Status:** Architecture and executable .NET 10 Web API baseline (Issue #1), SharedKernel Result integration (Issue #2), authentication/current-user/administrator-bootstrap behavior (Issue #3), Database package integration (Issue #4), JsonEngine query integration (Issue #5), outbound I18N HTTP integration (Issue #6), and domain entities/EF Core mappings (Issue #7) implemented and under automated verification. Provider-specific versioned migrations for the `Example` schema are implemented in Issue #17 and were merged into `Develop` through PR #39. PostgreSQL real-provider persistence validation is tracked by Issue #20; SQL Server and MySQL provider validation remain tracked by Issues #21 and #22.  
 **Target framework:** .NET 10  
-**Scope:** Architecture, security and dependency boundaries. Versioned Sample migrations, real-provider validation, Sample business endpoints and client interfaces remain for their implementation Issues.
+**Scope:** Architecture, security and dependency boundaries, with the implemented migration baseline and current provider-validation status documented below. Business endpoints and client interfaces remain for their implementation Issues.
 
 ## 1. Architectural decisions
 
@@ -90,9 +90,9 @@ KUKULCAN.SharedKernel.Example/
 
 Use .NET configuration keys `Kukulcan:Database:Provider` and `Kukulcan:Database:ConnectionString`, which map to environment variables `Kukulcan__Database__Provider` and `Kukulcan__Database__ConnectionString`. Do not commit connection strings containing credentials.
 
-The Database package documents SQL Server, PostgreSQL and MySQL provider selection, but the Example must only claim support for a provider after its own migrations and behavior have been validated against a real instance of that provider.
+The Database package supports provider selection for SQL Server, PostgreSQL and MySQL. The Example has provider-specific EF Core migration projects for all three providers. The initial versioned migration `20261022200000_InitialExampleSchema` initializes the `Example` schema; its implementation and migration infrastructure were completed in Issue #17 and merged into `Develop` through PR #39. A provider is only considered validated when its migrations and persistence behavior have been exercised against a real instance of that provider.
 
-All Example-owned tables, including `DatabaseIntegrationRecords`, map to database schema `Example`. Authentication-owned tables and schema are not to be recreated by the Example domain model. The CLR entities live in `Source/WebAPI/KUKULCAN.SharedKernel.Example.Domain`; their explicit tenant-aware EF Core mappings are configured in `Infrastructure/ExampleDbContext`. Versioned migrations and provider-specific integration checks remain tracked in Issues #17 and #20–#22. See [DATABASE-INTEGRATION.md](DATABASE-INTEGRATION.md) for endpoints, secret handling, and the distinction between integration testing and production migrations.
+All Example-owned tables, including `DatabaseIntegrationRecords`, map to database schema `Example`. Authentication-owned tables and schema are not to be recreated by the Example domain model. The CLR entities live in `Source/WebAPI/KUKULCAN.SharedKernel.Example.Domain`; their explicit tenant-aware EF Core mappings are configured in `Infrastructure/ExampleDbContext`. Real PostgreSQL persistence validation is tracked in Issue #20; SQL Server and MySQL provider validation remain tracked in Issues #21 and #22. See [DATABASE-INTEGRATION.md](DATABASE-INTEGRATION.md) for configuration, secret handling, and the distinction between integration testing and production migrations.
 
 ## 5. HTTP API contract
 
@@ -195,6 +195,9 @@ Issue #16 is an architecture/documentation issue. It does not justify artificial
 - **Issue #1:** establish the .NET 10 solution foundation, executable Web API host, health endpoint and API integration-test seam.
 - **Issue #2:** demonstrate the published `KUKULCAN.SharedKernel` Result contract through `GET /api/examples/shared-kernel/result/success` (HTTP 200 with `isSuccess` and `value`) and `GET /api/examples/shared-kernel/result/failure` (HTTP 404 Problem Details carrying the shared error code).
 - **Issue #3:** add `POST /api/auth/login`, `GET /api/auth/me` and authenticated password change using the published `KUKULCAN.SharedKernel.Auth` contract; issue/validate short-lived bearer JWTs in the Example host; and provide idempotent, secret-configured administrator bootstrap with password hashing and automated behavior tests.
-- Later persistence, domain and UI Issues must inspect the exact published package versions and verify the public APIs before coding. Update this document when an evidence-based decision changes the target design.
+- **Issue #17 (completed; PR #39 merged into `Develop`):** add provider-specific EF Core migration projects and design-time factories for PostgreSQL, SQL Server and MySQL, and initialize the `Example` schema with a versioned initial migration. PostgreSQL migration application, history, schema objects, constraints and repeat initialization have integration-test coverage.
+- **Issue #20 (in progress):** validate PostgreSQL persistence against a real PostgreSQL instance using Testcontainers, including connection/configuration, migration behavior, relational constraints, indexes/uniqueness, decimal precision, CRUD/query behavior, tenant isolation and logical-delete/history rules.
+- **Issues #21 and #22:** validate persistence and migrations against real SQL Server and MySQL instances respectively.
+- Later domain and UI Issues must inspect the exact published package versions and verify the public APIs before coding. Update this document when an evidence-based decision changes the target design.
 
 Before implementing each integration, verify the package version, service registration signatures, exposed interfaces, error/result types, configuration options and supported provider/session behavior from its source/API documentation. A README-level description is not a substitute for compiling against the actual public contract.
