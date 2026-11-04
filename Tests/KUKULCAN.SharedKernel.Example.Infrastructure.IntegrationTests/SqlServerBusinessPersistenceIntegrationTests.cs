@@ -174,6 +174,7 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
             Value = "original-primary-key-record"
         });
         await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
 
         context.DatabaseIntegrationRecords.Add(new DatabaseIntegrationRecord
         {
