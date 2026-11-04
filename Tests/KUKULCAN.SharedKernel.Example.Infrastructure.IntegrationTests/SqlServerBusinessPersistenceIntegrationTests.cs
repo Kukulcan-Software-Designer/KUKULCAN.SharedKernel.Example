@@ -182,7 +182,7 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
             Value = "duplicate-primary-key-record"
         });
 
-        var duplicateKeyException = Assert.ThrowsAsync<DbUpdateException>(
+        var duplicateKeyException = await Assert.ThrowsAsync<DbUpdateException>(
             () => context.SaveChangesAsync(),
             "SQL Server must reject a second row with an existing primary-key identifier.");
         Assert.That(duplicateKeyException, Is.Not.Null);
