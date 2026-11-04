@@ -34,8 +34,8 @@ public sealed class AdministratorBootstrapPersistenceIntegrationTests
 
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("auth_integration")
-            .WithUsername("postgres")
-            .WithPassword("auth-integration-test-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 

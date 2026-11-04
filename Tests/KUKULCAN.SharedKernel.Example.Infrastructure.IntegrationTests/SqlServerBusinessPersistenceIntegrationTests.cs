@@ -4,6 +4,7 @@ using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.DomainEvents.Abstractions;
 using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Testcontainers.MsSql;
@@ -158,6 +159,52 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
     }
 
     [Test]
+    public async Task SqlServerPrimaryKey_RejectsDuplicateIdentifiers()
+    {
+        await using var sqlServer = await CreateSqlServerAsync();
+        var tenantId = Guid.NewGuid();
+        var recordId = Guid.NewGuid();
+        await using var context = CreateContext(tenantId, sqlServer.GetConnectionString());
+        await context.Database.MigrateAsync();
+
+        context.DatabaseIntegrationRecords.Add(new DatabaseIntegrationRecord
+        {
+            Id = recordId,
+            TenantId = tenantId,
+            Value = "original-primary-key-record"
+        });
+        await context.SaveChangesAsync();
+
+        context.DatabaseIntegrationRecords.Add(new DatabaseIntegrationRecord
+        {
+            Id = recordId,
+            TenantId = tenantId,
+            Value = "duplicate-primary-key-record"
+        });
+
+        var duplicateKeyException = Assert.ThrowsAsync<DbUpdateException>(
+            () => context.SaveChangesAsync(),
+            "SQL Server must reject a second row with an existing primary-key identifier.");
+        Assert.That(duplicateKeyException, Is.Not.Null);
+
+        var sqlException = duplicateKeyException!.GetBaseException() as SqlException;
+        Assert.That(sqlException, Is.Not.Null,
+            "The duplicate-key failure must originate from the SQL Server provider.");
+        Assert.That(sqlException!.Number, Is.EqualTo(2627),
+            "SQL Server error 2627 identifies a primary-key or unique-constraint violation.");
+
+        context.ChangeTracker.Clear();
+        var persistedRecords = await context.DatabaseIntegrationRecords
+            .AsNoTracking()
+            .Where(record => record.Id == recordId)
+            .ToArrayAsync();
+
+        Assert.That(persistedRecords, Has.Length.EqualTo(1));
+        Assert.That(persistedRecords[0].Value, Is.EqualTo("original-primary-key-record"),
+            "The rejected duplicate must not replace or alter the original row.");
+    }
+
+    [Test]
     public async Task SqlServerBusinessConstraints_RejectMissingReferencesAndDuplicateCommercialKeys()
     {
         await using var sqlServer = await CreateSqlServerAsync();
@@ -273,7 +320,7 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
     private static async Task<Testcontainers.MsSql.MsSqlContainer> CreateSqlServerAsync()
     {
         var sqlServer = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest")
-            .WithPassword("Kukulcan_SqlServer_Test!2026")
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await sqlServer.StartAsync();
         return sqlServer;

@@ -21,8 +21,8 @@ public sealed class BusinessDecimalAndTransactionIntegrationTests
     {
         await using var database = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_decimal_transaction_integration")
-            .WithUsername("postgres")
-            .WithPassword("example-decimal-transaction-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await database.StartAsync();
 
@@ -35,7 +35,7 @@ public sealed class BusinessDecimalAndTransactionIntegrationTests
     public async Task SqlServer_DecimalsKeepPrecisionAndScale_TransactionsRollbackAndCommittedDataSurvivesContextRecreation()
     {
         await using var database = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest")
-            .WithPassword("Kukulcan_SqlServer_Test!2026")
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await database.StartAsync();
 

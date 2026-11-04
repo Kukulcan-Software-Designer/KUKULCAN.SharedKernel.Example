@@ -274,8 +274,8 @@ public sealed class PostgreSqlBusinessPersistenceIntegrationTests
     {
         var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_business_persistence_integration")
-            .WithUsername("postgres")
-            .WithPassword("example-business-persistence-integration-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
         return postgres;

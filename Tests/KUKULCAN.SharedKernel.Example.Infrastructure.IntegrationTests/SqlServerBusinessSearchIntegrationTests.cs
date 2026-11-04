@@ -276,7 +276,7 @@ public sealed class SqlServerBusinessSearchIntegrationTests
     private static async Task<Testcontainers.MsSql.MsSqlContainer> CreateSqlServerAsync()
     {
         var sqlServer = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest")
-            .WithPassword("Kukulcan_SqlServer_Test!2026")
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await sqlServer.StartAsync();
         return sqlServer;

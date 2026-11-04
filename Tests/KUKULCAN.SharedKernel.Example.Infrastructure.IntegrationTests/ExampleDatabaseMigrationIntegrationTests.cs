@@ -57,8 +57,8 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_migrations_integration")
-            .WithUsername("postgres")
-            .WithPassword("example-migrations-integration-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
@@ -485,8 +485,8 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_referential_integrity")
-            .WithUsername("postgres")
-            .WithPassword("example-referential-integrity-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
@@ -700,8 +700,8 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_business_constraints")
-            .WithUsername("postgres")
-            .WithPassword("example-business-constraints-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
@@ -862,8 +862,8 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_commercial_snapshots")
-            .WithUsername("postgres")
-            .WithPassword("example-commercial-snapshots-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 

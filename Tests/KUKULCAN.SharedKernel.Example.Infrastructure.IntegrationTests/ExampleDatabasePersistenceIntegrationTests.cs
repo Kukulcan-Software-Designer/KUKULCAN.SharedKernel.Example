@@ -21,8 +21,8 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_database_integration")
-            .WithUsername("postgres")
-            .WithPassword("example-database-integration-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
@@ -168,8 +168,8 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_soft_delete_integration")
-            .WithUsername("postgres")
-            .WithPassword("example-soft-delete-integration-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
@@ -237,8 +237,8 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_transaction_integration")
-            .WithUsername("postgres")
-            .WithPassword("example-transaction-integration-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
@@ -277,8 +277,8 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_tenant_query_integration")
-            .WithUsername("postgres")
-            .WithPassword("example-tenant-query-integration-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
@@ -319,8 +319,8 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_decimal_precision_integration")
-            .WithUsername("postgres")
-            .WithPassword("example-decimal-precision-integration-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
@@ -398,8 +398,8 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_business_crud_integration")
-            .WithUsername("postgres")
-            .WithPassword("example-business-crud-integration-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
@@ -483,8 +483,8 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_commercial_history_soft_delete")
-            .WithUsername("postgres")
-            .WithPassword("example-commercial-history-soft-delete-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
