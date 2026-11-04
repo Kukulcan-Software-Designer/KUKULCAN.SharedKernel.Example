@@ -626,7 +626,7 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
         const string factoryTypeName =
             "KUKULCAN.SharedKernel.Example.Migrations.SQLServer.ExampleDbContextFactory, KUKULCAN.SharedKernel.Example.Migrations.SQLServer";
         const string connectionString =
-            "Server=localhost;Database=ExampleDesignTime;User Id=sa;Password=DesignTime_Test_Password;TrustServerCertificate=True;";
+            "Server=localhost;Database=ExampleDesignTime;TrustServerCertificate=True;";
 
         var previousProvider = Environment.GetEnvironmentVariable("KUKULCAN__DATABASE__PROVIDER");
         var previousConnectionString = Environment.GetEnvironmentVariable("KUKULCAN__DATABASE__CONNECTIONSTRING");
