@@ -85,7 +85,7 @@ dotnet ef migrations add <MigrationName> \
   --output-dir Migrations
 ```
 
-Repeat for the SQL Server and MySQL migration projects. Review the generated migration and model snapshot before applying it. Never edit an already-applied migration. The initial migration snapshots are verified against the current EF model for all three provider configurations; the real-container migration/re-application test currently runs against PostgreSQL. SQL Server and MySQL are not declared validated until Issues #21 and #22 pass their provider-backed checks. MySQL uses database/catalog semantics for schema names; the `Example` catalog must be provisioned and validated according to the MySQL provider before claiming support.
+Repeat for the SQL Server and MySQL migration projects. Review the generated migration and model snapshot before applying it. Never edit an already-applied migration. The initial migration snapshots are verified against the current EF model for all three provider configurations. Real-container migration and persistence validation has been completed for PostgreSQL (Issue #20) and Microsoft SQL Server (Issue #21). MySQL remains pending provider-backed validation under Issue #22. MySQL uses database/catalog semantics for schema names; the `Example` catalog must be provisioned and validated according to the MySQL provider before claiming support.
 
 The Database package exposes `Kukulcan:Database:Migration:AutoMigrateOnStartup`, which defaults to `false`. Apply production migrations as an explicit deployment step after reviewing the target provider's migration. Do not treat `EnsureCreatedAsync` as a substitute for versioned migrations.
 
