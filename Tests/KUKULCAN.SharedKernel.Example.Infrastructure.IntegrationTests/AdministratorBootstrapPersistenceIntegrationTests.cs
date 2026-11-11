@@ -1,4 +1,3 @@
-using System.Data.Common;
 using System.Reflection;
 using KUKULCAN.SharedKernel.Abstractions;
 using KUKULCAN.SharedKernel.Auth.Persistence;
@@ -35,8 +34,8 @@ public sealed class AdministratorBootstrapPersistenceIntegrationTests
 
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("auth_integration")
-            .WithUsername("postgres")
-            .WithPassword("auth-integration-test-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 

@@ -28,7 +28,7 @@ Use an application test host or equivalent supported integration harness to veri
 
 ### Database integration tests
 
-Use real provider instances for behavior whose result depends on EF Core/provider semantics. Validate schema `Sample`, migrations, relationships, unique constraints, queries, string matching, transaction boundaries, soft deletion, and history preservation. Provider support must be evidenced separately for PostgreSQL, SQL Server, and MySQL.
+Use real provider instances for behavior whose result depends on EF Core/provider semantics. Validate schema `Example`, migrations, relationships, unique constraints, queries, string matching, transaction boundaries, soft deletion, and history preservation. Provider support must be evidenced separately for PostgreSQL, SQL Server, and MySQL.
 
 ### External-service integration tests
 
