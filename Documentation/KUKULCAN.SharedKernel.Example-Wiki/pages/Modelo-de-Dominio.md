@@ -4,7 +4,7 @@
 
 ## Estado y alcance
 
-Los nueve tipos de entidad del dominio Sample y sus mapeos EF Core están implementados en los proyectos Domain e Infrastructure del Example. Las migraciones versionadas y las comprobaciones de persistencia con proveedores reales pertenecen a las Issues #17 y #20–#22; este modelo no afirma que los tres proveedores estén validados.
+Los nueve tipos de entidad del dominio Example y sus mapeos EF Core están implementados en los proyectos Domain e Infrastructure del Example. Las migraciones versionadas y la inicialización repetible del esquema se abordaron en la Issue #17. La validación de persistencia con proveedores reales se ha completado para PostgreSQL (Issue #20) y Microsoft SQL Server (Issue #21); la validación de MySQL sigue pendiente en la Issue #22.
 
 ## Entidades
 
@@ -45,7 +45,7 @@ Las líneas de venta y de compra son tipos separados porque pertenecen a documen
 ## Límites respecto a las siguientes Issues
 
 - La Issue #17 es responsable de las migraciones versionadas y la inicialización repetible del esquema. Esta Issue establece el modelo CLR y sus mapeos EF Core.
-- Las Issues #20–#22 validan la persistencia contra instancias reales de PostgreSQL, SQL Server y MySQL; instalar paquetes no demuestra soporte.
+- Las Issues #20 y #21 completaron la validación de persistencia contra instancias reales de PostgreSQL y Microsoft SQL Server. La Issue #22 sigue siendo responsable de validar MySQL; instalar paquetes no demuestra soporte.
 - La Issue #8 implementa las operaciones Web API y los filtros de búsqueda requeridos.
 - La Issue #18 es responsable de la validación de solicitudes y las reglas de negocio detalladas.
 - La Issue #19 es responsable del flujo de borrado de la API y de conservar los datos históricos. El modelo ya aporta campos de borrado lógico y relaciones restrictivas que respaldan esa política.
