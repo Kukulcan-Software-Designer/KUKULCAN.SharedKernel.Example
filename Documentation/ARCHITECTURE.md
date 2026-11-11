@@ -1,6 +1,6 @@
 # Example Application Architecture
 
-**Status:** Architecture and executable .NET 10 Web API baseline (Issue #1), SharedKernel Result integration (Issue #2), authentication/current-user/administrator-bootstrap behavior (Issue #3), Database package integration (Issue #4), JsonEngine query integration (Issue #5), outbound I18N HTTP integration (Issue #6), and domain entities/EF Core mappings (Issue #7) implemented and under automated verification. Provider-specific versioned migrations for the `Example` schema are implemented in Issue #17 and were merged into `Develop` through PR #39. PostgreSQL real-provider persistence validation is tracked by Issue #20; SQL Server and MySQL provider validation remain tracked by Issues #21 and #22.  
+**Status:** Architecture and executable .NET 10 Web API baseline (Issue #1), SharedKernel Result integration (Issue #2), authentication/current-user/administrator-bootstrap behavior (Issue #3), Database package integration (Issue #4), JsonEngine query integration (Issue #5), outbound I18N HTTP integration (Issue #6), and domain entities/EF Core mappings (Issue #7) implemented and under automated verification. Provider-specific versioned migrations for the `Example` schema are implemented in Issue #17 and were merged into `Develop` through PR #39. PostgreSQL persistence was validated against a real provider in Issue #20, and SQL Server persistence was validated against SQL Server 2025 in Issue #21. MySQL provider validation remains pending in Issue #22.  
 **Target framework:** .NET 10  
 **Scope:** Architecture, security and dependency boundaries, with the implemented migration baseline and current provider-validation status documented below. Business endpoints and client interfaces remain for their implementation Issues.
 
@@ -10,9 +10,9 @@
 2. No user interface connects directly to a database, owns persistence credentials, or implements authoritative business rules.
 3. The API host is the composition root: it configures dependency injection, HTTP endpoints, authentication/authorization, transport mapping, error responses, persistence, and outbound service clients.
 4. Application-specific use cases and domain rules belong to the Example, not to reusable KUKULCAN libraries. Reuse the published library contracts and do not copy their implementations.
-5. Persistence is reached through the verified public API of `KUKULCAN.SharedKernel.Database`. The Example owns its `Sample` domain model and its provider-specific host configuration; the shared package owns reusable persistence infrastructure.
+5. Persistence is reached through the verified public API of `KUKULCAN.SharedKernel.Database`. The Example owns its `Example` domain model and its provider-specific host configuration; the shared package owns reusable persistence infrastructure.
 6. `KUKULCAN.SharedKernel.I18N` is a separate HTTP service. The Example consumes it through a configured typed/named HTTP client and does not reference its implementation project.
-7. The baseline includes an executable Web API host, health endpoint, authentication endpoints and automated Web API/database integration tests. Sample business endpoints and outbound-service integrations remain for their implementation Issues.
+7. The baseline includes an executable Web API host, health endpoint, authentication endpoints and automated Web API/database integration tests. Example business endpoints and any future outbound-service integrations remain for their implementation Issues. The I18N HTTP integration is already implemented (Issue #6).
 
 ## 2. Logical architecture
 
@@ -23,15 +23,18 @@
   React ───────────┘                                      |
                                                           +-- Authentication / authorization
                                                           +-- Application use cases / validation
-                                                          +-- Sample domain rules
+                                                          +-- Example domain rules
                                                           +-- KUKULCAN.SharedKernel contracts
                                                           +-- KUKULCAN.SharedKernel.Auth
                                                           +-- KUKULCAN.SharedKernel.Database
                                                           |       |
-                                                          |       +-- configured EF Core provider
-                                                          |               +-- PostgreSQL
-                                                          |               +-- SQL Server
-                                                          |               +-- MySQL
+                                                         |       +-- shared EF Core infrastructure
+                                                         |
+                                                         +-- Example Infrastructure
+                                                                 +-- provider-specific EF Core integration
+                                                                         +-- PostgreSQL
+                                                                         +-- SQL Server
+                                                                         +-- MySQL
                                                           +-- KUKULCAN.SharedKernel.JsonEngine
                                                           +-- HTTP client --> KUKULCAN.SharedKernel.I18N
 ```
@@ -49,8 +52,11 @@ KUKULCAN.SharedKernel.Example/
 │   ├── WebAPI
 │   │     ├── KUKULCAN.SharedKernel.Example.WebApi/          # HTTP host and composition root
 │   │     ├── KUKULCAN.SharedKernel.Example.Application/     # use cases, orchestration, validation 
-│   │     ├── KUKULCAN.SharedKernel.Example.Domain/          # Sample entities and business invariants 
-│   │     └── KUKULCAN.SharedKernel.Example.Infrastructure/  # Database and outbound-service adapters 
+│   │     ├── KUKULCAN.SharedKernel.Example.Domain/          # Example entities and business invariants 
+│   │     ├── KUKULCAN.SharedKernel.Example.Infrastructure/  # Database and outbound-service adapters
+│   │     ├── KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL/ # PostgreSQL migrations and design-time factory
+│   │     ├── KUKULCAN.SharedKernel.Example.Migrations.SQLServer/  # SQL Server migrations and design-time factory
+│   │     └── KUKULCAN.SharedKernel.Example.Migrations.MySQL/      # MySQL migrations and design-time factory
 │   └── WebInterfaces
 │         ├── KUKULCAN.SharedKernel.Example.Razor/           # Razor client / server host
 │         ├── KUKULCAN.SharedKernel.Example.Blazor/          # Blazor client; hosting model per ADR below
@@ -88,11 +94,11 @@ KUKULCAN.SharedKernel.Example/
 
 ### Database configuration
 
-Use .NET configuration keys `Kukulcan:Database:Provider` and `Kukulcan:Database:ConnectionString`, which map to environment variables `Kukulcan__Database__Provider` and `Kukulcan__Database__ConnectionString`. Do not commit connection strings containing credentials.
+Use .NET configuration keys `Kukulcan:Database:Provider` and `Kukulcan:Database:ConnectionString`. Their canonical environment variable names are `KUKULCAN__DATABASE__PROVIDER` and `KUKULCAN__DATABASE__CONNECTIONSTRING`. Do not commit connection strings containing credentials.
 
 The Database package supports provider selection for SQL Server, PostgreSQL and MySQL. The Example has provider-specific EF Core migration projects for all three providers. The initial versioned migration `20261022200000_InitialExampleSchema` initializes the `Example` schema; its implementation and migration infrastructure were completed in Issue #17 and merged into `Develop` through PR #39. A provider is only considered validated when its migrations and persistence behavior have been exercised against a real instance of that provider.
 
-All Example-owned tables, including `DatabaseIntegrationRecords`, map to database schema `Example`. Authentication-owned tables and schema are not to be recreated by the Example domain model. The CLR entities live in `Source/WebAPI/KUKULCAN.SharedKernel.Example.Domain`; their explicit tenant-aware EF Core mappings are configured in `Infrastructure/ExampleDbContext`. Real PostgreSQL persistence validation is tracked in Issue #20; SQL Server and MySQL provider validation remain tracked in Issues #21 and #22. See [DATABASE-INTEGRATION.md](DATABASE-INTEGRATION.md) for configuration, secret handling, and the distinction between integration testing and production migrations.
+All Example-owned tables, including `DatabaseIntegrationRecords`, map to database schema `Example`. Authentication-owned tables and schema are not to be recreated by the Example domain model. The CLR entities live in `Source/WebAPI/KUKULCAN.SharedKernel.Example.Domain`; their explicit tenant-aware EF Core mappings are configured in `Infrastructure/Persistence/ExampleDbContext`. PostgreSQL persistence validation was completed in Issue #20, and SQL Server persistence validation was completed in Issue #21. MySQL provider validation remains pending in Issue #22. See [DATABASE-INTEGRATION.md](DATABASE-INTEGRATION.md) for provider configuration and migration guidance, and [DATABASE-SQLSERVER.md](DATABASE-SQLSERVER.md) for SQL Server-specific instructions.
 
 ## 5. HTTP API contract
 
@@ -109,7 +115,7 @@ All Example-owned tables, including `DatabaseIntegrationRecords`, map to databas
 
 ### Authentication authority
 
-The Example Web API is the security enforcement point for protected application operations. It consumes the public contracts of the published `KUKULCAN.SharedKernel.Auth` 1.1.4 package; Auth remains a class library and does not host these HTTP routes or issue this application's JWTs. `LocalAuthenticationService` validates local credentials and returns membership data, while the Example host applies its HTTP policies and issues signed access tokens.
+The Example Web API is the security enforcement point for protected application operations. It consumes the public contracts of the published `KUKULCAN.SharedKernel.Auth` 1.1.6 package; Auth remains a class library and does not host these HTTP routes or issue this application's JWTs. `LocalAuthenticationService` validates local credentials and returns membership data, while the Example host applies its HTTP policies and issues signed access tokens.
 
 ### Interface-specific session model
 
@@ -130,7 +136,7 @@ The UI-specific cookie/BFF session mechanics above remain work for the correspon
 
 ### Implemented authentication API and administrator bootstrap
 
-The Example host consumes the published `KUKULCAN.SharedKernel.Auth` 1.1.4 public contract. The Auth package remains a class library; it does not host HTTP routes or issue the Example's application JWTs.
+The Example host consumes the published `KUKULCAN.SharedKernel.Auth` 1.1.6 public contract. The Auth package remains a class library; it does not host HTTP routes or issue the Example's application JWTs.
 
 | Endpoint | Behavior |
 |---|---|
@@ -196,8 +202,9 @@ Issue #16 is an architecture/documentation issue. It does not justify artificial
 - **Issue #2:** demonstrate the published `KUKULCAN.SharedKernel` Result contract through `GET /api/examples/shared-kernel/result/success` (HTTP 200 with `isSuccess` and `value`) and `GET /api/examples/shared-kernel/result/failure` (HTTP 404 Problem Details carrying the shared error code).
 - **Issue #3:** add `POST /api/auth/login`, `GET /api/auth/me` and authenticated password change using the published `KUKULCAN.SharedKernel.Auth` contract; issue/validate short-lived bearer JWTs in the Example host; and provide idempotent, secret-configured administrator bootstrap with password hashing and automated behavior tests.
 - **Issue #17 (completed; PR #39 merged into `Develop`):** add provider-specific EF Core migration projects and design-time factories for PostgreSQL, SQL Server and MySQL, and initialize the `Example` schema with a versioned initial migration. PostgreSQL migration application, history, schema objects, constraints and repeat initialization have integration-test coverage.
-- **Issue #20 (in progress):** validate PostgreSQL persistence against a real PostgreSQL instance using Testcontainers, including connection/configuration, migration behavior, relational constraints, indexes/uniqueness, decimal precision, CRUD/query behavior, tenant isolation and logical-delete/history rules.
-- **Issues #21 and #22:** validate persistence and migrations against real SQL Server and MySQL instances respectively.
+- **Issue #20 (completed):** validate PostgreSQL persistence against a real PostgreSQL instance using Testcontainers, including connection/configuration, migration behavior, relational constraints, indexes/uniqueness, decimal precision, CRUD/query behavior, tenant isolation and logical-delete/history rules.
+- **Issue #21 (completed; PR #44 merged into `Develop`):** validate SQL Server persistence and migrations against SQL Server 2025 using Testcontainers. See [the validation record](Validation/Issue-21-SQLServer-Persistence-Validation.md).
+- **Issue #22 (pending):** validate MySQL persistence and migrations against a real MySQL instance.
 - Later domain and UI Issues must inspect the exact published package versions and verify the public APIs before coding. Update this document when an evidence-based decision changes the target design.
 
 Before implementing each integration, verify the package version, service registration signatures, exposed interfaces, error/result types, configuration options and supported provider/session behavior from its source/API documentation. A README-level description is not a substitute for compiling against the actual public contract.

@@ -4,7 +4,7 @@
 
 ## Status and scope
 
-The nine Sample domain entity types and their EF Core mappings are implemented in the Example Domain and Infrastructure projects. Versioned migrations and real-provider persistence checks remain in Issues #17 and #20–#22; this model does not claim all three providers have been validated.
+The nine Example domain entity types and their EF Core mappings are implemented in the Example Domain and Infrastructure projects. Versioned migrations and repeatable schema initialization were addressed in Issue #17. Real-provider persistence validation has been completed for PostgreSQL (Issue #20) and Microsoft SQL Server (Issue #21); MySQL validation remains pending under Issue #22.
 
 ## Entities
 
@@ -45,7 +45,7 @@ Sales and purchase lines are separate types because they belong to different doc
 ## Boundaries with later Issues
 
 - Issue #17 owns versioned migrations and repeatable schema initialization. This Issue only establishes the CLR domain model and EF Core mappings.
-- Issues #20–#22 validate provider-specific persistence against real PostgreSQL, SQL Server and MySQL instances; installed packages alone do not prove support.
+- Issues #20 and #21 completed provider-specific persistence validation against real PostgreSQL and Microsoft SQL Server instances. Issue #22 remains responsible for MySQL validation; installed packages alone do not prove support.
 - Issue #8 owns Web API operations and required search filters.
 - Issue #18 owns request-level validation and detailed business rules.
 - Issue #19 owns the API deletion workflow and historical-data retention policy. The domain model already provides logical-delete fields and restrictive relationships that support that policy.

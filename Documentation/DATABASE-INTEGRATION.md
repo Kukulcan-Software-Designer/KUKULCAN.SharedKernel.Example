@@ -66,7 +66,7 @@ dotnet ef database update \
   --context ExampleDbContext
 ```
 
-For SQL Server, set `KUKULCAN__DATABASE__PROVIDER='SqlServer'` and use `Source/WebAPI/KUKULCAN.SharedKernel.Example.Migrations.SQLServer/KUKULCAN.SharedKernel.Example.Migrations.SQLServer.csproj`. For MySQL, set `KUKULCAN__DATABASE__PROVIDER='MySql'` and use `Source/WebAPI/KUKULCAN.SharedKernel.Example.Migrations.MySQL/KUKULCAN.SharedKernel.Example.Migrations.MySQL.csproj`. The `KUKULCAN__DATABASE__CONNECTIONSTRING` value must match the target provider and environment. Run these commands against the selected provider-specific project; do not apply one provider's migrations to another provider.
+For SQL Server, follow [DATABASE-SQLSERVER.md](DATABASE-SQLSERVER.md), which documents the provider-specific project, design-time factory, environment configuration and migration commands. For MySQL, set `KUKULCAN__DATABASE__PROVIDER='MySql'` and use `Source/WebAPI/KUKULCAN.SharedKernel.Example.Migrations.MySQL/KUKULCAN.SharedKernel.Example.Migrations.MySQL.csproj`. The `KUKULCAN__DATABASE__CONNECTIONSTRING` value must match the target provider and environment. Run commands against the selected provider-specific project; do not apply one provider's migrations to another provider.
 
 To add a later model change, add a **new** migration to each provider project that is intended to remain supported, using the same logical migration name. Review the generated `Up`, `Down`, indexes, constraints, provider-specific types, and model snapshot before applying it. Do not edit an already-applied migration.
 
@@ -80,12 +80,10 @@ Treat schema migration as a deployment operation, separate from the API's normal
 - Use a dedicated migration identity with only the provider-specific privileges required to create or alter the `Example` schema objects and maintain EF Core's migration-history table. Do not use a database superuser or server administrator as the routine migration identity.
 - Use a separate runtime identity for the Web API. It should not have schema-creation or schema-alteration privileges; grant only the data access required by the application.
 - Review the generated migration operations and the target environment before applying them, and retain a tested backup/restore path for production changes.
-- Exact grant statements differ by provider. SQL Server and MySQL grants must be determined and verified in their real-provider work for Issues #21 and #22; this document does not claim those permission sets or providers have been validated.
+- Exact grant statements differ by provider. Do not infer or copy permission statements between providers. Determine and verify the minimum required privileges for each deployment environment; MySQL-specific permissions remain part of the pending Issue #22 work.
 - Keep automatic startup migration disabled in production. Apply migrations as a controlled deployment step and verify the resulting schema and migration history before releasing the application.
 
-The initial migrations and snapshots are checked against the current EF model for all three provider configurations. The real-container initialization and repeat-application test currently exercises PostgreSQL. SQL Server and MySQL are **not** declared validated until Issues #21 and #22 complete their provider-backed checks. MySQL uses database/catalog semantics for schema names; provisioning and validation of the `Example` catalog must be verified by Issue #22 rather than inferred from the PostgreSQL test.
-
-The provider packages for PostgreSQL, SQL Server, and MySQL are explicit Infrastructure dependencies. PostgreSQL has an automated real-provider persistence test in this integration issue. SQL Server and MySQL must not be represented as fully validated until their respective provider-specific integration issues run against real instances.
+The provider packages for PostgreSQL, SQL Server, and MySQL are explicit Infrastructure dependencies. The initial migrations and snapshots are checked against the current EF model for all three provider configurations. PostgreSQL has automated real-provider persistence coverage from Issue #20. SQL Server migrations and persistence behavior have automated real-provider and migration coverage from Issue #21, using SQL Server 2025 Testcontainers. MySQL remains unvalidated pending the provider-backed integration checks against a real instance in Issue #22. MySQL uses database/catalog semantics for schema names; provisioning and validation of the `Example` catalog must be verified by Issue #22 rather than inferred from PostgreSQL or SQL Server behavior.
 
 ## PostgreSQL integration-test prerequisites and commands
 
