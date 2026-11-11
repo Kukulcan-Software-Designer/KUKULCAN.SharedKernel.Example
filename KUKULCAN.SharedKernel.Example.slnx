@@ -9,6 +9,9 @@
   <Folder Name="/Documentation/Scripts/">
     <File Path="Documentation\Scripts\setup-example-milestones.sh" />
   </Folder>
+  <Folder Name="/Documentation/Validation/">
+    <File Path="Documentation\Validation\Issue-21-SQLServer-Persistence-Validation.md" />
+  </Folder>
   <Folder Name="/Documentation/Wiki/">
     <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\publish-example-wiki.sh" />
     <File Path="Documentation\KUKULCAN.SharedKernel.Example-Wiki\README-Publishing.md" />

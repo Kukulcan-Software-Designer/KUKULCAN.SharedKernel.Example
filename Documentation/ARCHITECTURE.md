@@ -12,7 +12,7 @@
 4. Application-specific use cases and domain rules belong to the Example, not to reusable KUKULCAN libraries. Reuse the published library contracts and do not copy their implementations.
 5. Persistence is reached through the verified public API of `KUKULCAN.SharedKernel.Database`. The Example owns its `Example` domain model and its provider-specific host configuration; the shared package owns reusable persistence infrastructure.
 6. `KUKULCAN.SharedKernel.I18N` is a separate HTTP service. The Example consumes it through a configured typed/named HTTP client and does not reference its implementation project.
-7. The baseline includes an executable Web API host, health endpoint, authentication endpoints and automated Web API/database integration tests. Example business endpoints and outbound-service integrations remain for their implementation Issues.
+7. The baseline includes an executable Web API host, health endpoint, authentication endpoints and automated Web API/database integration tests. Example business endpoints and any future outbound-service integrations remain for their implementation Issues. The I18N HTTP integration is already implemented (Issue #6).
 
 ## 2. Logical architecture
 
@@ -28,10 +28,13 @@
                                                           +-- KUKULCAN.SharedKernel.Auth
                                                           +-- KUKULCAN.SharedKernel.Database
                                                           |       |
-                                                          |       +-- configured EF Core provider
-                                                          |               +-- PostgreSQL
-                                                          |               +-- SQL Server
-                                                          |               +-- MySQL
+                                                         |       +-- shared EF Core infrastructure
+                                                         |
+                                                         +-- Example Infrastructure
+                                                                 +-- provider-specific EF Core integration
+                                                                         +-- PostgreSQL
+                                                                         +-- SQL Server
+                                                                         +-- MySQL
                                                           +-- KUKULCAN.SharedKernel.JsonEngine
                                                           +-- HTTP client --> KUKULCAN.SharedKernel.I18N
 ```
@@ -50,7 +53,10 @@ KUKULCAN.SharedKernel.Example/
 │   │     ├── KUKULCAN.SharedKernel.Example.WebApi/          # HTTP host and composition root
 │   │     ├── KUKULCAN.SharedKernel.Example.Application/     # use cases, orchestration, validation 
 │   │     ├── KUKULCAN.SharedKernel.Example.Domain/          # Example entities and business invariants 
-│   │     └── KUKULCAN.SharedKernel.Example.Infrastructure/  # Database and outbound-service adapters 
+│   │     ├── KUKULCAN.SharedKernel.Example.Infrastructure/  # Database and outbound-service adapters
+│   │     ├── KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL/ # PostgreSQL migrations and design-time factory
+│   │     ├── KUKULCAN.SharedKernel.Example.Migrations.SQLServer/  # SQL Server migrations and design-time factory
+│   │     └── KUKULCAN.SharedKernel.Example.Migrations.MySQL/      # MySQL migrations and design-time factory
 │   └── WebInterfaces
 │         ├── KUKULCAN.SharedKernel.Example.Razor/           # Razor client / server host
 │         ├── KUKULCAN.SharedKernel.Example.Blazor/          # Blazor client; hosting model per ADR below
@@ -109,7 +115,7 @@ All Example-owned tables, including `DatabaseIntegrationRecords`, map to databas
 
 ### Authentication authority
 
-The Example Web API is the security enforcement point for protected application operations. It consumes the public contracts of the published `KUKULCAN.SharedKernel.Auth` 1.1.4 package; Auth remains a class library and does not host these HTTP routes or issue this application's JWTs. `LocalAuthenticationService` validates local credentials and returns membership data, while the Example host applies its HTTP policies and issues signed access tokens.
+The Example Web API is the security enforcement point for protected application operations. It consumes the public contracts of the published `KUKULCAN.SharedKernel.Auth` 1.1.6 package; Auth remains a class library and does not host these HTTP routes or issue this application's JWTs. `LocalAuthenticationService` validates local credentials and returns membership data, while the Example host applies its HTTP policies and issues signed access tokens.
 
 ### Interface-specific session model
 
@@ -130,7 +136,7 @@ The UI-specific cookie/BFF session mechanics above remain work for the correspon
 
 ### Implemented authentication API and administrator bootstrap
 
-The Example host consumes the published `KUKULCAN.SharedKernel.Auth` 1.1.4 public contract. The Auth package remains a class library; it does not host HTTP routes or issue the Example's application JWTs.
+The Example host consumes the published `KUKULCAN.SharedKernel.Auth` 1.1.6 public contract. The Auth package remains a class library; it does not host HTTP routes or issue the Example's application JWTs.
 
 | Endpoint | Behavior |
 |---|---|
