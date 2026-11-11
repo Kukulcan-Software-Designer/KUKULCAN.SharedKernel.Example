@@ -318,6 +318,159 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
             "A product referenced by stock and document lines must not be physically deleted.");
     }
 
+
+    [Test]
+    public async Task SqlServerBusinessConstraints_RejectCrossTenantReferences()
+    {
+        await using var sqlServer = await CreateSqlServerAsync();
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        await using var context = CreateContext(tenantA, sqlServer.GetConnectionString());
+        await context.Database.MigrateAsync();
+
+        var clientA = Guid.NewGuid();
+        var clientB = Guid.NewGuid();
+        var providerA = Guid.NewGuid();
+        var providerB = Guid.NewGuid();
+        var productA = Guid.NewGuid();
+        var productB = Guid.NewGuid();
+        var warehouseA = Guid.NewGuid();
+        var warehouseB = Guid.NewGuid();
+        var invoiceA = Guid.NewGuid();
+        var invoiceB = Guid.NewGuid();
+        var purchaseA = Guid.NewGuid();
+        var purchaseB = Guid.NewGuid();
+
+        // Seed valid principals for both tenants directly, bypassing EF tenant query filters.
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO [Example].[Clients] ([Id], [TenantId], [Name])
+            VALUES ({clientA}, {tenantA}, N'Client A'), ({clientB}, {tenantB}, N'Client B');
+
+            INSERT INTO [Example].[Providers] ([Id], [TenantId], [Name])
+            VALUES ({providerA}, {tenantA}, N'Provider A'), ({providerB}, {tenantB}, N'Provider B');
+
+            INSERT INTO [Example].[Products] ([Id], [TenantId], [Code], [Name])
+            VALUES
+                ({productA}, {tenantA}, N'SKU-A', N'Product A'),
+                ({productB}, {tenantB}, N'SKU-B', N'Product B');
+
+            INSERT INTO [Example].[Warehouses] ([Id], [TenantId], [Name])
+            VALUES
+                ({warehouseA}, {tenantA}, N'Warehouse A'),
+                ({warehouseB}, {tenantB}, N'Warehouse B');
+
+            INSERT INTO [Example].[Invoices]
+                ([Id], [TenantId], [ClientId], [InvoiceNumber], [IssuedAt], [ClientName])
+            VALUES
+                ({invoiceA}, {tenantA}, {clientA}, N'SALE-A', {DateTimeOffset.UtcNow}, N'Client A'),
+                ({invoiceB}, {tenantB}, {clientB}, N'SALE-B', {DateTimeOffset.UtcNow}, N'Client B');
+
+            INSERT INTO [Example].[ProdInvoices]
+                ([Id], [TenantId], [ProviderId], [InvoiceNumber], [IssuedAt], [ProviderName])
+            VALUES
+                ({purchaseA}, {tenantA}, {providerA}, N'PURCHASE-A', {DateTimeOffset.UtcNow}, N'Provider A'),
+                ({purchaseB}, {tenantB}, {providerB}, N'PURCHASE-B', {DateTimeOffset.UtcNow}, N'Provider B');
+            """);
+
+        async Task AssertForeignKeyViolationAsync(FormattableString command, string description)
+        {
+            var exception = Assert.ThrowsAsync<SqlException>(
+                async () => await context.Database.ExecuteSqlInterpolatedAsync(command),
+                description);
+
+            Assert.That(exception!.Number, Is.EqualTo(547),
+                $"{description} SQL Server must report foreign-key violation 547.");
+        }
+
+        var invalidInvoiceClientId = Guid.NewGuid();
+        await AssertForeignKeyViolationAsync($"""
+            INSERT INTO [Example].[Invoices]
+                ([Id], [TenantId], [ClientId], [InvoiceNumber], [IssuedAt], [ClientName])
+            VALUES
+                ({invalidInvoiceClientId}, {tenantB}, {clientA}, N'CROSS-TENANT-CLIENT', {DateTimeOffset.UtcNow}, N'Client A');
+            """,
+            "An invoice must not reference a client belonging to another tenant.");
+
+        var invalidPurchaseProviderId = Guid.NewGuid();
+        await AssertForeignKeyViolationAsync($"""
+            INSERT INTO [Example].[ProdInvoices]
+                ([Id], [TenantId], [ProviderId], [InvoiceNumber], [IssuedAt], [ProviderName])
+            VALUES
+                ({invalidPurchaseProviderId}, {tenantB}, {providerA}, N'CROSS-TENANT-PROVIDER', {DateTimeOffset.UtcNow}, N'Provider A');
+            """,
+            "A purchase invoice must not reference a provider belonging to another tenant.");
+
+        var invalidStockProductId = Guid.NewGuid();
+        await AssertForeignKeyViolationAsync($"""
+            INSERT INTO [Example].[WarehouseStocks]
+                ([Id], [TenantId], [WarehouseId], [ProductId], [Quantity])
+            VALUES
+                ({invalidStockProductId}, {tenantB}, {warehouseB}, {productA}, 1.000);
+            """,
+            "Warehouse stock must not reference a product belonging to another tenant.");
+
+        var invalidStockWarehouseId = Guid.NewGuid();
+        await AssertForeignKeyViolationAsync($"""
+            INSERT INTO [Example].[WarehouseStocks]
+                ([Id], [TenantId], [WarehouseId], [ProductId], [Quantity])
+            VALUES
+                ({invalidStockWarehouseId}, {tenantB}, {warehouseA}, {productB}, 1.000);
+            """,
+            "Warehouse stock must not reference a warehouse belonging to another tenant.");
+
+        var invalidSalesLineInvoiceId = Guid.NewGuid();
+        await AssertForeignKeyViolationAsync($"""
+            INSERT INTO [Example].[InvoiceLines]
+                ([Id], [TenantId], [InvoiceId], [LineNumber], [ProductId], [ProductCode], [ProductName], [Quantity], [UnitPrice])
+            VALUES
+                ({invalidSalesLineInvoiceId}, {tenantB}, {invoiceA}, 1, {productB}, N'SKU-B', N'Product B', 1.000, 2.0000);
+            """,
+            "A sales line must not reference an invoice belonging to another tenant.");
+
+        var invalidSalesLineProductId = Guid.NewGuid();
+        await AssertForeignKeyViolationAsync($"""
+            INSERT INTO [Example].[InvoiceLines]
+                ([Id], [TenantId], [InvoiceId], [LineNumber], [ProductId], [ProductCode], [ProductName], [Quantity], [UnitPrice])
+            VALUES
+                ({invalidSalesLineProductId}, {tenantB}, {invoiceB}, 2, {productA}, N'SKU-A', N'Product A', 1.000, 2.0000);
+            """,
+            "A sales line must not reference a product belonging to another tenant.");
+
+        var invalidPurchaseLineInvoiceId = Guid.NewGuid();
+        await AssertForeignKeyViolationAsync($"""
+            INSERT INTO [Example].[ProdInvoiceLines]
+                ([Id], [TenantId], [ProdInvoiceId], [LineNumber], [ProductId], [ProductCode], [ProductName], [Quantity], [UnitPrice])
+            VALUES
+                ({invalidPurchaseLineInvoiceId}, {tenantB}, {purchaseA}, 1, {productB}, N'SKU-B', N'Product B', 1.000, 1.0000);
+            """,
+            "A purchase line must not reference a purchase invoice belonging to another tenant.");
+
+        var invalidPurchaseLineProductId = Guid.NewGuid();
+        await AssertForeignKeyViolationAsync($"""
+            INSERT INTO [Example].[ProdInvoiceLines]
+                ([Id], [TenantId], [ProdInvoiceId], [LineNumber], [ProductId], [ProductCode], [ProductName], [Quantity], [UnitPrice])
+            VALUES
+                ({invalidPurchaseLineProductId}, {tenantB}, {purchaseB}, 2, {productA}, N'SKU-A', N'Product A', 1.000, 1.0000);
+            """,
+            "A purchase line must not reference a product belonging to another tenant.");
+
+        var rejectedRows = await context.Database.SqlQuery<int>($"""
+            SELECT
+                (SELECT COUNT(*) FROM [Example].[Invoices] WHERE [Id] = {invalidInvoiceClientId}) +
+                (SELECT COUNT(*) FROM [Example].[ProdInvoices] WHERE [Id] = {invalidPurchaseProviderId}) +
+                (SELECT COUNT(*) FROM [Example].[WarehouseStocks] WHERE [Id] = {invalidStockProductId}) +
+                (SELECT COUNT(*) FROM [Example].[WarehouseStocks] WHERE [Id] = {invalidStockWarehouseId}) +
+                (SELECT COUNT(*) FROM [Example].[InvoiceLines] WHERE [Id] = {invalidSalesLineInvoiceId}) +
+                (SELECT COUNT(*) FROM [Example].[InvoiceLines] WHERE [Id] = {invalidSalesLineProductId}) +
+                (SELECT COUNT(*) FROM [Example].[ProdInvoiceLines] WHERE [Id] = {invalidPurchaseLineInvoiceId}) +
+                (SELECT COUNT(*) FROM [Example].[ProdInvoiceLines] WHERE [Id] = {invalidPurchaseLineProductId})
+                AS [Value]
+            """).SingleAsync();
+
+        Assert.That(rejectedRows, Is.Zero,
+            "No cross-tenant relationship row may be persisted in the Example schema.");
+    }
+
     private static async Task<Testcontainers.MsSql.MsSqlContainer> CreateSqlServerAsync()
     {
         var sqlServer = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest")
