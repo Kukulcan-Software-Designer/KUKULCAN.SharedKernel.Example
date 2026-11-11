@@ -374,7 +374,7 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
 
         async Task AssertForeignKeyViolationAsync(FormattableString command, string description)
         {
-            var exception = Assert.ThrowsAsync<SqlException>(
+            var exception = await Assert.ThrowsAsync<SqlException>(
                 async () => await context.Database.ExecuteSqlInterpolatedAsync(command),
                 description);
 
