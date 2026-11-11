@@ -19,8 +19,8 @@ public sealed class PostgreSqlBusinessSearchIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_business_search_integration")
-            .WithUsername("postgres")
-            .WithPassword("example-business-search-integration-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 

@@ -57,8 +57,8 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_migrations_integration")
-            .WithUsername("postgres")
-            .WithPassword("example-migrations-integration-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
@@ -485,8 +485,8 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_referential_integrity")
-            .WithUsername("postgres")
-            .WithPassword("example-referential-integrity-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
@@ -620,6 +620,45 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
             "Valid sales and purchase invoice records and their lines must persist in PostgreSQL.");
     }
 
+    [Test]
+    public void DesignTimeMigrationFactory_CreatesSqlServerContextWhenConfigurationIsValid()
+    {
+        const string factoryTypeName =
+            "KUKULCAN.SharedKernel.Example.Migrations.SQLServer.ExampleDbContextFactory, KUKULCAN.SharedKernel.Example.Migrations.SQLServer";
+        const string connectionString =
+            "Server=localhost;Database=ExampleDesignTime;TrustServerCertificate=True;";
+
+        var previousProvider = Environment.GetEnvironmentVariable("KUKULCAN__DATABASE__PROVIDER");
+        var previousConnectionString = Environment.GetEnvironmentVariable("KUKULCAN__DATABASE__CONNECTIONSTRING");
+
+        try
+        {
+            Environment.SetEnvironmentVariable("KUKULCAN__DATABASE__PROVIDER", "SqlServer");
+            Environment.SetEnvironmentVariable("KUKULCAN__DATABASE__CONNECTIONSTRING", connectionString);
+
+            var factoryType = Type.GetType(factoryTypeName, throwOnError: true)!;
+            var factory = (IDesignTimeDbContextFactory<ExampleDbContext>)Activator.CreateInstance(factoryType)!;
+
+            using var context = factory.CreateDbContext([]);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(context, Is.TypeOf<ExampleDbContext>());
+                Assert.That(
+                    context.Database.ProviderName,
+                    Is.EqualTo("Microsoft.EntityFrameworkCore.SqlServer"));
+                Assert.That(
+                    context.GetService<IMigrationsAssembly>().Assembly.GetName().Name,
+                    Is.EqualTo("KUKULCAN.SharedKernel.Example.Migrations.SQLServer"));
+            });
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("KUKULCAN__DATABASE__PROVIDER", previousProvider);
+            Environment.SetEnvironmentVariable("KUKULCAN__DATABASE__CONNECTIONSTRING", previousConnectionString);
+        }
+    }
+
     [TestCase(
         "KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL.ExampleDbContextFactory, KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL",
         "PostgresSql",
@@ -700,8 +739,8 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_business_constraints")
-            .WithUsername("postgres")
-            .WithPassword("example-business-constraints-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
@@ -862,8 +901,8 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("example_commercial_snapshots")
-            .WithUsername("postgres")
-            .WithPassword("example-commercial-snapshots-password")
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
 
