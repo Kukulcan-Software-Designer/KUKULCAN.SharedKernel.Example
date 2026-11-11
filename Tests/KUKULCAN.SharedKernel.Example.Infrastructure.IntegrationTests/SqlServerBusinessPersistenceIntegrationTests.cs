@@ -60,11 +60,19 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
         {
             TenantId = tenantId, Name = "Temporary warehouse"
         };
+        var independentStockWarehouse = new Warehouse
+        {
+            TenantId = tenantId, Name = "Independent stock warehouse"
+        };
+        var independentStock = new WarehouseStock
+        {
+            TenantId = tenantId, Warehouse = independentStockWarehouse, Product = product, Quantity = 3.750m
+        };
 
         context.AddRange(
             client, provider, product, warehouse, stock, invoice, invoiceLine, purchase, purchaseLine,
-            disposableProduct, disposableWarehouse);
-        Assert.That(await context.SaveChangesAsync(), Is.GreaterThanOrEqualTo(11));
+            disposableProduct, disposableWarehouse, independentStockWarehouse, independentStock);
+        Assert.That(await context.SaveChangesAsync(), Is.GreaterThanOrEqualTo(13));
 
         context.RemoveRange(disposableProduct, disposableWarehouse);
         await context.SaveChangesAsync();
@@ -107,14 +115,34 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
             Assert.That(persistedPurchase.Lines.Single().Product.Name, Is.EqualTo("Original Product"));
         });
 
+        var updatedSalesIssuedAt = DateTimeOffset.UtcNow.AddDays(1);
+        var updatedPurchaseIssuedAt = DateTimeOffset.UtcNow.AddDays(2);
+
         persistedStock.Quantity = 8.250m;
+        persistedStock.Warehouse.Name = "Renamed Main Warehouse";
+        persistedStock.Product.Code = "SKU-001-UPDATED";
+        persistedStock.Product.Name = "Renamed Product";
+        persistedStock.Product.Description = "Updated product description";
         persistedInvoice.Client.Name = "Renamed Client";
+        persistedInvoice.Client.City = "Updated Client City";
         persistedPurchase.Provider.Name = "Renamed Provider";
-        persistedInvoice.Lines.Single().Product.Name = "Renamed Product";
+        persistedPurchase.Provider.City = "Updated Provider City";
+        persistedInvoice.InvoiceNumber = "SALE-001-UPDATED";
+        persistedInvoice.IssuedAt = updatedSalesIssuedAt;
+        persistedPurchase.InvoiceNumber = "PURCHASE-001-UPDATED";
+        persistedPurchase.IssuedAt = updatedPurchaseIssuedAt;
+        persistedInvoice.Lines.Single().Quantity = 3.750m;
+        persistedInvoice.Lines.Single().UnitPrice = 21.5000m;
+        persistedPurchase.Lines.Single().Quantity = 6.250m;
+        persistedPurchase.Lines.Single().UnitPrice = 12.7500m;
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
         var updatedStock = await context.WarehouseStocks.AsNoTracking().SingleAsync(entity => entity.Id == stock.Id);
+        var updatedClient = await context.Clients.AsNoTracking().SingleAsync(entity => entity.Id == client.Id);
+        var updatedProvider = await context.Providers.AsNoTracking().SingleAsync(entity => entity.Id == provider.Id);
+        var updatedProduct = await context.Products.AsNoTracking().SingleAsync(entity => entity.Id == product.Id);
+        var updatedWarehouse = await context.Warehouses.AsNoTracking().SingleAsync(entity => entity.Id == warehouse.Id);
         var updatedInvoice = await context.Invoices.AsNoTracking().SingleAsync(entity => entity.Id == invoice.Id);
         var updatedPurchase = await context.ProdInvoices.AsNoTracking().SingleAsync(entity => entity.Id == purchase.Id);
         var persistedSalesLine = await context.InvoiceLines.AsNoTracking().SingleAsync(entity => entity.Id == invoiceLine.Id);
@@ -123,6 +151,19 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
         Assert.Multiple(() =>
         {
             Assert.That(updatedStock.Quantity, Is.EqualTo(8.250m), "Stock quantity must support updates.");
+            Assert.That(updatedClient.City, Is.EqualTo("Updated Client City"), "Client fields must support updates.");
+            Assert.That(updatedProvider.City, Is.EqualTo("Updated Provider City"), "Provider fields must support updates.");
+            Assert.That(updatedProduct.Code, Is.EqualTo("SKU-001-UPDATED"), "Product code must support updates.");
+            Assert.That(updatedProduct.Description, Is.EqualTo("Updated product description"));
+            Assert.That(updatedWarehouse.Name, Is.EqualTo("Renamed Main Warehouse"));
+            Assert.That(updatedInvoice.InvoiceNumber, Is.EqualTo("SALE-001-UPDATED"));
+            Assert.That(updatedInvoice.IssuedAt, Is.EqualTo(updatedSalesIssuedAt));
+            Assert.That(updatedPurchase.InvoiceNumber, Is.EqualTo("PURCHASE-001-UPDATED"));
+            Assert.That(updatedPurchase.IssuedAt, Is.EqualTo(updatedPurchaseIssuedAt));
+            Assert.That(persistedSalesLine.Quantity, Is.EqualTo(3.750m));
+            Assert.That(persistedSalesLine.UnitPrice, Is.EqualTo(21.5000m));
+            Assert.That(persistedPurchaseLine.Quantity, Is.EqualTo(6.250m));
+            Assert.That(persistedPurchaseLine.UnitPrice, Is.EqualTo(12.7500m));
             Assert.That(updatedInvoice.ClientName, Is.EqualTo("Original Client"),
                 "The invoice customer-name snapshot must not change when master data changes.");
             Assert.That(updatedPurchase.ProviderName, Is.EqualTo("Original Provider"),
@@ -133,6 +174,29 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
             Assert.That(persistedPurchaseLine.ProductCode, Is.EqualTo("SKU-001"));
             Assert.That(persistedPurchaseLine.ProductName, Is.EqualTo("Original Product"),
                 "Purchase line snapshots must remain unchanged when product master data changes.");
+        });
+
+        var stockToDelete = await context.WarehouseStocks
+            .SingleAsync(entity => entity.Id == independentStock.Id);
+        context.WarehouseStocks.Remove(stockToDelete);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var independentStockExists = await context.WarehouseStocks.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(entity => entity.Id == independentStock.Id);
+        var independentProductExists = await context.Products.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(entity => entity.Id == product.Id);
+        var independentWarehouseExists = await context.Warehouses.IgnoreQueryFilters().AsNoTracking()
+            .AnyAsync(entity => entity.Id == independentStockWarehouse.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(independentStockExists, Is.False,
+                "An independent warehouse-stock row must be physically deletable.");
+            Assert.That(independentProductExists, Is.True,
+                "Deleting a stock row must not delete its product.");
+            Assert.That(independentWarehouseExists, Is.True,
+                "Deleting a stock row must not delete its warehouse.");
         });
 
         var trackedClient = await context.Clients.SingleAsync(entity => entity.Id == client.Id);
