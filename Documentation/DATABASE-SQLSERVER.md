@@ -40,7 +40,7 @@ The initial migration is:
 Install or update the EF Core tool if necessary:
 
 ```bash
-dotnet tool install --global dotnet-ef --version 10.*
+dotnet tool install --global dotnet-ef --version '10.*'
 dotnet ef --version
 ```
 
@@ -203,6 +203,6 @@ Check that Docker is running, that the current user can access the Docker daemon
 
 ## Related documentation
 
-- Architecture
-- Database Integration
-- Issue #21 SQL Server Persistence Validation
+- [Architecture](ARCHITECTURE.md)
+- [Database Integration](DATABASE-INTEGRATION.md)
+- [Issue #21 SQL Server Persistence Validation](Validation/Issue-21-SQLServer-Persistence-Validation.md)
