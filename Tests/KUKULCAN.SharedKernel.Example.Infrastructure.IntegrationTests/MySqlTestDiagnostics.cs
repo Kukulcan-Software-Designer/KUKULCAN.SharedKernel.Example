@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Testcontainers.MySql;
 
 namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
@@ -83,7 +84,17 @@ internal static class MySqlTestDiagnostics
         }
         catch
         {
-            await database.DisposeAsync();
+            try
+            {
+                await database.DisposeAsync();
+            }
+            catch (Exception cleanupException)
+            {
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] CLEANUP FAILURE {DateTimeOffset.UtcNow:O} | database={databaseName}");
+                TestContext.Progress.WriteLine(cleanupException.ToString());
+            }
+
             throw;
         }
     }
