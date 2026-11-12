@@ -470,7 +470,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         finally
         {
             if (shouldClose)
-                await connection.CloseAsync(cancellationToken);
+                await connection.CloseAsync();
         }
     }
 
@@ -509,7 +509,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         finally
         {
             if (shouldClose)
-                await connection.CloseAsync(cancellationToken);
+                await connection.CloseAsync();
         }
     }
 
