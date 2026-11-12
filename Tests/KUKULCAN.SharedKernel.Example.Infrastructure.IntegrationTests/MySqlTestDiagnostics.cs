@@ -156,10 +156,10 @@ internal static class MySqlTestDiagnostics
                     new[]
                     {
                         "mysql",
-                        databaseName,
                         "--connect-timeout=5",
                         "--silent",
-                        "--execute=SELECT 1;"
+                        "--execute=SELECT 1;",
+                        databaseName
                     });
 
                 var ready = 0L.Equals(result.ExitCode);
