@@ -200,7 +200,8 @@ public static class ExampleDbContextModelConfiguration
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-    }    
+    }
+
     /// <summary>
     /// Configures provider-specific column types and identifier metadata so runtime models,
     /// migration targets, and snapshots remain aligned for the same database engine.
