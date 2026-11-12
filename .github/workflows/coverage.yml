@@ -75,6 +75,7 @@ jobs:
           --settings /tmp/example-coverage.runsettings
           --collect:"XPlat Code Coverage"
           --results-directory ./TestResults
+          --logger "console;verbosity=detailed"
 
       - name: Install ReportGenerator
         if: hashFiles('TestResults/**/coverage.cobertura.xml') != ''
