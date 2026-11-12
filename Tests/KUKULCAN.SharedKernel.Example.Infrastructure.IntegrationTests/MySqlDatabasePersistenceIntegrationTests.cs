@@ -245,13 +245,18 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
             });
             await context.SaveChangesAsync(cancellationToken);
 
-            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-            context.DatabaseIntegrationRecords.Add(new DatabaseIntegrationRecord
+            var executionStrategy = context.Database.CreateExecutionStrategy();
+            await executionStrategy.ExecuteAsync(async () =>
             {
-                Id = rolledBackId, TenantId = tenantId, Value = "must-rollback"
+                await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+                context.DatabaseIntegrationRecords.Add(new DatabaseIntegrationRecord
+                {
+                    Id = rolledBackId, TenantId = tenantId, Value = "must-rollback"
+                });
+                await context.SaveChangesAsync(cancellationToken);
+                await transaction.RollbackAsync(cancellationToken);
+                context.ChangeTracker.Clear();
             });
-            await context.SaveChangesAsync(cancellationToken);
-            await transaction.RollbackAsync(cancellationToken);
         }
 
         await using var verificationContext = CreateContext(database.GetConnectionString(), tenantId);
