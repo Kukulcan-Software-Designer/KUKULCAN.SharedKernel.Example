@@ -142,6 +142,96 @@ internal static class MySqlTestDiagnostics
         }
     }
 
+    public static async Task DiagnoseTcpConfigurationAsync(MySqlContainer database)
+    {
+        TestContext.Progress.WriteLine(
+            "[MYSQL-DIAGNOSTIC] Inspecting MySQL TCP configuration inside container.");
+
+        var variables = await database.ExecAsync(
+            new[]
+            {
+                "mysql",
+                "--no-defaults",
+                "--protocol=SOCKET",
+                "--socket=/var/run/mysqld/mysqld.sock",
+                "--user=root",
+                "--batch",
+                "--raw",
+                "--execute=SHOW VARIABLES WHERE Variable_name IN ('bind_address','port','skip_networking');"
+            });
+
+        TestContext.Progress.WriteLine(
+            $"[MYSQL-DIAGNOSTIC] MySQL TCP variables | exitCode={variables.ExitCode}");
+        TestContext.Progress.WriteLine(
+            $"[MYSQL-DIAGNOSTIC] MySQL TCP variables STDOUT:\\n{variables.Stdout}");
+
+        if (!string.IsNullOrWhiteSpace(variables.Stderr))
+        {
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-DIAGNOSTIC] MySQL TCP variables STDERR:\\n{variables.Stderr}");
+        }
+
+        if (variables.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                "Unable to inspect MySQL TCP configuration inside the container.");
+        }
+
+        var listeners = await database.ExecAsync(
+            new[]
+            {
+                "sh",
+                "-c",
+                "cat /proc/net/tcp /proc/net/tcp6"
+            });
+
+        TestContext.Progress.WriteLine(
+            $"[MYSQL-DIAGNOSTIC] TCP socket table | exitCode={listeners.ExitCode}");
+        TestContext.Progress.WriteLine(
+            $"[MYSQL-DIAGNOSTIC] TCP socket table STDOUT:\\n{listeners.Stdout}");
+
+        if (!string.IsNullOrWhiteSpace(listeners.Stderr))
+        {
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-DIAGNOSTIC] TCP socket table STDERR:\\n{listeners.Stderr}");
+        }
+    }
+
+    public static async Task WriteContainerLogsAsync(MySqlContainer database, string stage)
+    {
+        TestContext.Progress.WriteLine(
+            $"[MYSQL-CONTAINER] LOG CAPTURE START | stage={stage} | {DateTimeOffset.UtcNow:O}");
+
+        try
+        {
+            var (stdout, stderr) = await database.GetLogsAsync(
+                DateTime.UnixEpoch,
+                DateTime.UtcNow,
+                true,
+                CancellationToken.None);
+
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] STDOUT BEGIN | stage={stage}");
+            TestContext.Progress.WriteLine(
+                string.IsNullOrWhiteSpace(stdout) ? "<empty>" : stdout);
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] STDOUT END | stage={stage}");
+
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] STDERR BEGIN | stage={stage}");
+            TestContext.Progress.WriteLine(
+                string.IsNullOrWhiteSpace(stderr) ? "<empty>" : stderr);
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] STDERR END | stage={stage}");
+        }
+        catch (Exception exception)
+        {
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] LOG CAPTURE FAILURE | stage={stage}");
+            TestContext.Progress.WriteLine(exception.ToString());
+        }
+    }
+
     private sealed class MySqlReadinessWaitStrategy(string databaseName) : IWaitUntil
     {
         private int _attempt;
