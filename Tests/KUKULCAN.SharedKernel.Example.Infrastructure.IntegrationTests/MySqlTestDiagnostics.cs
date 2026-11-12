@@ -147,34 +147,41 @@ internal static class MySqlTestDiagnostics
         TestContext.Progress.WriteLine(
             "[MYSQL-DIAGNOSTIC] Inspecting MySQL TCP configuration inside container.");
 
-        var variables = await database.ExecAsync(
+        // Do not inspect server variables through the Unix socket: the official image
+        // configures root authentication, and a password-less socket query fails even
+        // when the final MySQL server is healthy. The readiness strategy has already
+        // verified the final server over TCP; repeat that credential-independent probe
+        // here for diagnostics, then inspect the kernel TCP socket table below.
+        var tcpProbe = await database.ExecAsync(
             new[]
             {
-                "mysql",
+                "mysqladmin",
                 "--no-defaults",
-                "--protocol=SOCKET",
-                "--socket=/var/run/mysqld/mysqld.sock",
-                "--user=root",
-                "--batch",
-                "--raw",
-                "--execute=SHOW VARIABLES WHERE Variable_name IN ('bind_address','port','skip_networking');"
+                "--protocol=TCP",
+                "--host=127.0.0.1",
+                "--port=3306",
+                "--connect-timeout=1",
+                "ping"
             });
 
         TestContext.Progress.WriteLine(
-            $"[MYSQL-DIAGNOSTIC] MySQL TCP variables | exitCode={variables.ExitCode}");
-        TestContext.Progress.WriteLine(
-            $"[MYSQL-DIAGNOSTIC] MySQL TCP variables STDOUT:\n{variables.Stdout}");
-
-        if (!string.IsNullOrWhiteSpace(variables.Stderr))
+            $"[MYSQL-DIAGNOSTIC] MySQL TCP ping | exitCode={tcpProbe.ExitCode}");
+        if (!string.IsNullOrWhiteSpace(tcpProbe.Stdout))
         {
             TestContext.Progress.WriteLine(
-                $"[MYSQL-DIAGNOSTIC] MySQL TCP variables STDERR:\n{variables.Stderr}");
+                $"[MYSQL-DIAGNOSTIC] MySQL TCP ping STDOUT:\n{tcpProbe.Stdout}");
         }
 
-        if (variables.ExitCode != 0)
+        if (!string.IsNullOrWhiteSpace(tcpProbe.Stderr))
+        {
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-DIAGNOSTIC] MySQL TCP ping STDERR:\n{tcpProbe.Stderr}");
+        }
+
+        if (tcpProbe.ExitCode != 0)
         {
             throw new InvalidOperationException(
-                "Unable to inspect MySQL TCP configuration inside the container.");
+                "Unable to reach the MySQL server over TCP from inside the container.");
         }
 
         var listeners = await database.ExecAsync(
