@@ -16,6 +16,24 @@ namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
 public sealed class MySqlDatabasePersistenceIntegrationTests
 {
     [Test]
+    public async Task MySqlConnectionFailure_IsNotReportedAsSuccessfulConnectionOrExposeCredentials()
+    {
+        const string passwordSentinel = "never-log-this-secret";
+        const string connectionString =
+            "Server=127.0.0.1;Port=1;Database=example-tests;User ID=example-test-user;Password="
+            + passwordSentinel + ";Connection Timeout=1";
+
+        await using var context = CreateContext(connectionString, Guid.NewGuid());
+        var exception = await Assert.CatchAsync<Exception>(
+            async () => await context.Database.OpenConnectionAsync());
+
+        Assert.That(exception, Is.Not.Null,
+            "An unreachable MySQL endpoint must be reported as a connection failure.");
+        Assert.That(exception!.ToString(), Does.Not.Contain(passwordSentinel),
+            "Connection failure details must not expose the configured password.");
+    }
+
+    [Test]
     public async Task MySqlMigrations_InitializeExampleTablesAndCanBeReappliedWithoutLosingData()
     {
         await using var database = await StartDatabaseAsync();
