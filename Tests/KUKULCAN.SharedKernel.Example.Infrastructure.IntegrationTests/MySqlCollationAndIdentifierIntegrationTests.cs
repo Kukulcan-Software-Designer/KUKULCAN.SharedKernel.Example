@@ -112,8 +112,10 @@ public sealed class MySqlCollationAndIdentifierIntegrationTests
             await using var createOverLimit = connection.CreateCommand();
             createOverLimit.CommandText = $"CREATE TABLE `{identifierOverLimit}` (Id INT NOT NULL)";
 
-            var exception = Assert.ThrowsAsync<MySqlException>(
-                async () => await createOverLimit.ExecuteNonQueryAsync(cancellationToken));
+            var exception = await Assert.ThrowsAsync<MySqlException>(async () =>
+            {
+                await createOverLimit.ExecuteNonQueryAsync(cancellationToken);
+            });
 
             Assert.That(exception!.Number, Is.EqualTo(1059),
                 "MySQL must reject an identifier longer than its documented 64-character limit.");
