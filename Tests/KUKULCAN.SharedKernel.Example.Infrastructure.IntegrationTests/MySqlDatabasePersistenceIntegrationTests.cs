@@ -56,6 +56,8 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
     public async Task MySqlTcpConnection_WorksWithAndWithoutConfiguredPooling(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
+        await MySqlTestDiagnostics.DiagnoseTcpConfigurationAsync(database);
+
         var connectionString = database.GetConnectionString();
         var mappedPort = database.GetMappedPublicPort(3306);
         var parsedConnection = new MySqlConnectionStringBuilder(connectionString);
@@ -69,22 +71,41 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         TestContext.Progress.WriteLine(
             "[MYSQL-DIAGNOSTIC] Reading the initial MySQL protocol handshake directly from the mapped TCP endpoint.");
 
-        using (var tcpClient = new TcpClient())
+        try
         {
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            using var tcpClient = new TcpClient();
+
+            using var timeout =
+                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(10));
-            await tcpClient.ConnectAsync(database.Hostname, mappedPort, timeout.Token);
+
+            await tcpClient.ConnectAsync(
+                database.Hostname,
+                mappedPort,
+                timeout.Token);
+
+            TestContext.Progress.WriteLine(
+                "[MYSQL-DIAGNOSTIC] TCP connection established successfully.");
 
             await using var stream = tcpClient.GetStream();
             var handshakeHeader = new byte[4];
             var bytesRead = 0;
+
             while (bytesRead < handshakeHeader.Length)
             {
                 var read = await stream.ReadAsync(
-                    handshakeHeader.AsMemory(bytesRead, handshakeHeader.Length - bytesRead),
+                    handshakeHeader.AsMemory(
+                        bytesRead,
+                        handshakeHeader.Length - bytesRead),
                     timeout.Token);
+
                 if (read == 0)
+                {
+                    TestContext.Progress.WriteLine(
+                        "[MYSQL-DIAGNOSTIC] Remote endpoint closed the TCP connection before sending the complete handshake header.");
                     break;
+                }
+
                 bytesRead += read;
             }
 
@@ -92,10 +113,26 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
                 $"[MYSQL-DIAGNOSTIC] TCP handshake header | bytesRead={bytesRead} | " +
                 $"hex={Convert.ToHexString(handshakeHeader.AsSpan(0, bytesRead))}");
 
-            Assert.That(bytesRead, Is.EqualTo(4),
+            Assert.That(
+                bytesRead,
+                Is.EqualTo(4),
                 "The mapped MySQL TCP endpoint must return a MySQL protocol packet header.");
-            Assert.That(handshakeHeader[3], Is.EqualTo(0),
+
+            Assert.That(
+                handshakeHeader[3],
+                Is.EqualTo(0),
                 "The initial MySQL protocol packet must use sequence number zero.");
+        }
+        catch (Exception exception)
+        {
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-DIAGNOSTIC] TCP HANDSHAKE FAILURE: {exception}");
+
+            await MySqlTestDiagnostics.WriteContainerLogsAsync(
+                database,
+                "TCP handshake failure");
+
+            throw;
         }
 
         var unpooledConnectionString = new MySqlConnectionStringBuilder(connectionString)
