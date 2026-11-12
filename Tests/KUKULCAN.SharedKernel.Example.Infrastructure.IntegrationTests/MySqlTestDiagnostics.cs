@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Testcontainers.MySql;
 
 namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
