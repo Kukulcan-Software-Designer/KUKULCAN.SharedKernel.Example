@@ -426,7 +426,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
     private static async Task<MySqlContainer> StartDatabaseAsync()
     {
         var database = new MySqlBuilder("mysql:8.4")
-            .WithDatabase("example_mysql_integration")
+            .WithDatabase("Example")
             .WithUsername(TestDatabaseCredentials.GenerateUserName())
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
