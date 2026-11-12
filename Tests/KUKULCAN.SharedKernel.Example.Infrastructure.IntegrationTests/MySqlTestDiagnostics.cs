@@ -242,11 +242,12 @@ internal static class MySqlTestDiagnostics
 
             try
             {
-                // Testcontainers writes the generated application credentials to /etc/mysql/my.cnf.
-                // Passwords may contain option-file metacharacters, so the mysql client can read them
-                // incorrectly during readiness checks. Probe the local server over its Unix socket
-                // as the passwordless bootstrap root account instead; EF Core subsequently verifies
-                // the generated application credentials through the actual TCP connection string.
+                // The official MySQL image starts a temporary initialization server first.
+                // That server accepts Unix-socket connections while TCP is intentionally disabled
+                // (port=0, skip_networking=ON). A successful SELECT 1 is therefore not sufficient:
+                // wait until the final server is listening on the expected MySQL TCP port.
+                // Use the passwordless bootstrap root account over the Unix socket so generated
+                // application credentials and option-file escaping do not affect this probe.
                 var result = await container.ExecAsync(
                     new[]
                     {
@@ -255,10 +256,16 @@ internal static class MySqlTestDiagnostics
                         "--protocol=SOCKET",
                         "--socket=/var/run/mysqld/mysqld.sock",
                         "--user=root",
-                        "--execute=SELECT 1;"
+                        "--batch",
+                        "--skip-column-names",
+                        "--execute=SELECT IF(@@port = 3306 AND @@skip_networking = 'OFF', 'READY', 'WAIT');"
                     });
 
-                var ready = 0L.Equals(result.ExitCode);
+                var ready = 0L.Equals(result.ExitCode) &&
+                            string.Equals(
+                                result.Stdout.Trim(),
+                                "READY",
+                                StringComparison.OrdinalIgnoreCase);
                 if (ready || attempt == 1 || attempt % 10 == 0)
                 {
                     TestContext.Progress.WriteLine(
