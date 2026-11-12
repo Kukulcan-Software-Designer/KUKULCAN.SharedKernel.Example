@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Configurations;
+using DotNet.Testcontainers.Containers;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.MySql;
@@ -73,6 +76,9 @@ internal static class MySqlTestDiagnostics
             .WithDatabase(databaseName)
             .WithUsername(TestDatabaseCredentials.GenerateUserName())
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
+            .WithWaitStrategy(
+                Wait.ForUnixContainer().AddCustomWaitStrategy(
+                    new MySqlReadinessWaitStrategy(databaseName)))
             .Build();
 
         try
@@ -133,6 +139,57 @@ internal static class MySqlTestDiagnostics
             }
 
             throw;
+        }
+    }
+
+    private sealed class MySqlReadinessWaitStrategy(string databaseName) : IWaitUntil
+    {
+        private int _attempt;
+
+        public async Task<bool> UntilAsync(IContainer container)
+        {
+            var attempt = Interlocked.Increment(ref _attempt);
+
+            try
+            {
+                var result = await container.ExecAsync(
+                    new[]
+                    {
+                        "mysql",
+                        databaseName,
+                        "--connect-timeout=5",
+                        "--silent",
+                        "--execute=SELECT 1;"
+                    });
+
+                var ready = 0L.Equals(result.ExitCode);
+                if (ready || attempt == 1 || attempt % 10 == 0)
+                {
+                    TestContext.Progress.WriteLine(
+                        $"[MYSQL-READINESS] {(ready ? "SUCCESS" : "RETRY")} {DateTimeOffset.UtcNow:O} | " +
+                        $"database={databaseName} | attempt={attempt} | exitCode={result.ExitCode}");
+
+                    if (!string.IsNullOrWhiteSpace(result.Stdout))
+                        TestContext.Progress.WriteLine($"[MYSQL-READINESS] STDOUT: {result.Stdout}");
+
+                    if (!string.IsNullOrWhiteSpace(result.Stderr))
+                        TestContext.Progress.WriteLine($"[MYSQL-READINESS] STDERR: {result.Stderr}");
+                }
+
+                return ready;
+            }
+            catch (Exception exception)
+            {
+                if (attempt == 1 || attempt % 10 == 0)
+                {
+                    TestContext.Progress.WriteLine(
+                        $"[MYSQL-READINESS] EXEC FAILURE {DateTimeOffset.UtcNow:O} | " +
+                        $"database={databaseName} | attempt={attempt}");
+                    TestContext.Progress.WriteLine(exception.ToString());
+                }
+
+                return false;
+            }
         }
     }
 
