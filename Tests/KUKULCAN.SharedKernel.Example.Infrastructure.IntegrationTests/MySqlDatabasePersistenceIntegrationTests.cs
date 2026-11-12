@@ -92,7 +92,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
 
         var appliedAfterSecondMigration = (await context.Database.GetAppliedMigrationsAsync(cancellationToken)).ToArray();
         var pendingAfterSecondMigration = (await context.Database.GetPendingMigrationsAsync(cancellationToken)).ToArray();
-        var tablesAfterSecondMigration = await ReadTablesAsync(context);
+        var tablesAfterSecondMigration = await ReadTablesAsync(context, cancellationToken);
         var persisted = await context.DatabaseIntegrationRecords
             .AsNoTracking()
             .SingleAsync(entity => entity.Id == record.Id, cancellationToken);
@@ -151,7 +151,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         };
 
         context.AddRange(client, provider, product, warehouse, stock, invoice, invoiceLine, purchaseInvoice, purchaseLine);
-        Assert.That(await context.SaveChangesAsync(), Is.GreaterThanOrEqualTo(9));
+        Assert.That(await context.SaveChangesAsync(cancellationToken), Is.GreaterThanOrEqualTo(9));
 
         context.ChangeTracker.Clear();
         var persistedStock = await context.WarehouseStocks.AsNoTracking().SingleAsync(x => x.Id == stock.Id, cancellationToken);
@@ -480,7 +480,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         var connection = context.Database.GetDbConnection();
         var shouldClose = connection.State != ConnectionState.Open;
         if (shouldClose)
-            await connection.OpenAsync();
+            await connection.OpenAsync(cancellationToken);
 
         try
         {
@@ -509,7 +509,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         finally
         {
             if (shouldClose)
-                await connection.CloseAsync();
+                await connection.CloseAsync(cancellationToken);
         }
     }
 
