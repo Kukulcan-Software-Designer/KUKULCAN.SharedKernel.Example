@@ -243,29 +243,23 @@ internal static class MySqlTestDiagnostics
             try
             {
                 // The official MySQL image starts a temporary initialization server first.
-                // That server accepts Unix-socket connections while TCP is intentionally disabled
-                // (port=0, skip_networking=ON). A successful SELECT 1 is therefore not sufficient:
-                // wait until the final server is listening on the expected MySQL TCP port.
-                // Use the passwordless bootstrap root account over the Unix socket so generated
-                // application credentials and option-file escaping do not affect this probe.
+                // That server has TCP networking disabled, so a TCP ping to port 3306 cannot
+                // succeed until the final server is running. Use mysqladmin ping rather than a
+                // SQL query: the final server may already require the generated root password,
+                // while mysqladmin ping reports a live server even when authentication is denied.
                 var result = await container.ExecAsync(
                     new[]
                     {
-                        "mysql",
+                        "mysqladmin",
                         "--no-defaults",
-                        "--protocol=SOCKET",
-                        "--socket=/var/run/mysqld/mysqld.sock",
-                        "--user=root",
-                        "--batch",
-                        "--skip-column-names",
-                        "--execute=SELECT IF(@@port = 3306 AND @@skip_networking = 'OFF', 'READY', 'WAIT');"
+                        "--protocol=TCP",
+                        "--host=127.0.0.1",
+                        "--port=3306",
+                        "--connect-timeout=1",
+                        "ping"
                     });
 
-                var ready = 0L.Equals(result.ExitCode) &&
-                            string.Equals(
-                                result.Stdout.Trim(),
-                                "READY",
-                                StringComparison.OrdinalIgnoreCase);
+                var ready = 0L.Equals(result.ExitCode);
                 if (ready || attempt == 1 || attempt % 10 == 0)
                 {
                     TestContext.Progress.WriteLine(
