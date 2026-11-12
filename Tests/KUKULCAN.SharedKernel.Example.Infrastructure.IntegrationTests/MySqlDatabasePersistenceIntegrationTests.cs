@@ -1,4 +1,5 @@
 using System.Data;
+using System.Diagnostics;
 using KUKULCAN.SharedKernel.Abstractions;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
@@ -13,9 +14,25 @@ namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
 
 [TestFixture]
 [NonParallelizable]
+[Category("MySQL")]
 public sealed class MySqlDatabasePersistenceIntegrationTests
 {
-    [Test]
+    private Stopwatch? _testStopwatch;
+
+    [SetUp]
+    public void LogTestStart()
+    {
+        _testStopwatch = Stopwatch.StartNew();
+        MySqlTestDiagnostics.TestStarted(TestContext.CurrentContext.Test.Name);
+    }
+
+    [TearDown]
+    public void LogTestEnd()
+    {
+        if (_testStopwatch is not null)
+            MySqlTestDiagnostics.TestFinished(TestContext.CurrentContext.Test.Name, _testStopwatch);
+    }
+    [Test, Timeout(300_000)]
     public async Task MySqlConnectionFailure_IsNotReportedAsSuccessfulConnectionOrExposeCredentials()
     {
         const string passwordSentinel = "never-log-this-secret";
@@ -40,7 +57,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         var tenantId = Guid.NewGuid();
         await using var context = CreateContext(database.GetConnectionString(), tenantId);
 
-        await context.Database.MigrateAsync();
+        await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
         var appliedAfterFirstMigration = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
         var pendingAfterFirstMigration = (await context.Database.GetPendingMigrationsAsync()).ToArray();
         var tablesAfterFirstMigration = await ReadTablesAsync(context);
@@ -70,7 +87,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         context.DatabaseIntegrationRecords.Add(record);
         await context.SaveChangesAsync();
 
-        await context.Database.MigrateAsync();
+        await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
         context.ChangeTracker.Clear();
 
         var appliedAfterSecondMigration = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
@@ -95,7 +112,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         await using var database = await StartDatabaseAsync();
         var tenantId = Guid.NewGuid();
         await using var context = CreateContext(database.GetConnectionString(), tenantId);
-        await context.Database.MigrateAsync();
+        await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var client = new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Current client name" };
         var provider = new Provider { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Current provider name" };
@@ -182,7 +199,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
         await using var context = CreateContext(database.GetConnectionString(), tenantId);
-        await context.Database.MigrateAsync();
+        await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var ownClient = new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Tenant client" };
         var otherClient = new Client { Id = Guid.NewGuid(), TenantId = otherTenantId, Name = "Other tenant client" };
@@ -221,7 +238,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
 
         await using (var context = CreateContext(database.GetConnectionString(), tenantId))
         {
-            await context.Database.MigrateAsync();
+            await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
             context.DatabaseIntegrationRecords.Add(new DatabaseIntegrationRecord
             {
                 Id = committedId, TenantId = tenantId, Value = "committed"
@@ -256,7 +273,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         await using var database = await StartDatabaseAsync();
         var tenantId = Guid.NewGuid();
         await using var context = CreateContext(database.GetConnectionString(), tenantId);
-        await context.Database.MigrateAsync();
+        await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var client = new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Decimal client" };
         var product = new Product { Id = Guid.NewGuid(), TenantId = tenantId, Code = "DECIMAL-01", Name = "Decimal product" };
@@ -294,7 +311,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         await using var database = await StartDatabaseAsync();
         var tenantId = Guid.NewGuid();
         await using var context = CreateContext(database.GetConnectionString(), tenantId);
-        await context.Database.MigrateAsync();
+        await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var client = new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Constraint client" };
         context.Clients.Add(client);
@@ -327,7 +344,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         await using var database = await StartDatabaseAsync();
         var tenantId = Guid.NewGuid();
         await using var context = CreateContext(database.GetConnectionString(), tenantId);
-        await context.Database.MigrateAsync();
+        await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var client = new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Customer before deletion" };
         var provider = new Provider { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Supplier before deletion" };
@@ -404,7 +421,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         var tenantA = Guid.NewGuid();
         var tenantB = Guid.NewGuid();
         await using var context = CreateContext(database.GetConnectionString(), tenantA);
-        await context.Database.MigrateAsync();
+        await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var tenantAClient = new Client { Id = Guid.NewGuid(), TenantId = tenantA, Name = "Tenant A client" };
         var tenantBClient = new Client { Id = Guid.NewGuid(), TenantId = tenantB, Name = "Tenant B client" };
@@ -425,13 +442,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
 
     private static async Task<MySqlContainer> StartDatabaseAsync()
     {
-        var database = new MySqlBuilder("mysql:8.4")
-            .WithDatabase("example_mysql_integration")
-            .WithUsername(TestDatabaseCredentials.GenerateUserName())
-            .WithPassword(TestDatabaseCredentials.GeneratePassword())
-            .Build();
-        await database.StartAsync();
-        return database;
+        return await MySqlTestDiagnostics.StartDatabaseAsync("example_mysql_integration");
     }
 
     private static async Task<HashSet<string>> ReadTablesAsync(ExampleDbContext context)
