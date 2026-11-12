@@ -152,14 +152,20 @@ internal static class MySqlTestDiagnostics
 
             try
             {
+                // Testcontainers writes the generated application credentials to /etc/mysql/my.cnf.
+                // Passwords may contain option-file metacharacters, so the mysql client can read them
+                // incorrectly during readiness checks. Probe the local server over its Unix socket
+                // as the passwordless bootstrap root account instead; EF Core subsequently verifies
+                // the generated application credentials through the actual TCP connection string.
                 var result = await container.ExecAsync(
                     new[]
                     {
                         "mysql",
-                        "--connect-timeout=5",
-                        "--silent",
-                        "--execute=SELECT 1;",
-                        databaseName
+                        "--no-defaults",
+                        "--protocol=SOCKET",
+                        "--socket=/var/run/mysqld/mysqld.sock",
+                        "--user=root",
+                        "--execute=SELECT 1;"
                     });
 
                 var ready = 0L.Equals(result.ExitCode);
