@@ -18,7 +18,7 @@ public sealed class MySqlBusinessSearchIntegrationTests
     public async Task MySqlBusinessSearches_FilterByCriteriaAndIsolateResultsByTenant()
     {
         await using var database = new MySqlBuilder("mysql:8.4")
-            .WithDatabase("example_mysql_search")
+            .WithDatabase("Example")
             .WithUsername(TestDatabaseCredentials.GenerateUserName())
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
