@@ -291,7 +291,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         {
             Id = Guid.NewGuid(), TenantId = tenantId, Code = "DUPLICATE-SKU", Name = "Duplicate product code"
         });
-        Assert.ThrowsAsync<DbUpdateException>(async () => await context.SaveChangesAsync());
+        await Assert.ThrowsAsync<DbUpdateException>(async () => await context.SaveChangesAsync());
         context.ChangeTracker.Clear();
 
         var missingClientInvoice = new Invoice
