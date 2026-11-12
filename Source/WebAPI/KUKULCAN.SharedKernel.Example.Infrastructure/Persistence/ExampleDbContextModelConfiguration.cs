@@ -20,8 +20,6 @@ public static class ExampleDbContextModelConfiguration
         if (includeSchema)
             modelBuilder.HasDefaultSchema("Example");
 
-
-
         modelBuilder.Entity<DatabaseIntegrationRecord>(entity =>
         {
             entity.ToTable("DatabaseIntegrationRecords", includeSchema ? "Example" : null);
@@ -247,7 +245,9 @@ public static class ExampleDbContextModelConfiguration
         }
     }
 
-    private static string GetStoreType(Microsoft.EntityFrameworkCore.Metadata.IReadOnlyProperty property, DatabaseProvider provider)
+    private static string GetStoreType(
+        Microsoft.EntityFrameworkCore.Metadata.IReadOnlyProperty property,
+        DatabaseProvider provider)
     {
         var clrType = Nullable.GetUnderlyingType(property.ClrType) ?? property.ClrType;
 
@@ -311,5 +311,4 @@ public static class ExampleDbContextModelConfiguration
 
         throw new NotSupportedException($"No Example migration store type is defined for CLR type '{clrType}'.");
     }
-
 }
