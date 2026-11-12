@@ -1,5 +1,6 @@
 using System.Data;
 using KUKULCAN.SharedKernel.Abstractions;
+using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.DomainEvents.Abstractions;
 using KUKULCAN.SharedKernel.Example.Domain.Entities;
@@ -281,7 +282,15 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         context.Clients.Add(client);
         await context.SaveChangesAsync();
 
-        context.Clients.Add(new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Constraint client" });
+        context.Products.Add(new Product
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, Code = "DUPLICATE-SKU", Name = "First product"
+        });
+        await context.SaveChangesAsync();
+        context.Products.Add(new Product
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, Code = "DUPLICATE-SKU", Name = "Duplicate product code"
+        });
         Assert.ThrowsAsync<DbUpdateException>(async () => await context.SaveChangesAsync());
         context.ChangeTracker.Clear();
 
