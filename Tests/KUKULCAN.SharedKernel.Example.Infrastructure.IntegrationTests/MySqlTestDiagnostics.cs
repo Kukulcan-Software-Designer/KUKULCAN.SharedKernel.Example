@@ -83,11 +83,47 @@ internal static class MySqlTestDiagnostics
                 cancellationToken => database.StartAsync(cancellationToken));
             return database;
         }
-        catch
+        catch (Exception startException)
         {
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] START FAILURE {DateTimeOffset.UtcNow:O} | database={databaseName}");
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] ORIGINAL EXCEPTION: {startException}");
+
+            try
+            {
+                var (stdout, stderr) = await database.GetLogsAsync(
+                    DateTime.UnixEpoch,
+                    DateTime.UtcNow,
+                    true,
+                    CancellationToken.None);
+
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] STDOUT BEGIN | database={databaseName}");
+                TestContext.Progress.WriteLine(
+                    string.IsNullOrWhiteSpace(stdout) ? "<empty>" : stdout);
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] STDOUT END | database={databaseName}");
+
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] STDERR BEGIN | database={databaseName}");
+                TestContext.Progress.WriteLine(
+                    string.IsNullOrWhiteSpace(stderr) ? "<empty>" : stderr);
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] STDERR END | database={databaseName}");
+            }
+            catch (Exception logsException)
+            {
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] LOG CAPTURE FAILURE {DateTimeOffset.UtcNow:O} | database={databaseName}");
+                TestContext.Progress.WriteLine(logsException.ToString());
+            }
+
             try
             {
                 await database.DisposeAsync();
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] CLEANUP SUCCESS {DateTimeOffset.UtcNow:O} | database={databaseName}");
             }
             catch (Exception cleanupException)
             {
