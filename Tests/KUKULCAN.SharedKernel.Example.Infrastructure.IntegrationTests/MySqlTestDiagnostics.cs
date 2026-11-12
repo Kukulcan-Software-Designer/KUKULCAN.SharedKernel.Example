@@ -163,12 +163,12 @@ internal static class MySqlTestDiagnostics
         TestContext.Progress.WriteLine(
             $"[MYSQL-DIAGNOSTIC] MySQL TCP variables | exitCode={variables.ExitCode}");
         TestContext.Progress.WriteLine(
-            $"[MYSQL-DIAGNOSTIC] MySQL TCP variables STDOUT:\\n{variables.Stdout}");
+            $"[MYSQL-DIAGNOSTIC] MySQL TCP variables STDOUT:\n{variables.Stdout}");
 
         if (!string.IsNullOrWhiteSpace(variables.Stderr))
         {
             TestContext.Progress.WriteLine(
-                $"[MYSQL-DIAGNOSTIC] MySQL TCP variables STDERR:\\n{variables.Stderr}");
+                $"[MYSQL-DIAGNOSTIC] MySQL TCP variables STDERR:\n{variables.Stderr}");
         }
 
         if (variables.ExitCode != 0)
@@ -188,12 +188,12 @@ internal static class MySqlTestDiagnostics
         TestContext.Progress.WriteLine(
             $"[MYSQL-DIAGNOSTIC] TCP socket table | exitCode={listeners.ExitCode}");
         TestContext.Progress.WriteLine(
-            $"[MYSQL-DIAGNOSTIC] TCP socket table STDOUT:\\n{listeners.Stdout}");
+            $"[MYSQL-DIAGNOSTIC] TCP socket table STDOUT:\n{listeners.Stdout}");
 
         if (!string.IsNullOrWhiteSpace(listeners.Stderr))
         {
             TestContext.Progress.WriteLine(
-                $"[MYSQL-DIAGNOSTIC] TCP socket table STDERR:\\n{listeners.Stderr}");
+                $"[MYSQL-DIAGNOSTIC] TCP socket table STDERR:\n{listeners.Stderr}");
         }
     }
 
