@@ -12,15 +12,19 @@ public static class ExampleDbContextModelConfiguration
 {
     /// <summary>Configures every Example-owned table, key, index, and relationship.</summary>
     public static void Configure(ModelBuilder modelBuilder)
+        => Configure(modelBuilder, includeSchema: true);
+
+    private static void Configure(ModelBuilder modelBuilder, bool includeSchema)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
-        modelBuilder.HasDefaultSchema("Example");
+        if (includeSchema)
+            modelBuilder.HasDefaultSchema("Example");
 
 
 
         modelBuilder.Entity<DatabaseIntegrationRecord>(entity =>
         {
-            entity.ToTable("DatabaseIntegrationRecords", "Example");
+            entity.ToTable("DatabaseIntegrationRecords", includeSchema ? "Example" : null);
             entity.HasKey(record => record.Id);
             entity.Property(record => record.Value)
                 .HasMaxLength(200)
@@ -29,7 +33,7 @@ public static class ExampleDbContextModelConfiguration
 
         modelBuilder.Entity<Client>(entity =>
         {
-            entity.ToTable("Clients", "Example");
+            entity.ToTable("Clients", includeSchema ? "Example" : null);
             entity.HasKey(client => client.Id);
             entity.HasAlternateKey(client => new { client.TenantId, client.Id });
             entity.Property(client => client.Id).ValueGeneratedNever();
@@ -50,7 +54,7 @@ public static class ExampleDbContextModelConfiguration
 
         modelBuilder.Entity<Provider>(entity =>
         {
-            entity.ToTable("Providers", "Example");
+            entity.ToTable("Providers", includeSchema ? "Example" : null);
             entity.HasKey(provider => provider.Id);
             entity.HasAlternateKey(provider => new { provider.TenantId, provider.Id });
             entity.Property(provider => provider.Id).ValueGeneratedNever();
@@ -71,7 +75,7 @@ public static class ExampleDbContextModelConfiguration
 
         modelBuilder.Entity<Product>(entity =>
         {
-            entity.ToTable("Products", "Example");
+            entity.ToTable("Products", includeSchema ? "Example" : null);
             entity.HasKey(product => product.Id);
             entity.HasAlternateKey(product => new { product.TenantId, product.Id });
             entity.Property(product => product.Id).ValueGeneratedNever();
@@ -99,7 +103,7 @@ public static class ExampleDbContextModelConfiguration
 
         modelBuilder.Entity<Warehouse>(entity =>
         {
-            entity.ToTable("Warehouses", "Example");
+            entity.ToTable("Warehouses", includeSchema ? "Example" : null);
             entity.HasKey(warehouse => warehouse.Id);
             entity.HasAlternateKey(warehouse => new { warehouse.TenantId, warehouse.Id });
             entity.Property(warehouse => warehouse.Id).ValueGeneratedNever();
@@ -117,7 +121,7 @@ public static class ExampleDbContextModelConfiguration
 
         modelBuilder.Entity<WarehouseStock>(entity =>
         {
-            entity.ToTable("WarehouseStocks", "Example");
+            entity.ToTable("WarehouseStocks", includeSchema ? "Example" : null);
             entity.HasKey(stock => stock.Id);
             entity.Property(stock => stock.Id).ValueGeneratedNever();
             entity.Property(stock => stock.Quantity).HasPrecision(18, 3);
@@ -128,7 +132,7 @@ public static class ExampleDbContextModelConfiguration
 
         modelBuilder.Entity<Invoice>(entity =>
         {
-            entity.ToTable("Invoices", "Example");
+            entity.ToTable("Invoices", includeSchema ? "Example" : null);
             entity.HasKey(invoice => invoice.Id);
             entity.HasAlternateKey(invoice => new { invoice.TenantId, invoice.Id });
             entity.Property(invoice => invoice.Id).ValueGeneratedNever();
@@ -146,7 +150,7 @@ public static class ExampleDbContextModelConfiguration
 
         modelBuilder.Entity<InvoiceLine>(entity =>
         {
-            entity.ToTable("InvoiceLines", "Example");
+            entity.ToTable("InvoiceLines", includeSchema ? "Example" : null);
             entity.HasKey(line => line.Id);
             entity.Property(line => line.Id).ValueGeneratedNever();
             entity.Property(line => line.ProductCode).HasMaxLength(64).IsRequired();
@@ -164,7 +168,7 @@ public static class ExampleDbContextModelConfiguration
 
         modelBuilder.Entity<ProdInvoice>(entity =>
         {
-            entity.ToTable("ProdInvoices", "Example");
+            entity.ToTable("ProdInvoices", includeSchema ? "Example" : null);
             entity.HasKey(invoice => invoice.Id);
             entity.HasAlternateKey(invoice => new { invoice.TenantId, invoice.Id });
             entity.Property(invoice => invoice.Id).ValueGeneratedNever();
@@ -182,7 +186,7 @@ public static class ExampleDbContextModelConfiguration
 
         modelBuilder.Entity<ProdInvoiceLine>(entity =>
         {
-            entity.ToTable("ProdInvoiceLines", "Example");
+            entity.ToTable("ProdInvoiceLines", includeSchema ? "Example" : null);
             entity.HasKey(line => line.Id);
             entity.Property(line => line.Id).ValueGeneratedNever();
             entity.Property(line => line.ProductCode).HasMaxLength(64).IsRequired();
@@ -231,7 +235,7 @@ public static class ExampleDbContextModelConfiguration
                 throw new NotSupportedException($"Database provider '{provider}' is not supported.");
         }
 
-        Configure(modelBuilder);
+        Configure(modelBuilder, includeSchema: provider != DatabaseProvider.MySql);
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes().ToArray())
         {
