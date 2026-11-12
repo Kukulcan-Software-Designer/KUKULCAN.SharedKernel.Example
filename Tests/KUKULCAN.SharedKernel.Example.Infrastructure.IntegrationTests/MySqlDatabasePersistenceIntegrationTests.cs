@@ -318,7 +318,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
             InvoiceNumber = "MISSING-CLIENT-001", IssuedAt = DateTimeOffset.UtcNow, ClientName = "Missing"
         };
         context.Invoices.Add(missingClientInvoice);
-        Assert.ThrowsAsync<DbUpdateException>(async () => await context.SaveChangesAsync());
+        await Assert.ThrowsAsync<DbUpdateException>(async () => await context.SaveChangesAsync());
     }
 
     [Test]
