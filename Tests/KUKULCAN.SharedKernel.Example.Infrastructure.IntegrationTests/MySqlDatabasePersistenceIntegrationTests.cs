@@ -1,3 +1,4 @@
+using MySql.Data.MySqlClient;
 using System.Data;
 using System.Diagnostics;
 using KUKULCAN.SharedKernel.Abstractions;
@@ -48,6 +49,55 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
             "An unreachable MySQL endpoint must be reported as a connection failure.");
         Assert.That(exception!.ToString(), Does.Not.Contain(passwordSentinel),
             "Connection failure details must not expose the configured password.");
+    }
+
+    [Test, CancelAfter(300_000)]
+    public async Task MySqlTcpConnection_WorksWithAndWithoutConfiguredPooling(CancellationToken cancellationToken)
+    {
+        await using var database = await StartDatabaseAsync();
+        var connectionString = database.GetConnectionString();
+
+        var unpooledConnectionString = new MySqlConnectionStringBuilder(connectionString)
+        {
+            Pooling = false
+        }.ConnectionString;
+
+        TestContext.Progress.WriteLine(
+            "[MYSQL-DIAGNOSTIC] Opening a direct TCP connection with pooling disabled.");
+
+        await using (var connection = new MySqlConnection(unpooledConnectionString))
+        {
+            await connection.OpenAsync(cancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT 1;";
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            Assert.That(Convert.ToInt32(result), Is.EqualTo(1));
+        }
+
+        TestContext.Progress.WriteLine(
+            "[MYSQL-DIAGNOSTIC] Direct TCP connection with pooling disabled: SUCCESS.");
+
+        var pooledConnectionString = new MySqlConnectionStringBuilder(connectionString)
+        {
+            Pooling = true,
+            MinimumPoolSize = 5,
+            MaximumPoolSize = 100
+        }.ConnectionString;
+
+        TestContext.Progress.WriteLine(
+            "[MYSQL-DIAGNOSTIC] Opening a direct TCP connection with pooling enabled (minimum 5, maximum 100).");
+
+        await using (var connection = new MySqlConnection(pooledConnectionString))
+        {
+            await connection.OpenAsync(cancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT 1;";
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            Assert.That(Convert.ToInt32(result), Is.EqualTo(1));
+        }
+
+        TestContext.Progress.WriteLine(
+            "[MYSQL-DIAGNOSTIC] Direct TCP connection with pooling enabled: SUCCESS.");
     }
 
     [Test, CancelAfter(300_000)]
