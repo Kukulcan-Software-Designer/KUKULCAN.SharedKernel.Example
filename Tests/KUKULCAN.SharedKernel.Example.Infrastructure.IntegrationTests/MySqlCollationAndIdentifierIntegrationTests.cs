@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using KUKULCAN.SharedKernel.Abstractions;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
@@ -22,13 +21,14 @@ public sealed class MySqlCollationAndIdentifierIntegrationTests
         CancellationToken cancellationToken)
     {
         await using var database = await MySqlTestDiagnostics.StartDatabaseAsync("example_mysql_collation");
-        await using var context = CreateContext(database.GetConnectionString(), Guid.NewGuid());
+        var tenantId = Guid.NewGuid();
+        await using var context = CreateContext(database.GetConnectionString(), tenantId);
         await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var client = new Client
         {
             Id = Guid.NewGuid(),
-            TenantId = Guid.NewGuid(),
+            TenantId = tenantId,
             Name = "Northwind Distribution"
         };
         context.Clients.Add(client);
