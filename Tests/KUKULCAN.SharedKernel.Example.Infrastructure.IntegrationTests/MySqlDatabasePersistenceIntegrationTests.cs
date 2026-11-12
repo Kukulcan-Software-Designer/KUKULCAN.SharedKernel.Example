@@ -1,6 +1,7 @@
 using MySql.Data.MySqlClient;
 using System.Data;
 using System.Diagnostics;
+using System.Net.Sockets;
 using KUKULCAN.SharedKernel.Abstractions;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
@@ -56,6 +57,46 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
     {
         await using var database = await StartDatabaseAsync();
         var connectionString = database.GetConnectionString();
+        var mappedPort = database.GetMappedPublicPort(3306);
+        var parsedConnection = new MySqlConnectionStringBuilder(connectionString);
+
+        TestContext.Progress.WriteLine(
+            $"[MYSQL-DIAGNOSTIC] Testcontainers endpoint | hostname={database.Hostname} | " +
+            $"mappedPort={mappedPort} | connectionServer={parsedConnection.Server} | " +
+            $"connectionPort={parsedConnection.Port} | database={parsedConnection.Database} | " +
+            $"user={parsedConnection.UserID}");
+
+        TestContext.Progress.WriteLine(
+            "[MYSQL-DIAGNOSTIC] Reading the initial MySQL protocol handshake directly from the mapped TCP endpoint.");
+
+        using (var tcpClient = new TcpClient())
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(10));
+            await tcpClient.ConnectAsync(database.Hostname, mappedPort, timeout.Token);
+
+            await using var stream = tcpClient.GetStream();
+            var handshakeHeader = new byte[4];
+            var bytesRead = 0;
+            while (bytesRead < handshakeHeader.Length)
+            {
+                var read = await stream.ReadAsync(
+                    handshakeHeader.AsMemory(bytesRead, handshakeHeader.Length - bytesRead),
+                    timeout.Token);
+                if (read == 0)
+                    break;
+                bytesRead += read;
+            }
+
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-DIAGNOSTIC] TCP handshake header | bytesRead={bytesRead} | " +
+                $"hex={Convert.ToHexString(handshakeHeader.AsSpan(0, bytesRead))}");
+
+            Assert.That(bytesRead, Is.EqualTo(4),
+                "The mapped MySQL TCP endpoint must return a MySQL protocol packet header.");
+            Assert.That(handshakeHeader[3], Is.EqualTo(0),
+                "The initial MySQL protocol packet must use sequence number zero.");
+        }
 
         var unpooledConnectionString = new MySqlConnectionStringBuilder(connectionString)
         {
