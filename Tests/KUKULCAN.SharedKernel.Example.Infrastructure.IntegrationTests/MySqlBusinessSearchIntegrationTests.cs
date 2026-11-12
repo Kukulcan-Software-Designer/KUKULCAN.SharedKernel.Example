@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using KUKULCAN.SharedKernel.Abstractions;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
@@ -12,17 +13,28 @@ namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
 
 [TestFixture]
 [NonParallelizable]
+[Category("MySQL")]
 public sealed class MySqlBusinessSearchIntegrationTests
 {
-    [Test]
+    private Stopwatch? _testStopwatch;
+
+    [SetUp]
+    public void LogTestStart()
+    {
+        _testStopwatch = Stopwatch.StartNew();
+        MySqlTestDiagnostics.TestStarted(TestContext.CurrentContext.Test.Name);
+    }
+
+    [TearDown]
+    public void LogTestEnd()
+    {
+        if (_testStopwatch is not null)
+            MySqlTestDiagnostics.TestFinished(TestContext.CurrentContext.Test.Name, _testStopwatch);
+    }
+    [Test, Timeout(300_000)]
     public async Task MySqlBusinessSearches_FilterByCriteriaAndIsolateResultsByTenant()
     {
-        await using var database = new MySqlBuilder("mysql:8.4")
-            .WithDatabase("example_mysql_search")
-            .WithUsername(TestDatabaseCredentials.GenerateUserName())
-            .WithPassword(TestDatabaseCredentials.GeneratePassword())
-            .Build();
-        await database.StartAsync();
+        await using var database = await MySqlTestDiagnostics.StartDatabaseAsync("example_mysql_search");
 
         var connectionString = database.GetConnectionString();
         var tenantA = Guid.NewGuid();
@@ -84,7 +96,7 @@ public sealed class MySqlBusinessSearchIntegrationTests
 
         await using (var seed = CreateContext(connectionString, tenantA))
         {
-            await seed.Database.MigrateAsync();
+            await MySqlTestDiagnostics.MigrateAsync(seed, $"{TestContext.CurrentContext.Test.Name} / seed");
             seed.AddRange(
                 matchingClient, otherClient, codeProduct, nameProduct, codeWarehouse, nameWarehouse,
                 new WarehouseStock
