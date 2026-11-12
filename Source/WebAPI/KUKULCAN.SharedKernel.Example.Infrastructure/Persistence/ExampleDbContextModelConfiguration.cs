@@ -199,7 +199,7 @@ public static class ExampleDbContextModelConfiguration
                 .HasPrincipalKey(product => new { product.TenantId, product.Id })
                 .OnDelete(DeleteBehavior.Restrict);
         });
-    
+
     }    
     /// <summary>
     /// Configures provider-specific column types and identifier metadata so runtime models,
