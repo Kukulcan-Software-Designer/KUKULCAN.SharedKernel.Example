@@ -32,8 +32,8 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         if (_testStopwatch is not null)
             MySqlTestDiagnostics.TestFinished(TestContext.CurrentContext.Test.Name, _testStopwatch);
     }
-    [Test, Timeout(300_000)]
-    public async Task MySqlConnectionFailure_IsNotReportedAsSuccessfulConnectionOrExposeCredentials()
+    [Test, CancelAfter(300_000)]
+    public async Task MySqlConnectionFailure_IsNotReportedAsSuccessfulConnectionOrExposeCredentials(CancellationToken cancellationToken)
     {
         const string passwordSentinel = "never-log-this-secret";
         const string connectionString =
@@ -42,7 +42,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
 
         await using var context = CreateContext(connectionString, Guid.NewGuid());
         var exception = await Assert.CatchAsync<Exception>(
-            async () => await context.Database.OpenConnectionAsync());
+            async () => await context.Database.OpenConnectionAsync(cancellationToken));
 
         Assert.That(exception, Is.Not.Null,
             "An unreachable MySQL endpoint must be reported as a connection failure.");
@@ -50,17 +50,17 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
             "Connection failure details must not expose the configured password.");
     }
 
-    [Test, Timeout(300_000)]
-    public async Task MySqlMigrations_InitializeExampleTablesAndCanBeReappliedWithoutLosingData()
+    [Test, CancelAfter(300_000)]
+    public async Task MySqlMigrations_InitializeExampleTablesAndCanBeReappliedWithoutLosingData(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
         var tenantId = Guid.NewGuid();
         await using var context = CreateContext(database.GetConnectionString(), tenantId);
 
         await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
-        var appliedAfterFirstMigration = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
-        var pendingAfterFirstMigration = (await context.Database.GetPendingMigrationsAsync()).ToArray();
-        var tablesAfterFirstMigration = await ReadTablesAsync(context);
+        var appliedAfterFirstMigration = (await context.Database.GetAppliedMigrationsAsync(cancellationToken)).ToArray();
+        var pendingAfterFirstMigration = (await context.Database.GetPendingMigrationsAsync(cancellationToken)).ToArray();
+        var tablesAfterFirstMigration = await ReadTablesAsync(context, cancellationToken);
 
         Assert.Multiple(() =>
         {
@@ -85,17 +85,17 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
             Value = "mysql-migration-idempotency"
         };
         context.DatabaseIntegrationRecords.Add(record);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
 
         await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
         context.ChangeTracker.Clear();
 
-        var appliedAfterSecondMigration = (await context.Database.GetAppliedMigrationsAsync()).ToArray();
-        var pendingAfterSecondMigration = (await context.Database.GetPendingMigrationsAsync()).ToArray();
+        var appliedAfterSecondMigration = (await context.Database.GetAppliedMigrationsAsync(cancellationToken)).ToArray();
+        var pendingAfterSecondMigration = (await context.Database.GetPendingMigrationsAsync(cancellationToken)).ToArray();
         var tablesAfterSecondMigration = await ReadTablesAsync(context);
         var persisted = await context.DatabaseIntegrationRecords
             .AsNoTracking()
-            .SingleAsync(entity => entity.Id == record.Id);
+            .SingleAsync(entity => entity.Id == record.Id, cancellationToken);
 
         Assert.Multiple(() =>
         {
@@ -106,8 +106,8 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         });
     }
 
-    [Test, Timeout(300_000)]
-    public async Task MySqlBusinessPersistence_PersistsCommercialRelationshipsAndPreservesHistoricalSnapshots()
+    [Test, CancelAfter(300_000)]
+    public async Task MySqlBusinessPersistence_PersistsCommercialRelationshipsAndPreservesHistoricalSnapshots(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
         var tenantId = Guid.NewGuid();
@@ -154,11 +154,11 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         Assert.That(await context.SaveChangesAsync(), Is.GreaterThanOrEqualTo(9));
 
         context.ChangeTracker.Clear();
-        var persistedStock = await context.WarehouseStocks.AsNoTracking().SingleAsync(x => x.Id == stock.Id);
-        var persistedSalesLine = await context.InvoiceLines.AsNoTracking().SingleAsync(x => x.Id == invoiceLine.Id);
-        var persistedPurchaseLine = await context.ProdInvoiceLines.AsNoTracking().SingleAsync(x => x.Id == purchaseLine.Id);
-        var persistedSalesInvoice = await context.Invoices.AsNoTracking().SingleAsync(x => x.Id == invoice.Id);
-        var persistedPurchaseInvoice = await context.ProdInvoices.AsNoTracking().SingleAsync(x => x.Id == purchaseInvoice.Id);
+        var persistedStock = await context.WarehouseStocks.AsNoTracking().SingleAsync(x => x.Id == stock.Id, cancellationToken);
+        var persistedSalesLine = await context.InvoiceLines.AsNoTracking().SingleAsync(x => x.Id == invoiceLine.Id, cancellationToken);
+        var persistedPurchaseLine = await context.ProdInvoiceLines.AsNoTracking().SingleAsync(x => x.Id == purchaseLine.Id, cancellationToken);
+        var persistedSalesInvoice = await context.Invoices.AsNoTracking().SingleAsync(x => x.Id == invoice.Id, cancellationToken);
+        var persistedPurchaseInvoice = await context.ProdInvoices.AsNoTracking().SingleAsync(x => x.Id == purchaseInvoice.Id, cancellationToken);
 
         Assert.Multiple(() =>
         {
@@ -173,16 +173,16 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
             Assert.That(persistedPurchaseLine.ProductName, Is.EqualTo("Product name at purchase"));
         });
 
-        var currentProduct = await context.Products.SingleAsync(x => x.Id == product.Id);
+        var currentProduct = await context.Products.SingleAsync(x => x.Id == product.Id, cancellationToken);
         currentProduct.Name = "Renamed master product";
-        var currentClient = await context.Clients.SingleAsync(x => x.Id == client.Id);
+        var currentClient = await context.Clients.SingleAsync(x => x.Id == client.Id, cancellationToken);
         currentClient.Name = "Renamed master client";
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
         context.ChangeTracker.Clear();
 
-        var historicalSalesInvoice = await context.Invoices.AsNoTracking().SingleAsync(x => x.Id == invoice.Id);
-        var historicalPurchaseInvoice = await context.ProdInvoices.AsNoTracking().SingleAsync(x => x.Id == purchaseInvoice.Id);
-        var historicalSalesLine = await context.InvoiceLines.AsNoTracking().SingleAsync(x => x.Id == invoiceLine.Id);
+        var historicalSalesInvoice = await context.Invoices.AsNoTracking().SingleAsync(x => x.Id == invoice.Id, cancellationToken);
+        var historicalPurchaseInvoice = await context.ProdInvoices.AsNoTracking().SingleAsync(x => x.Id == purchaseInvoice.Id, cancellationToken);
+        var historicalSalesLine = await context.InvoiceLines.AsNoTracking().SingleAsync(x => x.Id == invoiceLine.Id, cancellationToken);
 
         Assert.Multiple(() =>
         {
@@ -192,8 +192,8 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         });
     }
 
-    [Test, Timeout(300_000)]
-    public async Task MySqlTenantQueries_IsolateDataAndSoftDeletePreservesMasterRecords()
+    [Test, CancelAfter(300_000)]
+    public async Task MySqlTenantQueries_IsolateDataAndSoftDeletePreservesMasterRecords(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
         var tenantId = Guid.NewGuid();
@@ -204,21 +204,21 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         var ownClient = new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Tenant client" };
         var otherClient = new Client { Id = Guid.NewGuid(), TenantId = otherTenantId, Name = "Other tenant client" };
         context.Clients.AddRange(ownClient, otherClient);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
         context.ChangeTracker.Clear();
 
-        var visibleNames = await context.Clients.AsNoTracking().Select(x => x.Name).ToArrayAsync();
+        var visibleNames = await context.Clients.AsNoTracking().Select(x => x.Name).ToArrayAsync(cancellationToken);
         Assert.That(visibleNames, Is.EquivalentTo(new[] { "Tenant client" }));
 
-        var clientToDelete = await context.Clients.SingleAsync(x => x.Id == ownClient.Id);
+        var clientToDelete = await context.Clients.SingleAsync(x => x.Id == ownClient.Id, cancellationToken);
         context.Clients.Remove(clientToDelete);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
         context.ChangeTracker.Clear();
 
         var visibleDeletedClient = await context.Clients.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.Id == ownClient.Id);
+            .SingleOrDefaultAsync(x => x.Id == ownClient.Id, cancellationToken);
         var persistedDeletedClient = await context.Clients.IgnoreQueryFilters().AsNoTracking()
-            .SingleAsync(x => x.Id == ownClient.Id);
+            .SingleAsync(x => x.Id == ownClient.Id, cancellationToken);
 
         Assert.Multiple(() =>
         {
@@ -228,8 +228,8 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         });
     }
 
-    [Test, Timeout(300_000)]
-    public async Task MySqlTransactions_RollbackPartialChangesAndKeepPreviouslyCommittedData()
+    [Test, CancelAfter(300_000)]
+    public async Task MySqlTransactions_RollbackPartialChangesAndKeepPreviouslyCommittedData(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
         var tenantId = Guid.NewGuid();
@@ -243,22 +243,22 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
             {
                 Id = committedId, TenantId = tenantId, Value = "committed"
             });
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(cancellationToken);
 
-            await using var transaction = await context.Database.BeginTransactionAsync();
+            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
             context.DatabaseIntegrationRecords.Add(new DatabaseIntegrationRecord
             {
                 Id = rolledBackId, TenantId = tenantId, Value = "must-rollback"
             });
-            await context.SaveChangesAsync();
-            await transaction.RollbackAsync();
+            await context.SaveChangesAsync(cancellationToken);
+            await transaction.RollbackAsync(cancellationToken);
         }
 
         await using var verificationContext = CreateContext(database.GetConnectionString(), tenantId);
         var committed = await verificationContext.DatabaseIntegrationRecords.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.Id == committedId);
+            .SingleOrDefaultAsync(x => x.Id == committedId, cancellationToken);
         var rolledBack = await verificationContext.DatabaseIntegrationRecords.IgnoreQueryFilters()
-            .AsNoTracking().SingleOrDefaultAsync(x => x.Id == rolledBackId);
+            .AsNoTracking().SingleOrDefaultAsync(x => x.Id == rolledBackId, cancellationToken);
 
         Assert.Multiple(() =>
         {
@@ -267,8 +267,8 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         });
     }
 
-    [Test, Timeout(300_000)]
-    public async Task MySqlDecimalColumns_PreserveConfiguredPrecisionAndScale()
+    [Test, CancelAfter(300_000)]
+    public async Task MySqlDecimalColumns_PreserveConfiguredPrecisionAndScale(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
         var tenantId = Guid.NewGuid();
@@ -289,12 +289,12 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
             Quantity = 123456789012345.678m, UnitPrice = 1234567890123456.78m
         };
         context.AddRange(client, product, invoice, line);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
         context.ChangeTracker.Clear();
 
-        var persisted = await context.InvoiceLines.AsNoTracking().SingleAsync(x => x.Id == line.Id);
-        var precision = await ReadDecimalPrecisionAsync(context, "InvoiceLines", "Quantity");
-        var scale = await ReadDecimalPrecisionAsync(context, "InvoiceLines", "UnitPrice");
+        var persisted = await context.InvoiceLines.AsNoTracking().SingleAsync(x => x.Id == line.Id, cancellationToken);
+        var precision = await ReadDecimalPrecisionAsync(context, "InvoiceLines", "Quantity", cancellationToken);
+        var scale = await ReadDecimalPrecisionAsync(context, "InvoiceLines", "UnitPrice", cancellationToken);
 
         Assert.Multiple(() =>
         {
@@ -305,8 +305,8 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         });
     }
 
-    [Test, Timeout(300_000)]
-    public async Task MySqlConstraints_RejectDuplicateCommercialKeysAndMissingReferences()
+    [Test, CancelAfter(300_000)]
+    public async Task MySqlConstraints_RejectDuplicateCommercialKeysAndMissingReferences(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
         var tenantId = Guid.NewGuid();
@@ -315,18 +315,18 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
 
         var client = new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Constraint client" };
         context.Clients.Add(client);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
 
         context.Products.Add(new Product
         {
             Id = Guid.NewGuid(), TenantId = tenantId, Code = "DUPLICATE-SKU", Name = "First product"
         });
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
         context.Products.Add(new Product
         {
             Id = Guid.NewGuid(), TenantId = tenantId, Code = "DUPLICATE-SKU", Name = "Duplicate product code"
         });
-        await Assert.ThrowsAsync<DbUpdateException>(async () => await context.SaveChangesAsync());
+        await Assert.ThrowsAsync<DbUpdateException>(async () => await context.SaveChangesAsync(cancellationToken));
         context.ChangeTracker.Clear();
 
         var missingClientInvoice = new Invoice
@@ -335,11 +335,11 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
             InvoiceNumber = "MISSING-CLIENT-001", IssuedAt = DateTimeOffset.UtcNow, ClientName = "Missing"
         };
         context.Invoices.Add(missingClientInvoice);
-        await Assert.ThrowsAsync<DbUpdateException>(async () => await context.SaveChangesAsync());
+        await Assert.ThrowsAsync<DbUpdateException>(async () => await context.SaveChangesAsync(cancellationToken));
     }
 
-    [Test, Timeout(300_000)]
-    public async Task MySqlBusinessSoftDelete_PreservesHistoricalSalesAndPurchaseDocuments()
+    [Test, CancelAfter(300_000)]
+    public async Task MySqlBusinessSoftDelete_PreservesHistoricalSalesAndPurchaseDocuments(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
         var tenantId = Guid.NewGuid();
@@ -376,24 +376,24 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         };
 
         context.AddRange(client, provider, product, sale, saleLine, purchase, purchaseLine);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
         context.ChangeTracker.Clear();
 
-        var clientToDelete = await context.Clients.SingleAsync(x => x.Id == client.Id);
-        var providerToDelete = await context.Providers.SingleAsync(x => x.Id == provider.Id);
+        var clientToDelete = await context.Clients.SingleAsync(x => x.Id == client.Id, cancellationToken);
+        var providerToDelete = await context.Providers.SingleAsync(x => x.Id == provider.Id, cancellationToken);
         context.Clients.Remove(clientToDelete);
         context.Providers.Remove(providerToDelete);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
         context.ChangeTracker.Clear();
 
-        var visibleClient = await context.Clients.AsNoTracking().AnyAsync(x => x.Id == client.Id);
-        var visibleProvider = await context.Providers.AsNoTracking().AnyAsync(x => x.Id == provider.Id);
-        var deletedClient = await context.Clients.IgnoreQueryFilters().AsNoTracking().SingleAsync(x => x.Id == client.Id);
-        var deletedProvider = await context.Providers.IgnoreQueryFilters().AsNoTracking().SingleAsync(x => x.Id == provider.Id);
-        var persistedSale = await context.Invoices.AsNoTracking().SingleAsync(x => x.Id == sale.Id);
-        var persistedSaleLine = await context.InvoiceLines.AsNoTracking().SingleAsync(x => x.Id == saleLine.Id);
-        var persistedPurchase = await context.ProdInvoices.AsNoTracking().SingleAsync(x => x.Id == purchase.Id);
-        var persistedPurchaseLine = await context.ProdInvoiceLines.AsNoTracking().SingleAsync(x => x.Id == purchaseLine.Id);
+        var visibleClient = await context.Clients.AsNoTracking().AnyAsync(x => x.Id == client.Id, cancellationToken);
+        var visibleProvider = await context.Providers.AsNoTracking().AnyAsync(x => x.Id == provider.Id, cancellationToken);
+        var deletedClient = await context.Clients.IgnoreQueryFilters().AsNoTracking().SingleAsync(x => x.Id == client.Id, cancellationToken);
+        var deletedProvider = await context.Providers.IgnoreQueryFilters().AsNoTracking().SingleAsync(x => x.Id == provider.Id, cancellationToken);
+        var persistedSale = await context.Invoices.AsNoTracking().SingleAsync(x => x.Id == sale.Id, cancellationToken);
+        var persistedSaleLine = await context.InvoiceLines.AsNoTracking().SingleAsync(x => x.Id == saleLine.Id, cancellationToken);
+        var persistedPurchase = await context.ProdInvoices.AsNoTracking().SingleAsync(x => x.Id == purchase.Id, cancellationToken);
+        var persistedPurchaseLine = await context.ProdInvoiceLines.AsNoTracking().SingleAsync(x => x.Id == purchaseLine.Id, cancellationToken);
 
         Assert.Multiple(() =>
         {
@@ -414,8 +414,8 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         });
     }
 
-    [Test, Timeout(300_000)]
-    public async Task MySqlCompositeForeignKeys_RejectCrossTenantCommercialReferences()
+    [Test, CancelAfter(300_000)]
+    public async Task MySqlCompositeForeignKeys_RejectCrossTenantCommercialReferences(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
         var tenantA = Guid.NewGuid();
@@ -426,7 +426,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         var tenantAClient = new Client { Id = Guid.NewGuid(), TenantId = tenantA, Name = "Tenant A client" };
         var tenantBClient = new Client { Id = Guid.NewGuid(), TenantId = tenantB, Name = "Tenant B client" };
         context.Clients.AddRange(tenantAClient, tenantBClient);
-        await context.SaveChangesAsync();
+        await context.SaveChangesAsync(cancellationToken);
 
         context.Invoices.Add(new Invoice
         {
@@ -436,7 +436,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         });
 
         await Assert.ThrowsAsync<DbUpdateException>(
-            async () => await context.SaveChangesAsync(),
+            async () => await context.SaveChangesAsync(cancellationToken),
             "A composite tenant foreign key must reject an invoice linked to another tenant's client.");
     }
 
@@ -445,12 +445,12 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         return await MySqlTestDiagnostics.StartDatabaseAsync("example_mysql_integration");
     }
 
-    private static async Task<HashSet<string>> ReadTablesAsync(ExampleDbContext context)
+    private static async Task<HashSet<string>> ReadTablesAsync(ExampleDbContext context, CancellationToken cancellationToken)
     {
         var connection = context.Database.GetDbConnection();
         var shouldClose = connection.State != ConnectionState.Open;
         if (shouldClose)
-            await connection.OpenAsync();
+            await connection.OpenAsync(cancellationToken);
 
         try
         {
@@ -462,7 +462,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
                   AND TABLE_TYPE = 'BASE TABLE'
                 """;
             var tables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            await using var reader = await command.ExecuteReaderAsync();
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync())
                 tables.Add(reader.GetString(0));
             return tables;
@@ -470,12 +470,12 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         finally
         {
             if (shouldClose)
-                await connection.CloseAsync();
+                await connection.CloseAsync(cancellationToken);
         }
     }
 
     private static async Task<(int Precision, int Scale)> ReadDecimalPrecisionAsync(
-        ExampleDbContext context, string tableName, string columnName)
+        ExampleDbContext context, string tableName, string columnName, CancellationToken cancellationToken)
     {
         var connection = context.Database.GetDbConnection();
         var shouldClose = connection.State != ConnectionState.Open;
@@ -501,7 +501,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
             column.Value = columnName;
             command.Parameters.Add(column);
 
-            await using var reader = await command.ExecuteReaderAsync();
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             Assert.That(await reader.ReadAsync(), Is.True,
                 $"Expected MySQL column {tableName}.{columnName} to exist.");
             return (Convert.ToInt32(reader.GetValue(0)), Convert.ToInt32(reader.GetValue(1)));
