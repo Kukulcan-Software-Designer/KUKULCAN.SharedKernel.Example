@@ -31,8 +31,8 @@ public sealed class MySqlBusinessSearchIntegrationTests
         if (_testStopwatch is not null)
             MySqlTestDiagnostics.TestFinished(TestContext.CurrentContext.Test.Name, _testStopwatch);
     }
-    [Test, Timeout(300_000)]
-    public async Task MySqlBusinessSearches_FilterByCriteriaAndIsolateResultsByTenant()
+    [Test, CancelAfter(300_000)]
+    public async Task MySqlBusinessSearches_FilterByCriteriaAndIsolateResultsByTenant(CancellationToken cancellationToken)
     {
         await using var database = await MySqlTestDiagnostics.StartDatabaseAsync("example_mysql_search");
 
@@ -108,7 +108,7 @@ public sealed class MySqlBusinessSearchIntegrationTests
                     Id = Guid.NewGuid(), TenantId = tenantA, Warehouse = nameWarehouse, Product = nameProduct, Quantity = 20m
                 },
                 inRangeInvoice, atEndInvoice);
-            await seed.SaveChangesAsync();
+            await seed.SaveChangesAsync(cancellationToken);
         }
 
         await using (var otherTenantSeed = CreateContext(connectionString, tenantB))
@@ -121,7 +121,7 @@ public sealed class MySqlBusinessSearchIntegrationTests
                     Product = otherProduct, Quantity = 30m
                 },
                 otherTenantInvoice);
-            await otherTenantSeed.SaveChangesAsync();
+            await otherTenantSeed.SaveChangesAsync(cancellationToken);
         }
 
         await using var queryA = CreateContext(connectionString, tenantA);
@@ -129,29 +129,29 @@ public sealed class MySqlBusinessSearchIntegrationTests
 
         var clientsByName = await queryA.Clients.AsNoTracking()
             .Where(x => EF.Functions.Like(x.Name.ToLower(), "%northwind%"))
-            .Select(x => x.Id).ToArrayAsync();
+            .Select(x => x.Id).ToArrayAsync(cancellationToken);
         var clientsByLocation = await queryA.Clients.AsNoTracking()
             .Where(x => EF.Functions.Like(x.City!.ToLower(), "%mad%") &&
                         x.State == "Madrid" && x.PostalCode == "28001")
-            .Select(x => x.Id).ToArrayAsync();
+            .Select(x => x.Id).ToArrayAsync(cancellationToken);
         var warehousesByProductCode = await queryA.Warehouses.AsNoTracking()
             .Where(x => x.WarehouseStocks.Any(stock =>
                 EF.Functions.Like(stock.Product.Code.ToLower(), "%search-01%")))
-            .Select(x => x.Id).ToArrayAsync();
+            .Select(x => x.Id).ToArrayAsync(cancellationToken);
         var warehousesByProductName = await queryA.Warehouses.AsNoTracking()
             .Where(x => x.WarehouseStocks.Any(stock =>
                 EF.Functions.Like(stock.Product.Name.ToLower(), "%widget%")))
-            .Select(x => x.Id).ToArrayAsync();
+            .Select(x => x.Id).ToArrayAsync(cancellationToken);
         var invoicesByClientAndDate = await queryA.Invoices.AsNoTracking()
             .Where(x => x.ClientId == matchingClient.Id && x.IssuedAt >= rangeStart && x.IssuedAt < rangeEnd)
-            .Select(x => x.Id).ToArrayAsync();
+            .Select(x => x.Id).ToArrayAsync(cancellationToken);
 
-        var tenantAClientIds = await queryA.Clients.AsNoTracking().Select(x => x.Id).ToArrayAsync();
-        var tenantBClientIds = await queryB.Clients.AsNoTracking().Select(x => x.Id).ToArrayAsync();
-        var tenantAWarehouseIds = await queryA.Warehouses.AsNoTracking().Select(x => x.Id).ToArrayAsync();
-        var tenantBWarehouseIds = await queryB.Warehouses.AsNoTracking().Select(x => x.Id).ToArrayAsync();
-        var tenantAInvoiceIds = await queryA.Invoices.AsNoTracking().Select(x => x.Id).ToArrayAsync();
-        var tenantBInvoiceIds = await queryB.Invoices.AsNoTracking().Select(x => x.Id).ToArrayAsync();
+        var tenantAClientIds = await queryA.Clients.AsNoTracking().Select(x => x.Id).ToArrayAsync(cancellationToken);
+        var tenantBClientIds = await queryB.Clients.AsNoTracking().Select(x => x.Id).ToArrayAsync(cancellationToken);
+        var tenantAWarehouseIds = await queryA.Warehouses.AsNoTracking().Select(x => x.Id).ToArrayAsync(cancellationToken);
+        var tenantBWarehouseIds = await queryB.Warehouses.AsNoTracking().Select(x => x.Id).ToArrayAsync(cancellationToken);
+        var tenantAInvoiceIds = await queryA.Invoices.AsNoTracking().Select(x => x.Id).ToArrayAsync(cancellationToken);
+        var tenantBInvoiceIds = await queryB.Invoices.AsNoTracking().Select(x => x.Id).ToArrayAsync(cancellationToken);
 
         Assert.Multiple(() =>
         {
