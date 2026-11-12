@@ -50,7 +50,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
             "Connection failure details must not expose the configured password.");
     }
 
-    [Test]
+    [Test, Timeout(300_000)]
     public async Task MySqlMigrations_InitializeExampleTablesAndCanBeReappliedWithoutLosingData()
     {
         await using var database = await StartDatabaseAsync();
@@ -106,7 +106,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         });
     }
 
-    [Test]
+    [Test, Timeout(300_000)]
     public async Task MySqlBusinessPersistence_PersistsCommercialRelationshipsAndPreservesHistoricalSnapshots()
     {
         await using var database = await StartDatabaseAsync();
@@ -192,7 +192,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         });
     }
 
-    [Test]
+    [Test, Timeout(300_000)]
     public async Task MySqlTenantQueries_IsolateDataAndSoftDeletePreservesMasterRecords()
     {
         await using var database = await StartDatabaseAsync();
@@ -228,7 +228,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         });
     }
 
-    [Test]
+    [Test, Timeout(300_000)]
     public async Task MySqlTransactions_RollbackPartialChangesAndKeepPreviouslyCommittedData()
     {
         await using var database = await StartDatabaseAsync();
@@ -267,7 +267,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         });
     }
 
-    [Test]
+    [Test, Timeout(300_000)]
     public async Task MySqlDecimalColumns_PreserveConfiguredPrecisionAndScale()
     {
         await using var database = await StartDatabaseAsync();
@@ -305,7 +305,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         });
     }
 
-    [Test]
+    [Test, Timeout(300_000)]
     public async Task MySqlConstraints_RejectDuplicateCommercialKeysAndMissingReferences()
     {
         await using var database = await StartDatabaseAsync();
@@ -338,7 +338,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         await Assert.ThrowsAsync<DbUpdateException>(async () => await context.SaveChangesAsync());
     }
 
-    [Test]
+    [Test, Timeout(300_000)]
     public async Task MySqlBusinessSoftDelete_PreservesHistoricalSalesAndPurchaseDocuments()
     {
         await using var database = await StartDatabaseAsync();
@@ -414,7 +414,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         });
     }
 
-    [Test]
+    [Test, Timeout(300_000)]
     public async Task MySqlCompositeForeignKeys_RejectCrossTenantCommercialReferences()
     {
         await using var database = await StartDatabaseAsync();
