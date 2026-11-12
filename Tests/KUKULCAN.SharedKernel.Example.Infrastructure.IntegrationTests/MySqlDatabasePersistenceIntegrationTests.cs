@@ -303,6 +303,108 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
         Assert.ThrowsAsync<DbUpdateException>(async () => await context.SaveChangesAsync());
     }
 
+    [Test]
+    public async Task MySqlBusinessSoftDelete_PreservesHistoricalSalesAndPurchaseDocuments()
+    {
+        await using var database = await StartDatabaseAsync();
+        var tenantId = Guid.NewGuid();
+        await using var context = CreateContext(database.GetConnectionString(), tenantId);
+        await context.Database.MigrateAsync();
+
+        var client = new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Customer before deletion" };
+        var provider = new Provider { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Supplier before deletion" };
+        var product = new Product
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, Code = "SOFT-DELETE-SKU", Name = "Product snapshot"
+        };
+        var sale = new Invoice
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, Client = client, InvoiceNumber = "SOFT-DELETE-SALE",
+            IssuedAt = DateTimeOffset.UtcNow, ClientName = "Customer snapshot"
+        };
+        var saleLine = new InvoiceLine
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, Invoice = sale, LineNumber = 1, Product = product,
+            ProductCode = "SALE-SKU-SNAPSHOT", ProductName = "Sale product snapshot", Quantity = 2.5m, UnitPrice = 15.25m
+        };
+        var purchase = new ProdInvoice
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, Provider = provider,
+            InvoiceNumber = "SOFT-DELETE-PURCHASE", IssuedAt = DateTimeOffset.UtcNow,
+            ProviderName = "Supplier snapshot"
+        };
+        var purchaseLine = new ProdInvoiceLine
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, ProdInvoice = purchase, LineNumber = 1, Product = product,
+            ProductCode = "PURCHASE-SKU-SNAPSHOT", ProductName = "Purchase product snapshot",
+            Quantity = 4.5m, UnitPrice = 7.75m
+        };
+
+        context.AddRange(client, provider, product, sale, saleLine, purchase, purchaseLine);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var clientToDelete = await context.Clients.SingleAsync(x => x.Id == client.Id);
+        var providerToDelete = await context.Providers.SingleAsync(x => x.Id == provider.Id);
+        context.Clients.Remove(clientToDelete);
+        context.Providers.Remove(providerToDelete);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var visibleClient = await context.Clients.AsNoTracking().AnyAsync(x => x.Id == client.Id);
+        var visibleProvider = await context.Providers.AsNoTracking().AnyAsync(x => x.Id == provider.Id);
+        var deletedClient = await context.Clients.IgnoreQueryFilters().AsNoTracking().SingleAsync(x => x.Id == client.Id);
+        var deletedProvider = await context.Providers.IgnoreQueryFilters().AsNoTracking().SingleAsync(x => x.Id == provider.Id);
+        var persistedSale = await context.Invoices.AsNoTracking().SingleAsync(x => x.Id == sale.Id);
+        var persistedSaleLine = await context.InvoiceLines.AsNoTracking().SingleAsync(x => x.Id == saleLine.Id);
+        var persistedPurchase = await context.ProdInvoices.AsNoTracking().SingleAsync(x => x.Id == purchase.Id);
+        var persistedPurchaseLine = await context.ProdInvoiceLines.AsNoTracking().SingleAsync(x => x.Id == purchaseLine.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(visibleClient, Is.False);
+            Assert.That(visibleProvider, Is.False);
+            Assert.That(deletedClient.IsDeleted, Is.True);
+            Assert.That(deletedClient.DeletedOn, Is.Not.Null);
+            Assert.That(deletedProvider.IsDeleted, Is.True);
+            Assert.That(deletedProvider.DeletedOn, Is.Not.Null);
+            Assert.That(persistedSale.ClientId, Is.EqualTo(client.Id));
+            Assert.That(persistedSale.ClientName, Is.EqualTo("Customer snapshot"));
+            Assert.That(persistedSaleLine.ProductCode, Is.EqualTo("SALE-SKU-SNAPSHOT"));
+            Assert.That(persistedSaleLine.ProductName, Is.EqualTo("Sale product snapshot"));
+            Assert.That(persistedPurchase.ProviderId, Is.EqualTo(provider.Id));
+            Assert.That(persistedPurchase.ProviderName, Is.EqualTo("Supplier snapshot"));
+            Assert.That(persistedPurchaseLine.ProductCode, Is.EqualTo("PURCHASE-SKU-SNAPSHOT"));
+            Assert.That(persistedPurchaseLine.ProductName, Is.EqualTo("Purchase product snapshot"));
+        });
+    }
+
+    [Test]
+    public async Task MySqlCompositeForeignKeys_RejectCrossTenantCommercialReferences()
+    {
+        await using var database = await StartDatabaseAsync();
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        await using var context = CreateContext(database.GetConnectionString(), tenantA);
+        await context.Database.MigrateAsync();
+
+        var tenantAClient = new Client { Id = Guid.NewGuid(), TenantId = tenantA, Name = "Tenant A client" };
+        var tenantBClient = new Client { Id = Guid.NewGuid(), TenantId = tenantB, Name = "Tenant B client" };
+        context.Clients.AddRange(tenantAClient, tenantBClient);
+        await context.SaveChangesAsync();
+
+        context.Invoices.Add(new Invoice
+        {
+            Id = Guid.NewGuid(), TenantId = tenantA, ClientId = tenantBClient.Id,
+            InvoiceNumber = "CROSS-TENANT-SALE", IssuedAt = DateTimeOffset.UtcNow,
+            ClientName = "Tenant B client"
+        });
+
+        await Assert.ThrowsAsync<DbUpdateException>(
+            async () => await context.SaveChangesAsync(),
+            "A composite tenant foreign key must reject an invoice linked to another tenant's client.");
+    }
+
     private static async Task<MySqlContainer> StartDatabaseAsync()
     {
         var database = new MySqlBuilder("mysql:8.4")
