@@ -10,6 +10,7 @@
     <File Path="Documentation\Scripts\setup-example-milestones.sh" />
   </Folder>
   <Folder Name="/Documentation/Validation/">
+    <File Path="Documentation\Validation\Issue-20-PostgreSQL-Persistence-Validation.md" />
     <File Path="Documentation\Validation\Issue-21-SQLServer-Persistence-Validation.md" />
     <File Path="Documentation\Validation\Issue-22-MySQL-Persistence-Validation.md" />
   </Folder>
