@@ -1,0 +1,305 @@
+using System.Diagnostics;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Configurations;
+using DotNet.Testcontainers.Containers;
+using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Testcontainers.MySql;
+
+namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
+
+internal static class MySqlTestDiagnostics
+{
+    public static readonly TimeSpan ContainerStartupTimeout = TimeSpan.FromMinutes(2);
+    public static readonly TimeSpan MigrationTimeout = TimeSpan.FromMinutes(2);
+
+    public static void TestStarted(string testName)
+        => TestContext.Progress.WriteLine(
+            $"[MYSQL-TEST] START {DateTimeOffset.UtcNow:O} | {testName}");
+
+    public static void TestFinished(string testName, Stopwatch stopwatch)
+    {
+        stopwatch.Stop();
+        var result = TestContext.CurrentContext.Result;
+        TestContext.Progress.WriteLine(
+            $"[MYSQL-TEST] {(result.Outcome.Status == NUnit.Framework.Interfaces.TestStatus.Passed ? "PASS" : "END")} " +
+            $"{DateTimeOffset.UtcNow:O} | {testName} | elapsed={stopwatch.Elapsed}");
+
+        if (result.Outcome.Status != NUnit.Framework.Interfaces.TestStatus.Passed &&
+            !string.IsNullOrWhiteSpace(result.Message))
+        {
+            TestContext.Progress.WriteLine($"[MYSQL-TEST] RESULT MESSAGE: {result.Message}");
+            if (!string.IsNullOrWhiteSpace(result.StackTrace))
+                TestContext.Progress.WriteLine($"[MYSQL-TEST] RESULT STACK TRACE: {result.StackTrace}");
+        }
+    }
+
+    public static async Task ExecuteAsync(
+        string operation,
+        TimeSpan timeout,
+        Func<CancellationToken, Task> action)
+    {
+        TestContext.Progress.WriteLine(
+            $"[MYSQL-OPERATION] START {DateTimeOffset.UtcNow:O} | {operation} | timeout={timeout}");
+        var stopwatch = Stopwatch.StartNew();
+        using var cancellation = new CancellationTokenSource(timeout);
+
+        try
+        {
+            await action(cancellation.Token);
+            stopwatch.Stop();
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-OPERATION] SUCCESS {DateTimeOffset.UtcNow:O} | {operation} | elapsed={stopwatch.Elapsed}");
+        }
+        catch (OperationCanceledException exception) when (cancellation.IsCancellationRequested)
+        {
+            stopwatch.Stop();
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-OPERATION] TIMEOUT {DateTimeOffset.UtcNow:O} | {operation} | elapsed={stopwatch.Elapsed}");
+            TestContext.Progress.WriteLine(exception.ToString());
+            throw new TimeoutException(
+                $"MySQL integration operation '{operation}' exceeded its timeout of {timeout}.", exception);
+        }
+        catch (Exception exception)
+        {
+            stopwatch.Stop();
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-OPERATION] FAILURE {DateTimeOffset.UtcNow:O} | {operation} | elapsed={stopwatch.Elapsed}");
+            TestContext.Progress.WriteLine(exception.ToString());
+            throw;
+        }
+    }
+
+    public static async Task<MySqlContainer> StartDatabaseAsync(string databaseName)
+    {
+        var database = new MySqlBuilder("mysql:8.4")
+            .WithDatabase(databaseName)
+            .WithUsername(TestDatabaseCredentials.GenerateUserName())
+            .WithPassword(TestDatabaseCredentials.GeneratePassword())
+            .WithWaitStrategy(
+                Wait.ForUnixContainer().AddCustomWaitStrategy(
+                    new MySqlReadinessWaitStrategy(databaseName)))
+            .Build();
+
+        try
+        {
+            await ExecuteAsync(
+                $"Testcontainers StartAsync (mysql:8.4, database={databaseName})",
+                ContainerStartupTimeout,
+                cancellationToken => database.StartAsync(cancellationToken));
+            return database;
+        }
+        catch (Exception startException)
+        {
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] START FAILURE {DateTimeOffset.UtcNow:O} | database={databaseName}");
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] ORIGINAL EXCEPTION: {startException}");
+
+            try
+            {
+                var (stdout, stderr) = await database.GetLogsAsync(
+                    DateTime.UnixEpoch,
+                    DateTime.UtcNow,
+                    true,
+                    CancellationToken.None);
+
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] STDOUT BEGIN | database={databaseName}");
+                TestContext.Progress.WriteLine(
+                    string.IsNullOrWhiteSpace(stdout) ? "<empty>" : stdout);
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] STDOUT END | database={databaseName}");
+
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] STDERR BEGIN | database={databaseName}");
+                TestContext.Progress.WriteLine(
+                    string.IsNullOrWhiteSpace(stderr) ? "<empty>" : stderr);
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] STDERR END | database={databaseName}");
+            }
+            catch (Exception logsException)
+            {
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] LOG CAPTURE FAILURE {DateTimeOffset.UtcNow:O} | database={databaseName}");
+                TestContext.Progress.WriteLine(logsException.ToString());
+            }
+
+            try
+            {
+                await database.DisposeAsync();
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] CLEANUP SUCCESS {DateTimeOffset.UtcNow:O} | database={databaseName}");
+            }
+            catch (Exception cleanupException)
+            {
+                TestContext.Progress.WriteLine(
+                    $"[MYSQL-CONTAINER] CLEANUP FAILURE {DateTimeOffset.UtcNow:O} | database={databaseName}");
+                TestContext.Progress.WriteLine(cleanupException.ToString());
+            }
+
+            throw;
+        }
+    }
+
+    public static async Task DiagnoseTcpConfigurationAsync(MySqlContainer database)
+    {
+        TestContext.Progress.WriteLine(
+            "[MYSQL-DIAGNOSTIC] Inspecting MySQL TCP configuration inside container.");
+
+        // Do not inspect server variables through the Unix socket: the official image
+        // configures root authentication, and a password-less socket query fails even
+        // when the final MySQL server is healthy. The readiness strategy has already
+        // verified the final server over TCP; repeat that credential-independent probe
+        // here for diagnostics, then inspect the kernel TCP socket table below.
+        var tcpProbe = await database.ExecAsync(
+            new[]
+            {
+                "mysqladmin",
+                "--no-defaults",
+                "--protocol=TCP",
+                "--host=127.0.0.1",
+                "--port=3306",
+                "--connect-timeout=1",
+                "ping"
+            });
+
+        TestContext.Progress.WriteLine(
+            $"[MYSQL-DIAGNOSTIC] MySQL TCP ping | exitCode={tcpProbe.ExitCode}");
+        if (!string.IsNullOrWhiteSpace(tcpProbe.Stdout))
+        {
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-DIAGNOSTIC] MySQL TCP ping STDOUT:\n{tcpProbe.Stdout}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(tcpProbe.Stderr))
+        {
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-DIAGNOSTIC] MySQL TCP ping STDERR:\n{tcpProbe.Stderr}");
+        }
+
+        if (tcpProbe.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                "Unable to reach the MySQL server over TCP from inside the container.");
+        }
+
+        var listeners = await database.ExecAsync(
+            new[]
+            {
+                "sh",
+                "-c",
+                "cat /proc/net/tcp /proc/net/tcp6"
+            });
+
+        TestContext.Progress.WriteLine(
+            $"[MYSQL-DIAGNOSTIC] TCP socket table | exitCode={listeners.ExitCode}");
+        TestContext.Progress.WriteLine(
+            $"[MYSQL-DIAGNOSTIC] TCP socket table STDOUT:\n{listeners.Stdout}");
+
+        if (!string.IsNullOrWhiteSpace(listeners.Stderr))
+        {
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-DIAGNOSTIC] TCP socket table STDERR:\n{listeners.Stderr}");
+        }
+    }
+
+    public static async Task WriteContainerLogsAsync(MySqlContainer database, string stage)
+    {
+        TestContext.Progress.WriteLine(
+            $"[MYSQL-CONTAINER] LOG CAPTURE START | stage={stage} | {DateTimeOffset.UtcNow:O}");
+
+        try
+        {
+            var (stdout, stderr) = await database.GetLogsAsync(
+                DateTime.UnixEpoch,
+                DateTime.UtcNow,
+                true,
+                CancellationToken.None);
+
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] STDOUT BEGIN | stage={stage}");
+            TestContext.Progress.WriteLine(
+                string.IsNullOrWhiteSpace(stdout) ? "<empty>" : stdout);
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] STDOUT END | stage={stage}");
+
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] STDERR BEGIN | stage={stage}");
+            TestContext.Progress.WriteLine(
+                string.IsNullOrWhiteSpace(stderr) ? "<empty>" : stderr);
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] STDERR END | stage={stage}");
+        }
+        catch (Exception exception)
+        {
+            TestContext.Progress.WriteLine(
+                $"[MYSQL-CONTAINER] LOG CAPTURE FAILURE | stage={stage}");
+            TestContext.Progress.WriteLine(exception.ToString());
+        }
+    }
+
+    private sealed class MySqlReadinessWaitStrategy(string databaseName) : IWaitUntil
+    {
+        private int _attempt;
+
+        public async Task<bool> UntilAsync(IContainer container)
+        {
+            var attempt = Interlocked.Increment(ref _attempt);
+
+            try
+            {
+                // The official MySQL image starts a temporary initialization server first.
+                // That server has TCP networking disabled, so a TCP ping to port 3306 cannot
+                // succeed until the final server is running. Use mysqladmin ping rather than a
+                // SQL query: the final server may already require the generated root password,
+                // while mysqladmin ping reports a live server even when authentication is denied.
+                var result = await container.ExecAsync(
+                    new[]
+                    {
+                        "mysqladmin",
+                        "--no-defaults",
+                        "--protocol=TCP",
+                        "--host=127.0.0.1",
+                        "--port=3306",
+                        "--connect-timeout=1",
+                        "ping"
+                    });
+
+                var ready = 0L.Equals(result.ExitCode);
+                if (ready || attempt == 1 || attempt % 10 == 0)
+                {
+                    TestContext.Progress.WriteLine(
+                        $"[MYSQL-READINESS] {(ready ? "SUCCESS" : "RETRY")} {DateTimeOffset.UtcNow:O} | " +
+                        $"database={databaseName} | attempt={attempt} | exitCode={result.ExitCode}");
+
+                    if (!string.IsNullOrWhiteSpace(result.Stdout))
+                        TestContext.Progress.WriteLine($"[MYSQL-READINESS] STDOUT: {result.Stdout}");
+
+                    if (!string.IsNullOrWhiteSpace(result.Stderr))
+                        TestContext.Progress.WriteLine($"[MYSQL-READINESS] STDERR: {result.Stderr}");
+                }
+
+                return ready;
+            }
+            catch (Exception exception)
+            {
+                if (attempt == 1 || attempt % 10 == 0)
+                {
+                    TestContext.Progress.WriteLine(
+                        $"[MYSQL-READINESS] EXEC FAILURE {DateTimeOffset.UtcNow:O} | " +
+                        $"database={databaseName} | attempt={attempt}");
+                    TestContext.Progress.WriteLine(exception.ToString());
+                }
+
+                return false;
+            }
+        }
+    }
+
+    public static Task MigrateAsync(ExampleDbContext context, string stage)
+        => ExecuteAsync(
+            $"EF Core MigrateAsync ({stage})",
+            MigrationTimeout,
+            cancellationToken => context.Database.MigrateAsync(cancellationToken));
+}

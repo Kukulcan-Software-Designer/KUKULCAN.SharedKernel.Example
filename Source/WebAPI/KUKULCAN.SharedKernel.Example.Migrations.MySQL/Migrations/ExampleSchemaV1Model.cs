@@ -15,7 +15,6 @@ internal static class ExampleSchemaV1Model
             .HasAnnotation("ProductVersion", "10.0.13")
             .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
-        modelBuilder.HasDefaultSchema("Example");
 
         modelBuilder.Entity("KUKULCAN.SharedKernel.Example.Infrastructure.Persistence.DatabaseIntegrationRecord", b =>
         {
@@ -23,7 +22,7 @@ internal static class ExampleSchemaV1Model
             b.Property<Guid>("TenantId").HasColumnType("char(36)");
             b.Property<string>("Value").IsRequired().HasMaxLength(200).HasColumnType("varchar(200)");
             b.HasKey("Id");
-            b.ToTable("DatabaseIntegrationRecords", "Example");
+            b.ToTable("DatabaseIntegrationRecords");
         });
 
         modelBuilder.Entity("KUKULCAN.SharedKernel.Example.Domain.Entities.Client", b =>
@@ -40,7 +39,7 @@ internal static class ExampleSchemaV1Model
             b.HasAlternateKey("TenantId", "Id");
             b.HasIndex("TenantId", "Name");
             b.HasIndex("TenantId", "City", "State", "PostalCode");
-            b.ToTable("Clients", "Example");
+            b.ToTable("Clients");
         });
 
         modelBuilder.Entity("KUKULCAN.SharedKernel.Example.Domain.Entities.Provider", b =>
@@ -57,7 +56,7 @@ internal static class ExampleSchemaV1Model
             b.HasAlternateKey("TenantId", "Id");
             b.HasIndex("TenantId", "Name");
             b.HasIndex("TenantId", "City", "State", "PostalCode");
-            b.ToTable("Providers", "Example");
+            b.ToTable("Providers");
         });
 
         modelBuilder.Entity("KUKULCAN.SharedKernel.Example.Domain.Entities.Product", b =>
@@ -71,7 +70,7 @@ internal static class ExampleSchemaV1Model
             b.HasAlternateKey("TenantId", "Id");
             b.HasIndex("TenantId", "Code").IsUnique();
             b.HasIndex("TenantId", "Name");
-            b.ToTable("Products", "Example");
+            b.ToTable("Products");
         });
 
         modelBuilder.Entity("KUKULCAN.SharedKernel.Example.Domain.Entities.Warehouse", b =>
@@ -85,7 +84,7 @@ internal static class ExampleSchemaV1Model
             b.HasKey("Id");
             b.HasAlternateKey("TenantId", "Id");
             b.HasIndex("TenantId", "Name");
-            b.ToTable("Warehouses", "Example");
+            b.ToTable("Warehouses");
         });
 
         modelBuilder.Entity("KUKULCAN.SharedKernel.Example.Domain.Entities.WarehouseStock", b =>
@@ -99,7 +98,7 @@ internal static class ExampleSchemaV1Model
             b.HasIndex("WarehouseId", "ProductId").IsUnique();
             b.HasIndex("TenantId", "ProductId");
             b.HasIndex("TenantId", "WarehouseId");
-            b.ToTable("WarehouseStocks", "Example");
+            b.ToTable("WarehouseStocks");
         });
 
         modelBuilder.Entity("KUKULCAN.SharedKernel.Example.Domain.Entities.Invoice", b =>
@@ -114,7 +113,7 @@ internal static class ExampleSchemaV1Model
             b.HasAlternateKey("TenantId", "Id");
             b.HasIndex("TenantId", "InvoiceNumber").IsUnique();
             b.HasIndex("TenantId", "ClientId", "IssuedAt");
-            b.ToTable("Invoices", "Example");
+            b.ToTable("Invoices");
         });
 
         modelBuilder.Entity("KUKULCAN.SharedKernel.Example.Domain.Entities.InvoiceLine", b =>
@@ -131,7 +130,7 @@ internal static class ExampleSchemaV1Model
             b.HasKey("Id");
             b.HasIndex("TenantId", "InvoiceId", "LineNumber").IsUnique();
             b.HasIndex("TenantId", "ProductId");
-            b.ToTable("InvoiceLines", "Example");
+            b.ToTable("InvoiceLines");
         });
 
         modelBuilder.Entity("KUKULCAN.SharedKernel.Example.Domain.Entities.ProdInvoice", b =>
@@ -146,7 +145,7 @@ internal static class ExampleSchemaV1Model
             b.HasAlternateKey("TenantId", "Id");
             b.HasIndex("TenantId", "InvoiceNumber").IsUnique();
             b.HasIndex("TenantId", "ProviderId", "IssuedAt");
-            b.ToTable("ProdInvoices", "Example");
+            b.ToTable("ProdInvoices");
         });
 
         modelBuilder.Entity("KUKULCAN.SharedKernel.Example.Domain.Entities.ProdInvoiceLine", b =>
@@ -163,7 +162,7 @@ internal static class ExampleSchemaV1Model
             b.HasKey("Id");
             b.HasIndex("TenantId", "ProdInvoiceId", "LineNumber").IsUnique();
             b.HasIndex("TenantId", "ProductId");
-            b.ToTable("ProdInvoiceLines", "Example");
+            b.ToTable("ProdInvoiceLines");
         });
 
         modelBuilder.Entity("KUKULCAN.SharedKernel.Example.Domain.Entities.WarehouseStock", b =>
