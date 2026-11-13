@@ -14,12 +14,9 @@ public partial class InitialExampleSchema : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.EnsureSchema(name: "Example");
-
         migrationBuilder.CreateTable(
             name: "Clients",
-            schema: "Example",
-            columns: table => new
+columns: table => new
             {
                 Id = table.Column<Guid>(type: "char(36)", nullable: false),
                 TenantId = table.Column<Guid>(type: "char(36)", nullable: false),
@@ -38,8 +35,7 @@ public partial class InitialExampleSchema : Migration
 
         migrationBuilder.CreateTable(
             name: "DatabaseIntegrationRecords",
-            schema: "Example",
-            columns: table => new
+columns: table => new
             {
                 Id = table.Column<Guid>(type: "char(36)", nullable: false),
                 TenantId = table.Column<Guid>(type: "char(36)", nullable: false),
@@ -49,8 +45,7 @@ public partial class InitialExampleSchema : Migration
 
         migrationBuilder.CreateTable(
             name: "Products",
-            schema: "Example",
-            columns: table => new
+columns: table => new
             {
                 Id = table.Column<Guid>(type: "char(36)", nullable: false),
                 TenantId = table.Column<Guid>(type: "char(36)", nullable: false),
@@ -66,8 +61,7 @@ public partial class InitialExampleSchema : Migration
 
         migrationBuilder.CreateTable(
             name: "Providers",
-            schema: "Example",
-            columns: table => new
+columns: table => new
             {
                 Id = table.Column<Guid>(type: "char(36)", nullable: false),
                 TenantId = table.Column<Guid>(type: "char(36)", nullable: false),
@@ -86,8 +80,7 @@ public partial class InitialExampleSchema : Migration
 
         migrationBuilder.CreateTable(
             name: "Warehouses",
-            schema: "Example",
-            columns: table => new
+columns: table => new
             {
                 Id = table.Column<Guid>(type: "char(36)", nullable: false),
                 TenantId = table.Column<Guid>(type: "char(36)", nullable: false),
@@ -104,8 +97,7 @@ public partial class InitialExampleSchema : Migration
 
         migrationBuilder.CreateTable(
             name: "Invoices",
-            schema: "Example",
-            columns: table => new
+columns: table => new
             {
                 Id = table.Column<Guid>(type: "char(36)", nullable: false),
                 TenantId = table.Column<Guid>(type: "char(36)", nullable: false),
@@ -122,15 +114,13 @@ public partial class InitialExampleSchema : Migration
                     name: "FK_Invoices_Clients_TenantId_ClientId",
                     columns: x => new { x.TenantId, x.ClientId },
                     principalTable: "Clients",
-                    principalSchema: "Example",
-                    principalColumns: new[] { "TenantId", "Id" },
+principalColumns: new[] { "TenantId", "Id" },
                     onDelete: ReferentialAction.Restrict);
             });
 
         migrationBuilder.CreateTable(
             name: "ProdInvoices",
-            schema: "Example",
-            columns: table => new
+columns: table => new
             {
                 Id = table.Column<Guid>(type: "char(36)", nullable: false),
                 TenantId = table.Column<Guid>(type: "char(36)", nullable: false),
@@ -147,15 +137,13 @@ public partial class InitialExampleSchema : Migration
                     name: "FK_ProdInvoices_Providers_TenantId_ProviderId",
                     columns: x => new { x.TenantId, x.ProviderId },
                     principalTable: "Providers",
-                    principalSchema: "Example",
-                    principalColumns: new[] { "TenantId", "Id" },
+principalColumns: new[] { "TenantId", "Id" },
                     onDelete: ReferentialAction.Restrict);
             });
 
         migrationBuilder.CreateTable(
             name: "WarehouseStocks",
-            schema: "Example",
-            columns: table => new
+columns: table => new
             {
                 Id = table.Column<Guid>(type: "char(36)", nullable: false),
                 TenantId = table.Column<Guid>(type: "char(36)", nullable: false),
@@ -170,22 +158,19 @@ public partial class InitialExampleSchema : Migration
                     name: "FK_WarehouseStocks_Products_TenantId_ProductId",
                     columns: x => new { x.TenantId, x.ProductId },
                     principalTable: "Products",
-                    principalSchema: "Example",
-                    principalColumns: new[] { "TenantId", "Id" },
+principalColumns: new[] { "TenantId", "Id" },
                     onDelete: ReferentialAction.Restrict);
                 table.ForeignKey(
                     name: "FK_WarehouseStocks_Warehouses_TenantId_WarehouseId",
                     columns: x => new { x.TenantId, x.WarehouseId },
                     principalTable: "Warehouses",
-                    principalSchema: "Example",
-                    principalColumns: new[] { "TenantId", "Id" },
+principalColumns: new[] { "TenantId", "Id" },
                     onDelete: ReferentialAction.Restrict);
             });
 
         migrationBuilder.CreateTable(
             name: "InvoiceLines",
-            schema: "Example",
-            columns: table => new
+columns: table => new
             {
                 Id = table.Column<Guid>(type: "char(36)", nullable: false),
                 TenantId = table.Column<Guid>(type: "char(36)", nullable: false),
@@ -204,22 +189,19 @@ public partial class InitialExampleSchema : Migration
                     name: "FK_InvoiceLines_Invoices_TenantId_InvoiceId",
                     columns: x => new { x.TenantId, x.InvoiceId },
                     principalTable: "Invoices",
-                    principalSchema: "Example",
-                    principalColumns: new[] { "TenantId", "Id" },
+principalColumns: new[] { "TenantId", "Id" },
                     onDelete: ReferentialAction.Restrict);
                 table.ForeignKey(
                     name: "FK_InvoiceLines_Products_TenantId_ProductId",
                     columns: x => new { x.TenantId, x.ProductId },
                     principalTable: "Products",
-                    principalSchema: "Example",
-                    principalColumns: new[] { "TenantId", "Id" },
+principalColumns: new[] { "TenantId", "Id" },
                     onDelete: ReferentialAction.Restrict);
             });
 
         migrationBuilder.CreateTable(
             name: "ProdInvoiceLines",
-            schema: "Example",
-            columns: table => new
+columns: table => new
             {
                 Id = table.Column<Guid>(type: "char(36)", nullable: false),
                 TenantId = table.Column<Guid>(type: "char(36)", nullable: false),
@@ -238,96 +220,93 @@ public partial class InitialExampleSchema : Migration
                     name: "FK_ProdInvoiceLines_ProdInvoices_TenantId_ProdInvoiceId",
                     columns: x => new { x.TenantId, x.ProdInvoiceId },
                     principalTable: "ProdInvoices",
-                    principalSchema: "Example",
-                    principalColumns: new[] { "TenantId", "Id" },
+principalColumns: new[] { "TenantId", "Id" },
                     onDelete: ReferentialAction.Restrict);
                 table.ForeignKey(
                     name: "FK_ProdInvoiceLines_Products_TenantId_ProductId",
                     columns: x => new { x.TenantId, x.ProductId },
                     principalTable: "Products",
-                    principalSchema: "Example",
-                    principalColumns: new[] { "TenantId", "Id" },
+principalColumns: new[] { "TenantId", "Id" },
                     onDelete: ReferentialAction.Restrict);
             });
 
         migrationBuilder.CreateIndex(
             name: "IX_Clients_TenantId_Name",
-            schema: "Example", table: "Clients", columns: new[] { "TenantId", "Name" });
+table: "Clients", columns: new[] { "TenantId", "Name" });
         migrationBuilder.CreateIndex(
             name: "IX_Clients_TenantId_City_State_PostalCode",
-            schema: "Example", table: "Clients", columns: new[] { "TenantId", "City", "State", "PostalCode" });
+table: "Clients", columns: new[] { "TenantId", "City", "State", "PostalCode" });
 
         migrationBuilder.CreateIndex(
             name: "IX_Providers_TenantId_Name",
-            schema: "Example", table: "Providers", columns: new[] { "TenantId", "Name" });
+table: "Providers", columns: new[] { "TenantId", "Name" });
         migrationBuilder.CreateIndex(
             name: "IX_Providers_TenantId_City_State_PostalCode",
-            schema: "Example", table: "Providers", columns: new[] { "TenantId", "City", "State", "PostalCode" });
+table: "Providers", columns: new[] { "TenantId", "City", "State", "PostalCode" });
 
         migrationBuilder.CreateIndex(
             name: "IX_Products_TenantId_Code",
-            schema: "Example", table: "Products", columns: new[] { "TenantId", "Code" }, unique: true);
+table: "Products", columns: new[] { "TenantId", "Code" }, unique: true);
         migrationBuilder.CreateIndex(
             name: "IX_Products_TenantId_Name",
-            schema: "Example", table: "Products", columns: new[] { "TenantId", "Name" });
+table: "Products", columns: new[] { "TenantId", "Name" });
 
         migrationBuilder.CreateIndex(
             name: "IX_Warehouses_TenantId_Name",
-            schema: "Example", table: "Warehouses", columns: new[] { "TenantId", "Name" });
+table: "Warehouses", columns: new[] { "TenantId", "Name" });
 
         migrationBuilder.CreateIndex(
             name: "IX_WarehouseStocks_WarehouseId_ProductId",
-            schema: "Example", table: "WarehouseStocks", columns: new[] { "WarehouseId", "ProductId" }, unique: true);
+table: "WarehouseStocks", columns: new[] { "WarehouseId", "ProductId" }, unique: true);
 
         migrationBuilder.CreateIndex(
             name: "IX_WarehouseStocks_TenantId_ProductId",
-            schema: "Example", table: "WarehouseStocks", columns: new[] { "TenantId", "ProductId" });
+table: "WarehouseStocks", columns: new[] { "TenantId", "ProductId" });
         migrationBuilder.CreateIndex(
             name: "IX_WarehouseStocks_TenantId_WarehouseId",
-            schema: "Example", table: "WarehouseStocks", columns: new[] { "TenantId", "WarehouseId" });
+table: "WarehouseStocks", columns: new[] { "TenantId", "WarehouseId" });
 
         migrationBuilder.CreateIndex(
             name: "IX_Invoices_TenantId_InvoiceNumber",
-            schema: "Example", table: "Invoices", columns: new[] { "TenantId", "InvoiceNumber" }, unique: true);
+table: "Invoices", columns: new[] { "TenantId", "InvoiceNumber" }, unique: true);
         migrationBuilder.CreateIndex(
             name: "IX_Invoices_TenantId_ClientId_IssuedAt",
-            schema: "Example", table: "Invoices", columns: new[] { "TenantId", "ClientId", "IssuedAt" });
+table: "Invoices", columns: new[] { "TenantId", "ClientId", "IssuedAt" });
 
         migrationBuilder.CreateIndex(
             name: "IX_InvoiceLines_TenantId_InvoiceId_LineNumber",
-            schema: "Example", table: "InvoiceLines", columns: new[] { "TenantId", "InvoiceId", "LineNumber" }, unique: true);
+table: "InvoiceLines", columns: new[] { "TenantId", "InvoiceId", "LineNumber" }, unique: true);
         migrationBuilder.CreateIndex(
             name: "IX_InvoiceLines_TenantId_ProductId",
-            schema: "Example", table: "InvoiceLines", columns: new[] { "TenantId", "ProductId" });
+table: "InvoiceLines", columns: new[] { "TenantId", "ProductId" });
 
         migrationBuilder.CreateIndex(
             name: "IX_ProdInvoices_TenantId_InvoiceNumber",
-            schema: "Example", table: "ProdInvoices", columns: new[] { "TenantId", "InvoiceNumber" }, unique: true);
+table: "ProdInvoices", columns: new[] { "TenantId", "InvoiceNumber" }, unique: true);
         migrationBuilder.CreateIndex(
             name: "IX_ProdInvoices_TenantId_ProviderId_IssuedAt",
-            schema: "Example", table: "ProdInvoices", columns: new[] { "TenantId", "ProviderId", "IssuedAt" });
+table: "ProdInvoices", columns: new[] { "TenantId", "ProviderId", "IssuedAt" });
 
         migrationBuilder.CreateIndex(
             name: "IX_ProdInvoiceLines_TenantId_ProdInvoiceId_LineNumber",
-            schema: "Example", table: "ProdInvoiceLines", columns: new[] { "TenantId", "ProdInvoiceId", "LineNumber" }, unique: true);
+table: "ProdInvoiceLines", columns: new[] { "TenantId", "ProdInvoiceId", "LineNumber" }, unique: true);
         migrationBuilder.CreateIndex(
             name: "IX_ProdInvoiceLines_TenantId_ProductId",
-            schema: "Example", table: "ProdInvoiceLines", columns: new[] { "TenantId", "ProductId" });
+table: "ProdInvoiceLines", columns: new[] { "TenantId", "ProductId" });
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.DropTable(name: "InvoiceLines", schema: "Example");
-        migrationBuilder.DropTable(name: "ProdInvoiceLines", schema: "Example");
-        migrationBuilder.DropTable(name: "WarehouseStocks", schema: "Example");
-        migrationBuilder.DropTable(name: "Invoices", schema: "Example");
-        migrationBuilder.DropTable(name: "ProdInvoices", schema: "Example");
-        migrationBuilder.DropTable(name: "Clients", schema: "Example");
-        migrationBuilder.DropTable(name: "Providers", schema: "Example");
-        migrationBuilder.DropTable(name: "Products", schema: "Example");
-        migrationBuilder.DropTable(name: "Warehouses", schema: "Example");
-        migrationBuilder.DropTable(name: "DatabaseIntegrationRecords", schema: "Example");
-        migrationBuilder.DropSchema(name: "Example");
+        migrationBuilder.DropTable(name: "InvoiceLines");
+        migrationBuilder.DropTable(name: "ProdInvoiceLines");
+        migrationBuilder.DropTable(name: "WarehouseStocks");
+        migrationBuilder.DropTable(name: "Invoices");
+        migrationBuilder.DropTable(name: "ProdInvoices");
+        migrationBuilder.DropTable(name: "Clients");
+        migrationBuilder.DropTable(name: "Providers");
+        migrationBuilder.DropTable(name: "Products");
+        migrationBuilder.DropTable(name: "Warehouses");
+        migrationBuilder.DropTable(name: "DatabaseIntegrationRecords");
     }
 
     protected override void BuildTargetModel(ModelBuilder modelBuilder)
