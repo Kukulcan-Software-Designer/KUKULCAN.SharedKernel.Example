@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Routing.Matching;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.Tests;
@@ -26,12 +27,14 @@ public sealed class ExampleApiAuthorizationEndpointTests
 
         var endpointDataSource = factory.Services.GetRequiredService<EndpointDataSource>();
 
-        var endpointExists = endpointDataSource.Endpoints
+        var getEndpointExists = endpointDataSource.Endpoints
             .OfType<RouteEndpoint>()
-            .Any(endpoint => endpoint.RoutePattern.RawText?.Trim('/') == "api/example/clients");
+            .Any(endpoint =>
+                endpoint.RoutePattern.RawText?.Trim('/') == "api/example/clients"
+                && endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods.Contains("GET") == true);
 
         Assert.That(
-            endpointExists,
+            getEndpointExists,
             Is.True,
             "Expected GET /api/example/clients to be registered in the application's endpoint routing.");
     }
