@@ -8,6 +8,7 @@
   </Folder>
   <Folder Name="/Documentation/Functional/">
     <File Path="Documentation\Functional\Diseno_Funcional_WebAPI_Example.docx" />
+    <File Path="Documentation\Functional\Example_Web_API_Functional_Design.docx" />
   </Folder>
   <Folder Name="/Documentation/Scripts/">
     <File Path="Documentation\Scripts\setup-example-milestones.sh" />
