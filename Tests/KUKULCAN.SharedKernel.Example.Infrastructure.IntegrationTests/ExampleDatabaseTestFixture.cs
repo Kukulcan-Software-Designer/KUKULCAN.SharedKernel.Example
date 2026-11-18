@@ -56,26 +56,32 @@ public abstract class ExampleDatabaseTestFixture
             var username = TestDatabaseCredentials.GenerateUserName();
             var password = TestDatabaseCredentials.GeneratePassword();
 
-            _container = _provider switch
+            if (_provider == DatabaseProvider.MySql)
             {
-                DatabaseProvider.PostgresSql => new PostgreSqlBuilder("postgres:16-alpine")
-                    .WithDatabase(DatabaseName)
-                    .WithUsername(username)
-                    .WithPassword(password)
-                    .Build(),
-                DatabaseProvider.MySql => new MySqlBuilder("mysql:8.4")
-                    .WithDatabase(DatabaseName)
-                    .WithUsername(username)
-                    .WithPassword(password)
-                    .Build(),
-                DatabaseProvider.SqlServer => new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
-                    .WithPassword(password)
-                    .Build(),
-                _ => throw new InvalidOperationException(
-                    $"Database provider '{_provider}' is not supported by the Example integration-test fixture.")
-            };
+                // Reuse the bounded startup probe used by the dedicated MySQL tests.
+                // The default MySqlBuilder readiness check can remain pending indefinitely
+                // when the official image is still switching from its initialization server.
+                _container = await MySqlTestDiagnostics.StartDatabaseAsync(DatabaseName);
+            }
+            else
+            {
+                _container = _provider switch
+                {
+                    DatabaseProvider.PostgresSql => new PostgreSqlBuilder("postgres:16-alpine")
+                        .WithDatabase(DatabaseName)
+                        .WithUsername(username)
+                        .WithPassword(password)
+                        .Build(),
+                    DatabaseProvider.SqlServer => new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
+                        .WithPassword(password)
+                        .Build(),
+                    _ => throw new InvalidOperationException(
+                        $"Database provider '{_provider}' is not supported by the Example integration-test fixture.")
+                };
 
-            await _container.StartAsync();
+                using var startupTimeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+                await _container.StartAsync(startupTimeout.Token);
+            }
 
             var generatedConnectionString = _container switch
             {
@@ -97,7 +103,17 @@ public abstract class ExampleDatabaseTestFixture
                 generatedConnectionString);
 
             await using var context = CreateDbContext(Guid.NewGuid());
-            await context.Database.MigrateAsync();
+            if (_provider == DatabaseProvider.MySql)
+            {
+                await MySqlTestDiagnostics.MigrateAsync(
+                    context,
+                    "ExampleDatabaseTestFixture initial migration");
+            }
+            else
+            {
+                using var migrationTimeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+                await context.Database.MigrateAsync(migrationTimeout.Token);
+            }
         }
         catch
         {
