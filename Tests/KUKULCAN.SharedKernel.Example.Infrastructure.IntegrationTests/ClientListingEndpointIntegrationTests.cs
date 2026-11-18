@@ -20,7 +20,7 @@ namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
 [NonParallelizable]
 public sealed class ClientListingEndpointIntegrationTests
 {
-    private static readonly byte[] SigningKey = RandomNumberGenerator.GetBytes(64);
+    private static readonly string SigningKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
     private const string Issuer = "issue-8-client-listing-tests";
     private const string Audience = "issue-8-client-listing-api";
 
@@ -65,7 +65,7 @@ public sealed class ClientListingEndpointIntegrationTests
     private static string CreateAccessToken(Guid tenantId)
     {
         var credentials = new SigningCredentials(
-            new SymmetricSecurityKey(SigningKey),
+            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)),
             SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(
             Issuer,
@@ -93,7 +93,7 @@ public sealed class ClientListingEndpointIntegrationTests
                     ["Kukulcan:Database:Migration:AutoMigrateOnStartup"] = "false",
                     ["Kukulcan:Database:Migration:SeedDataOnStartup"] = "false",
                     ["Kukulcan:Auth:DefaultTenantId"] = tenantId.ToString(),
-                    ["Kukulcan:Auth:Jwt:SigningKey"] = Encoding.UTF8.GetString(SigningKey),
+                    ["Kukulcan:Auth:Jwt:SigningKey"] = SigningKey,
                     ["Kukulcan:Auth:Jwt:Issuer"] = Issuer,
                     ["Kukulcan:Auth:Jwt:Audience"] = Audience
                 }));
