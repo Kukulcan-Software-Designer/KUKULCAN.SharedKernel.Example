@@ -5,7 +5,9 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.Example.Domain.Entities;
+using KUKULCAN.SharedKernel.Example.Infrastructure;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -86,18 +88,29 @@ public sealed class ClientListingEndpointIntegrationTests
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            var settings = new Dictionary<string, string?>
+            {
+                [$"{KukulcanDatabaseOptions.SectionKey}:Provider"] = "PostgresSql",
+                [$"{KukulcanDatabaseOptions.SectionKey}:ConnectionString"] = connectionString,
+                [$"{KukulcanDatabaseOptions.SectionKey}:Migration:AutoMigrateOnStartup"] = "false",
+                [$"{KukulcanDatabaseOptions.SectionKey}:Migration:SeedDataOnStartup"] = "false",
+                ["Kukulcan:Auth:DefaultTenantId"] = tenantId.ToString(),
+                ["Kukulcan:Auth:Jwt:SigningKey"] = SigningKey,
+                ["Kukulcan:Auth:Jwt:Issuer"] = Issuer,
+                ["Kukulcan:Auth:Jwt:Audience"] = Audience
+            };
+            IConfiguration testConfiguration = new ConfigurationBuilder()
+                .AddInMemoryCollection(settings)
+                .Build();
+
             builder.ConfigureAppConfiguration((_, configuration) =>
-                configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Kukulcan:Database:Provider"] = "PostgresSql",
-                    ["Kukulcan:Database:ConnectionString"] = connectionString,
-                    ["Kukulcan:Database:Migration:AutoMigrateOnStartup"] = "false",
-                    ["Kukulcan:Database:Migration:SeedDataOnStartup"] = "false",
-                    ["Kukulcan:Auth:DefaultTenantId"] = tenantId.ToString(),
-                    ["Kukulcan:Auth:Jwt:SigningKey"] = SigningKey,
-                    ["Kukulcan:Auth:Jwt:Issuer"] = Issuer,
-                    ["Kukulcan:Auth:Jwt:Audience"] = Audience
-                }));
+                configuration.AddConfiguration(testConfiguration));
+
+            // Register the Example context explicitly in the test host. This keeps
+            // database setup independent from WebApplicationFactory configuration
+            // timing while using the same provider and connection string as the API.
+            builder.ConfigureServices(services =>
+                services.AddExampleDatabase(testConfiguration));
         }
     }
 }
