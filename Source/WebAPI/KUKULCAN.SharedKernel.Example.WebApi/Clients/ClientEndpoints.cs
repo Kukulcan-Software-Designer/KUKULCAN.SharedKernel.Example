@@ -23,7 +23,7 @@ public static class ClientEndpoints
     private static async Task<IResult> GetClientsAsync(
         int? page,
         int? pageSize,
-        [Microsoft.AspNetCore.Http.FromServices] ExampleDbContext context,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
         ITenantContext tenantContext,
         CancellationToken cancellationToken)
     {
