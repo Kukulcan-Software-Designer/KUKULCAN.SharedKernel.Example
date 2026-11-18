@@ -20,9 +20,10 @@ public sealed class SqlServerDatabaseMigrationIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await sqlServer.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(sqlServer.GetConnectionString());
 
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(tenantId, sqlServer.GetConnectionString());
+        await using var context = CreateContext(tenantId, TestcontainersConnectionStringScope.Current);
 
         var registeredMigrations = context.Database.GetMigrations().ToArray();
         Assert.That(
