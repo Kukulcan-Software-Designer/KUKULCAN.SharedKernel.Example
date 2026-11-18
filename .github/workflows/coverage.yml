@@ -18,6 +18,8 @@ jobs:
     name: Measure and publish Example coverage
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      KUKULKAN__DATABASE__PROVIDER: PostgresSql
 
     steps:
       - name: Checkout repository
