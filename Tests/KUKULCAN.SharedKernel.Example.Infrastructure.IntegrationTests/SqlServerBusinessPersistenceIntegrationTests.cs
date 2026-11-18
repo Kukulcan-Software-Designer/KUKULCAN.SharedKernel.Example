@@ -19,8 +19,9 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
     public async Task SqlServerBusinessPersistence_PersistsRelationshipsUpdatesMasterDataAndPreservesDocumentSnapshots()
     {
         await using var sqlServer = await CreateSqlServerAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(sqlServer.GetConnectionString());
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(tenantId, sqlServer.GetConnectionString());
+        await using var context = CreateContext(tenantId, TestcontainersConnectionStringScope.Current);
         await context.Database.MigrateAsync();
 
         var client = new Client { TenantId = tenantId, Name = "Original Client" };
@@ -226,9 +227,10 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
     public async Task SqlServerPrimaryKey_RejectsDuplicateIdentifiers()
     {
         await using var sqlServer = await CreateSqlServerAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(sqlServer.GetConnectionString());
         var tenantId = Guid.NewGuid();
         var recordId = Guid.NewGuid();
-        await using var context = CreateContext(tenantId, sqlServer.GetConnectionString());
+        await using var context = CreateContext(tenantId, TestcontainersConnectionStringScope.Current);
         await context.Database.MigrateAsync();
 
         context.DatabaseIntegrationRecords.Add(new DatabaseIntegrationRecord
@@ -273,8 +275,9 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
     public async Task SqlServerBusinessConstraints_RejectMissingReferencesAndDuplicateCommercialKeys()
     {
         await using var sqlServer = await CreateSqlServerAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(sqlServer.GetConnectionString());
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(tenantId, sqlServer.GetConnectionString());
+        await using var context = CreateContext(tenantId, TestcontainersConnectionStringScope.Current);
         await context.Database.MigrateAsync();
 
         var client = new Client { TenantId = tenantId, Name = "Constraint Client" };
@@ -387,9 +390,10 @@ public sealed class SqlServerBusinessPersistenceIntegrationTests
     public async Task SqlServerBusinessConstraints_RejectCrossTenantReferences()
     {
         await using var sqlServer = await CreateSqlServerAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(sqlServer.GetConnectionString());
         var tenantA = Guid.NewGuid();
         var tenantB = Guid.NewGuid();
-        await using var context = CreateContext(tenantA, sqlServer.GetConnectionString());
+        await using var context = CreateContext(tenantA, TestcontainersConnectionStringScope.Current);
         await context.Database.MigrateAsync();
 
         var clientA = Guid.NewGuid();
