@@ -1,3 +1,4 @@
+using DotNet.Testcontainers.Containers;
 using KUKULCAN.SharedKernel.Abstractions;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
@@ -6,32 +7,68 @@ using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Testcontainers.MsSql;
+using Testcontainers.MySql;
 using Testcontainers.PostgreSql;
 
 namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
 
 /// <summary>
-/// Shared PostgreSQL infrastructure for an NUnit integration-test fixture.
-/// A fresh tenant and fresh entity identifiers isolate each test's data.
+/// Provider-independent NUnit fixture infrastructure. The database engine is selected
+/// exclusively through KUKULCAN__DATABASE__PROVIDER and provisioned with Testcontainers.
 /// </summary>
 public abstract class ExampleDatabaseTestFixture
 {
-    private PostgreSqlContainer? _postgres;
+    private const string ProviderEnvironmentVariable = "KUKULCAN__DATABASE__PROVIDER";
+    private const string DatabaseName = "example_m4_integration";
+    private IContainer? _container;
+    private string _connectionString = string.Empty;
+    private DatabaseProvider _provider;
 
     protected string ConnectionString =>
-        _postgres?.GetConnectionString()
-        ?? throw new InvalidOperationException("The Example test database has not been started.");
+        !string.IsNullOrWhiteSpace(_connectionString)
+            ? _connectionString
+            : throw new InvalidOperationException("The Example test database has not been started.");
+
+    protected string ProviderName => _provider.ToString();
 
     [OneTimeSetUp]
     public async Task StartExampleDatabaseAsync()
     {
-        _postgres = new PostgreSqlBuilder("postgres:16-alpine")
-            .WithDatabase("example_m4_integration")
-            .WithUsername(TestDatabaseCredentials.GenerateUserName())
-            .WithPassword(TestDatabaseCredentials.GeneratePassword())
-            .Build();
+        var configuredProvider = Environment.GetEnvironmentVariable(ProviderEnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(configuredProvider)
+            || !Enum.TryParse(configuredProvider, ignoreCase: true, out _provider)
+            || !Enum.IsDefined(_provider))
+        {
+            throw new InvalidOperationException(
+                $"Set {ProviderEnvironmentVariable} to one of the supported database providers: "
+                + "PostgresSql, MySql or SqlServer.");
+        }
 
-        await _postgres.StartAsync();
+        var username = TestDatabaseCredentials.GenerateUserName();
+        var password = TestDatabaseCredentials.GeneratePassword();
+
+        _container = _provider switch
+        {
+            DatabaseProvider.PostgresSql => new PostgreSqlBuilder("postgres:16-alpine")
+                .WithDatabase(DatabaseName)
+                .WithUsername(username)
+                .WithPassword(password)
+                .Build(),
+            DatabaseProvider.MySql => new MySqlBuilder("mysql:8.4")
+                .WithDatabase(DatabaseName)
+                .WithUsername(username)
+                .WithPassword(password)
+                .Build(),
+            DatabaseProvider.SqlServer => new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
+                .WithPassword(password)
+                .Build(),
+            _ => throw new InvalidOperationException(
+                $"Database provider '{_provider}' is not supported by the Example integration-test fixture.")
+        };
+
+        await _container.StartAsync();
+        _connectionString = BuildConnectionString(_provider, _container, username, password);
 
         await using var context = CreateDbContext(Guid.NewGuid());
         await context.Database.MigrateAsync();
@@ -40,20 +77,21 @@ public abstract class ExampleDatabaseTestFixture
     [OneTimeTearDown]
     public async Task StopExampleDatabaseAsync()
     {
-        if (_postgres is null)
+        if (_container is null)
         {
             return;
         }
 
-        await _postgres.DisposeAsync();
-        _postgres = null;
+        await _container.DisposeAsync();
+        _container = null;
+        _connectionString = string.Empty;
     }
 
     protected ExampleDbContext CreateDbContext(Guid tenantId)
     {
         var options = Options.Create(new KukulcanDatabaseOptions
         {
-            Provider = DatabaseProvider.PostgresSql,
+            Provider = _provider,
             ConnectionString = ConnectionString,
             Migration = new KukulcanDatabaseOptions.MigrationOptions
             {
@@ -71,8 +109,8 @@ public abstract class ExampleDatabaseTestFixture
 
     /// <summary>
     /// Seeds a complete, internally consistent business graph for one isolated tenant.
-    /// The caller supplies that scenario's clients; all other identifiers are generated
-    /// independently and all foreign keys remain within the same tenant.
+    /// All entity identifiers are generated independently and all foreign keys stay
+    /// within the supplied tenant.
     /// </summary>
     protected async Task SeedTenantAsync(Guid tenantId, IReadOnlyCollection<Client> clients)
     {
@@ -89,80 +127,48 @@ public abstract class ExampleDatabaseTestFixture
 
         var provider = new Provider
         {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            Name = "Integration test provider",
-            City = "Madrid",
-            State = "Madrid",
-            PostalCode = "28001"
+            Id = Guid.NewGuid(), TenantId = tenantId, Name = "Integration test provider",
+            City = "Madrid", State = "Madrid", PostalCode = "28001"
         };
         var product = new Product
         {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            Code = $"TEST-{Guid.NewGuid():N}"[..13],
-            Name = "Integration test product",
+            Id = Guid.NewGuid(), TenantId = tenantId,
+            Code = $"TEST-{Guid.NewGuid():N}"[..13], Name = "Integration test product",
             Description = "Deterministic integration-test seed"
         };
         var warehouse = new Warehouse
         {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            Name = "Integration test warehouse",
-            City = "Madrid",
-            State = "Madrid",
-            PostalCode = "28002"
+            Id = Guid.NewGuid(), TenantId = tenantId, Name = "Integration test warehouse",
+            City = "Madrid", State = "Madrid", PostalCode = "28002"
         };
         var stock = new WarehouseStock
         {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            WarehouseId = warehouse.Id,
-            ProductId = product.Id,
-            Quantity = 125.5m
+            Id = Guid.NewGuid(), TenantId = tenantId, WarehouseId = warehouse.Id,
+            ProductId = product.Id, Quantity = 125.5m
         };
-
         var salesInvoice = new Invoice
         {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            ClientId = clients.First().Id,
+            Id = Guid.NewGuid(), TenantId = tenantId, ClientId = clients.First().Id,
             InvoiceNumber = $"SALE-{Guid.NewGuid():N}"[..13],
-            IssuedAt = DateTimeOffset.UtcNow,
-            ClientName = clients.First().Name
+            IssuedAt = DateTimeOffset.UtcNow, ClientName = clients.First().Name
         };
         var salesLine = new InvoiceLine
         {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            InvoiceId = salesInvoice.Id,
-            LineNumber = 1,
-            ProductId = product.Id,
-            ProductCode = product.Code,
-            ProductName = product.Name,
-            Quantity = 2m,
-            UnitPrice = 19.95m
+            Id = Guid.NewGuid(), TenantId = tenantId, InvoiceId = salesInvoice.Id,
+            LineNumber = 1, ProductId = product.Id, ProductCode = product.Code,
+            ProductName = product.Name, Quantity = 2m, UnitPrice = 19.95m
         };
         var purchaseInvoice = new ProdInvoice
         {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            ProviderId = provider.Id,
+            Id = Guid.NewGuid(), TenantId = tenantId, ProviderId = provider.Id,
             InvoiceNumber = $"PUR-{Guid.NewGuid():N}"[..12],
-            IssuedAt = DateTimeOffset.UtcNow,
-            ProviderName = provider.Name
+            IssuedAt = DateTimeOffset.UtcNow, ProviderName = provider.Name
         };
         var purchaseLine = new ProdInvoiceLine
         {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            ProdInvoiceId = purchaseInvoice.Id,
-            LineNumber = 1,
-            ProductId = product.Id,
-            ProductCode = product.Code,
-            ProductName = product.Name,
-            Quantity = 10m,
-            UnitPrice = 12.5m
+            Id = Guid.NewGuid(), TenantId = tenantId, ProdInvoiceId = purchaseInvoice.Id,
+            LineNumber = 1, ProductId = product.Id, ProductCode = product.Code,
+            ProductName = product.Name, Quantity = 10m, UnitPrice = 12.5m
         };
 
         await using var context = CreateDbContext(tenantId);
@@ -176,6 +182,22 @@ public abstract class ExampleDatabaseTestFixture
         context.ProdInvoices.Add(purchaseInvoice);
         context.ProdInvoiceLines.Add(purchaseLine);
         await context.SaveChangesAsync();
+    }
+
+    private static string BuildConnectionString(
+        DatabaseProvider provider, IContainer container, string username, string password)
+    {
+        var host = container.Hostname;
+        return provider switch
+        {
+            DatabaseProvider.PostgresSql =>
+                $"Host={host};Port={container.GetMappedPublicPort(5432)};Database={DatabaseName};Username={username};Password={password}",
+            DatabaseProvider.MySql =>
+                $"Server={host};Port={container.GetMappedPublicPort(3306)};Database={DatabaseName};User ID={username};Password={password}",
+            DatabaseProvider.SqlServer =>
+                $"Server={host},{container.GetMappedPublicPort(1433)};Database={DatabaseName};User ID=sa;Password={password};Encrypt=False;TrustServerCertificate=True",
+            _ => throw new InvalidOperationException($"Unsupported database provider '{provider}'.")
+        };
     }
 
     private sealed class FixtureTenantContext(Guid tenantId) : ITenantContext
