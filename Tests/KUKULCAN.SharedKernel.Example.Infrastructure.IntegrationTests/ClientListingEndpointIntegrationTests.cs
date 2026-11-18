@@ -27,6 +27,20 @@ public sealed class ClientListingEndpointIntegrationTests : ExampleDatabaseTestF
     private const string Audience = "issue-8-client-listing-api";
 
     [Test]
+    public void ExampleDatabaseFixture_ExposesTestcontainersConnectionThroughCanonicalEnvironmentVariable()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                Environment.GetEnvironmentVariable("KUKULCAN__DATABASE__PROVIDER"),
+                Is.EqualTo(ProviderName));
+            Assert.That(
+                Environment.GetEnvironmentVariable("KUKULCAN__DATABASE__CONNECTIONSTRING"),
+                Is.EqualTo(ConnectionString).And.Not.Empty);
+        });
+    }
+
+    [Test]
     public async Task GetClients_WithNameFilter_IsCaseAndAccentInsensitiveAndUsesContainsMatching()
     {
         var tenantId = Guid.NewGuid();
