@@ -14,9 +14,14 @@ jobs:
   build-and-test:
     name: Restore, build and test Example
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      KUKULCAN__DATABASE__PROVIDER: PostgresSql
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        database-provider:
+          - PostgresSql
+          - MySql
+          - SqlServer
 
     steps:
       - name: Checkout
@@ -41,5 +46,13 @@ jobs:
       - name: Build
         run: dotnet build KUKULCAN.SharedKernel.Example.slnx --configuration Release --no-restore
 
-      - name: Test
-        run: dotnet test KUKULCAN.SharedKernel.Example.slnx --configuration Release --no-build --no-restore --logger "console;verbosity=detailed"
+      - name: Test application and Web API projects without database configuration
+        run: |
+          dotnet test Tests/KUKULCAN.SharedKernel.Example.Application.Tests/KUKULCAN.SharedKernel.Example.Application.Tests.csproj --configuration Release --no-build --no-restore --logger "console;verbosity=detailed"
+          dotnet test Tests/KUKULCAN.SharedKernel.Example.Domain.Tests/KUKULCAN.SharedKernel.Example.Domain.Tests.csproj --configuration Release --no-build --no-restore --logger "console;verbosity=detailed"
+          dotnet test Tests/KUKULCAN.SharedKernel.Example.WebApi.Tests/KUKULCAN.SharedKernel.Example.WebApi.Tests.csproj --configuration Release --no-build --no-restore --logger "console;verbosity=detailed"
+
+      - name: Test database integration projects
+        env:
+          KUKULCAN__DATABASE__PROVIDER: ${{ matrix.database-provider }}
+        run: dotnet test Tests/KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests/KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests.csproj --configuration Release --no-build --no-restore --logger "console;verbosity=detailed"
