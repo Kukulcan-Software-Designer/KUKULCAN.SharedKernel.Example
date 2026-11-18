@@ -38,7 +38,7 @@ public sealed class ClientListingEndpointIntegrationTests : ExampleDatabaseTestF
         };
         await SeedTenantAsync(tenantId, clients);
 
-        await using var factory = new ClientListingTestApplicationFactory(ConnectionString, tenantId);
+        await using var factory = new ClientListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateAccessToken(tenantId));
@@ -112,14 +112,15 @@ public sealed class ClientListingEndpointIntegrationTests : ExampleDatabaseTestF
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    private sealed class ClientListingTestApplicationFactory(string connectionString, Guid tenantId)
+    private sealed class ClientListingTestApplicationFactory(
+        string connectionString, string providerName, Guid tenantId)
         : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             var settings = new Dictionary<string, string?>
             {
-                [$"{KukulcanDatabaseOptions.SectionKey}:Provider"] = ProviderName,
+                [$"{KukulcanDatabaseOptions.SectionKey}:Provider"] = providerName,
                 [$"{KukulcanDatabaseOptions.SectionKey}:ConnectionString"] = connectionString,
                 [$"{KukulcanDatabaseOptions.SectionKey}:Migration:AutoMigrateOnStartup"] = "false",
                 [$"{KukulcanDatabaseOptions.SectionKey}:Migration:SeedDataOnStartup"] = "false",
