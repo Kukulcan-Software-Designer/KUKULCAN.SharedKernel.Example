@@ -19,7 +19,7 @@ namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
 /// </summary>
 public abstract class ExampleDatabaseTestFixture
 {
-    private const string ProviderEnvironmentVariable = "KUKULCAN__DATABASE__PROVIDER";
+    private const string ProviderEnvironmentVariable = "KUKULKAN__DATABASE__PROVIDER";
     private const string DatabaseName = "example_m4_integration";
     private IContainer? _container;
     private string _connectionString = string.Empty;
