@@ -17,9 +17,14 @@ jobs:
   coverage:
     name: Measure and publish Example coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      KUKULCAN__DATABASE__PROVIDER: PostgresSql
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        database-provider:
+          - PostgresSql
+          - MySql
+          - SqlServer
 
     steps:
       - name: Checkout repository
@@ -68,9 +73,24 @@ jobs:
       - name: Build
         run: dotnet build KUKULCAN.SharedKernel.Example.slnx --no-restore --configuration Release
 
-      - name: Test and collect coverage
+      - name: Test application, domain and Web API projects and collect coverage
+        run: |
+          for project in \
+            Tests/KUKULCAN.SharedKernel.Example.Application.Tests/KUKULCAN.SharedKernel.Example.Application.Tests.csproj \
+            Tests/KUKULCAN.SharedKernel.Example.Domain.Tests/KUKULCAN.SharedKernel.Example.Domain.Tests.csproj \
+            Tests/KUKULCAN.SharedKernel.Example.WebApi.Tests/KUKULCAN.SharedKernel.Example.WebApi.Tests.csproj
+          do
+            dotnet test "$project" --no-build --no-restore --configuration Release \
+              --settings /tmp/example-coverage.runsettings --collect:"XPlat Code Coverage" \
+              --results-directory ./TestResults --logger "console;verbosity=detailed"
+          done
+
+      - name: Test database integration projects and collect coverage
+        env:
+          KUKULCAN__DATABASE__PROVIDER: ${{ matrix.database-provider }}
         run: >
-          dotnet test KUKULCAN.SharedKernel.Example.slnx
+          dotnet test
+          Tests/KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests/KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests.csproj
           --no-build
           --no-restore
           --configuration Release
@@ -113,7 +133,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: example-code-coverage
+          name: example-code-coverage-${{ matrix.database-provider }}
           path: |
             CoverageReport/
             TestResults/**/coverage.cobertura.xml
