@@ -15,13 +15,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
-using Testcontainers.PostgreSql;
 
 namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
 
 [TestFixture]
 [NonParallelizable]
-public sealed class ClientListingEndpointIntegrationTests
+public sealed class ClientListingEndpointIntegrationTests : ExampleDatabaseTestFixture
 {
     private static readonly string SigningKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
     private const string Issuer = "issue-8-client-listing-tests";
@@ -30,25 +29,16 @@ public sealed class ClientListingEndpointIntegrationTests
     [Test]
     public async Task GetClients_WithNameFilter_IsCaseAndAccentInsensitiveAndUsesContainsMatching()
     {
-        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
-            .WithDatabase("example_client_search_integration")
-            .WithUsername(TestDatabaseCredentials.GenerateUserName())
-            .WithPassword(TestDatabaseCredentials.GeneratePassword())
-            .Build();
-        await postgres.StartAsync();
-
         var tenantId = Guid.NewGuid();
-        await using var factory = new ClientListingTestApplicationFactory(postgres.GetConnectionString(), tenantId);
-        await using (var scope = factory.Services.CreateAsyncScope())
+        var clients = new[]
         {
-            var context = scope.ServiceProvider.GetRequiredService<ExampleDbContext>();
-            await context.Database.MigrateAsync();
-            context.Clients.AddRange(
-                new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Álvaro Núñez", City = "Málaga", State = "Andalucía", PostalCode = "00123" },
-                new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Alvaro Rios", City = "Sevilla", State = "Andalucía", PostalCode = "41001" },
-                new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Beatriz García", City = "Madrid", State = "Madrid", PostalCode = "28001" });
-            await context.SaveChangesAsync();
-        }
+            new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Álvaro Núñez", City = "Málaga", State = "Andalucía", PostalCode = "00123" },
+            new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Alvaro Rios", City = "Sevilla", State = "Andalucía", PostalCode = "41001" },
+            new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Beatriz García", City = "Madrid", State = "Madrid", PostalCode = "28001" }
+        };
+        await SeedTenantAsync(tenantId, clients);
+
+        await using var factory = new ClientListingTestApplicationFactory(ConnectionString, tenantId);
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateAccessToken(tenantId));
