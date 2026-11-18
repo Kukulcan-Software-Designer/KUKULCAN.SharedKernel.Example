@@ -20,71 +20,114 @@ namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
 public abstract class ExampleDatabaseTestFixture
 {
     private const string ProviderEnvironmentVariable = "KUKULCAN__DATABASE__PROVIDER";
+    private const string ConnectionStringEnvironmentVariable = "KUKULCAN__DATABASE__CONNECTIONSTRING";
     private const string DatabaseName = "example_m4_integration";
     private IContainer? _container;
-    private string _connectionString = string.Empty;
+    private string? _originalConnectionString;
+    private bool _originalConnectionStringCaptured;
     private DatabaseProvider _provider;
 
     protected string ConnectionString =>
-        !string.IsNullOrWhiteSpace(_connectionString)
-            ? _connectionString
-            : throw new InvalidOperationException("The Example test database has not been started.");
+        Environment.GetEnvironmentVariable(ConnectionStringEnvironmentVariable) is { Length: > 0 } connectionString
+            ? connectionString
+            : throw new InvalidOperationException(
+                $"The Example test database has not configured {ConnectionStringEnvironmentVariable}.");
 
     protected string ProviderName => _provider.ToString();
 
     [OneTimeSetUp]
     public async Task StartExampleDatabaseAsync()
     {
-        var configuredProvider = Environment.GetEnvironmentVariable(ProviderEnvironmentVariable);
-        if (string.IsNullOrWhiteSpace(configuredProvider)
-            || !Enum.TryParse(configuredProvider, ignoreCase: true, out _provider)
-            || !Enum.IsDefined(_provider))
+        _originalConnectionString = Environment.GetEnvironmentVariable(ConnectionStringEnvironmentVariable);
+        _originalConnectionStringCaptured = true;
+
+        try
         {
-            throw new InvalidOperationException(
-                $"Set {ProviderEnvironmentVariable} to one of the supported database providers: "
-                + "PostgresSql, MySql or SqlServer.");
+            var configuredProvider = Environment.GetEnvironmentVariable(ProviderEnvironmentVariable);
+            if (string.IsNullOrWhiteSpace(configuredProvider)
+                || !Enum.TryParse(configuredProvider, ignoreCase: true, out _provider)
+                || !Enum.IsDefined(_provider))
+            {
+                throw new InvalidOperationException(
+                    $"Set {ProviderEnvironmentVariable} to one of the supported database providers: "
+                    + "PostgresSql, MySql or SqlServer.");
+            }
+
+            var username = TestDatabaseCredentials.GenerateUserName();
+            var password = TestDatabaseCredentials.GeneratePassword();
+
+            _container = _provider switch
+            {
+                DatabaseProvider.PostgresSql => new PostgreSqlBuilder("postgres:16-alpine")
+                    .WithDatabase(DatabaseName)
+                    .WithUsername(username)
+                    .WithPassword(password)
+                    .Build(),
+                DatabaseProvider.MySql => new MySqlBuilder("mysql:8.4")
+                    .WithDatabase(DatabaseName)
+                    .WithUsername(username)
+                    .WithPassword(password)
+                    .Build(),
+                DatabaseProvider.SqlServer => new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
+                    .WithPassword(password)
+                    .Build(),
+                _ => throw new InvalidOperationException(
+                    $"Database provider '{_provider}' is not supported by the Example integration-test fixture.")
+            };
+
+            await _container.StartAsync();
+
+            var generatedConnectionString = _container switch
+            {
+                PostgreSqlContainer postgres => postgres.GetConnectionString(),
+                MySqlContainer mysql => mysql.GetConnectionString(),
+                MsSqlContainer sqlServer => sqlServer.GetConnectionString(),
+                _ => throw new InvalidOperationException(
+                    "The Example test database container does not expose a supported connection string.")
+            };
+
+            if (string.IsNullOrWhiteSpace(generatedConnectionString))
+            {
+                throw new InvalidOperationException(
+                    $"Testcontainers did not provide a value for {ConnectionStringEnvironmentVariable}.");
+            }
+
+            Environment.SetEnvironmentVariable(
+                ConnectionStringEnvironmentVariable,
+                generatedConnectionString);
+
+            await using var context = CreateDbContext(Guid.NewGuid());
+            await context.Database.MigrateAsync();
         }
-
-        var username = TestDatabaseCredentials.GenerateUserName();
-        var password = TestDatabaseCredentials.GeneratePassword();
-
-        _container = _provider switch
+        catch
         {
-            DatabaseProvider.PostgresSql => new PostgreSqlBuilder("postgres:16-alpine")
-                .WithDatabase(DatabaseName)
-                .WithUsername(username)
-                .WithPassword(password)
-                .Build(),
-            DatabaseProvider.MySql => new MySqlBuilder("mysql:8.4")
-                .WithDatabase(DatabaseName)
-                .WithUsername(username)
-                .WithPassword(password)
-                .Build(),
-            DatabaseProvider.SqlServer => new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
-                .WithPassword(password)
-                .Build(),
-            _ => throw new InvalidOperationException(
-                $"Database provider '{_provider}' is not supported by the Example integration-test fixture.")
-        };
-
-        await _container.StartAsync();
-        _connectionString = BuildConnectionString(_provider, _container, username, password);
-
-        await using var context = CreateDbContext(Guid.NewGuid());
-        await context.Database.MigrateAsync();
+            await StopExampleDatabaseAsync();
+            throw;
+        }
     }
 
     [OneTimeTearDown]
     public async Task StopExampleDatabaseAsync()
     {
-        if (_container is null)
+        try
         {
-            return;
+            if (_container is not null)
+            {
+                await _container.DisposeAsync();
+                _container = null;
+            }
         }
-
-        await _container.DisposeAsync();
-        _container = null;
-        _connectionString = string.Empty;
+        finally
+        {
+            if (_originalConnectionStringCaptured)
+            {
+                Environment.SetEnvironmentVariable(
+                    ConnectionStringEnvironmentVariable,
+                    _originalConnectionString);
+                _originalConnectionString = null;
+                _originalConnectionStringCaptured = false;
+            }
+        }
     }
 
     protected ExampleDbContext CreateDbContext(Guid tenantId)
@@ -182,22 +225,6 @@ public abstract class ExampleDatabaseTestFixture
         context.ProdInvoices.Add(purchaseInvoice);
         context.ProdInvoiceLines.Add(purchaseLine);
         await context.SaveChangesAsync();
-    }
-
-    private static string BuildConnectionString(
-        DatabaseProvider provider, IContainer container, string username, string password)
-    {
-        var host = container.Hostname;
-        return provider switch
-        {
-            DatabaseProvider.PostgresSql =>
-                $"Host={host};Port={container.GetMappedPublicPort(5432)};Database={DatabaseName};Username={username};Password={password}",
-            DatabaseProvider.MySql =>
-                $"Server={host};Port={container.GetMappedPublicPort(3306)};Database={DatabaseName};User ID={username};Password={password}",
-            DatabaseProvider.SqlServer =>
-                $"Server={host},{container.GetMappedPublicPort(1433)};Database={DatabaseName};User ID=sa;Password={password};Encrypt=False;TrustServerCertificate=True",
-            _ => throw new InvalidOperationException($"Unsupported database provider '{provider}'.")
-        };
     }
 
     private sealed class FixtureTenantContext(Guid tenantId) : ITenantContext
