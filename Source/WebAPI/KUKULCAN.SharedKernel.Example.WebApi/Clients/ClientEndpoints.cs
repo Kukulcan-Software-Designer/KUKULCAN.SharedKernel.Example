@@ -24,15 +24,12 @@ public static class ClientEndpoints
 
     private static string NormalizeSearchText(string value)
     {
-        var decomposed = value.Normalize(NormalizationForm.FormD);
+        string decomposed = value.Normalize(NormalizationForm.FormD);
         var normalized = new StringBuilder(decomposed.Length);
 
-        foreach (var rune in decomposed.EnumerateRunes())
+        foreach (Rune rune in decomposed.EnumerateRunes().Where(rune => Rune.GetUnicodeCategory(rune) != UnicodeCategory.NonSpacingMark))
         {
-            if (Rune.GetUnicodeCategory(rune) != UnicodeCategory.NonSpacingMark)
-            {
-                normalized.Append(rune);
-            }
+            normalized.Append(rune);
         }
 
         return normalized
@@ -41,16 +38,12 @@ public static class ClientEndpoints
             .ToUpperInvariant();
     }
 
-    private static async Task<IResult> GetClientsAsync(
-        int? page,
-        int? pageSize,
-        string? name,
-        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
-        ITenantContext tenantContext,
+    private static async Task<IResult> GetClientsAsync(int? page, int? pageSize, string? name,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
         CancellationToken cancellationToken)
     {
-        var requestedPage = page ?? 1;
-        var requestedPageSize = pageSize ?? 25;
+        int requestedPage = page ?? 1;
+        int requestedPageSize = pageSize ?? 25;
 
         var validationErrors = new Dictionary<string, string[]>();
         if (requestedPage < 1)
@@ -82,57 +75,42 @@ public static class ClientEndpoints
         // Normalize the optional name filter in application code so its
         // case- and accent-insensitive behavior is identical across all supported
         // database providers. Tenant and soft-delete restrictions remain in SQL.
-        var matchingClients = await clientsQuery
-            .Select(client => new ClientListItemResponse(
-                client.Id,
-                client.Name,
-                client.City,
-                client.State,
-                client.PostalCode,
-                client.IsDeleted))
+        List<ClientListItemResponse> matchingClients = await clientsQuery
+            .Select(client => new ClientListItemResponse(client.Id, client.Name, client.City, client.State,
+                client.PostalCode, client.IsDeleted))
             .ToListAsync(cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(name))
         {
-            var normalizedName = NormalizeSearchText(name);
-            matchingClients = matchingClients
-                .Where(client => NormalizeSearchText(client.Name)
-                    .Contains(normalizedName, StringComparison.Ordinal))
-                .ToList();
+            string normalizedName = NormalizeSearchText(name);
+            matchingClients =
+            [
+                .. matchingClients
+                    .Where(client => NormalizeSearchText(client.Name)
+                        .Contains(normalizedName, StringComparison.Ordinal))
+            ];
         }
 
-        var totalCount = matchingClients.Count;
-        var items = matchingClients
-            .OrderBy(client => client.Name, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(client => client.Id)
-            .Skip((requestedPage - 1) * requestedPageSize)
-            .Take(requestedPageSize)
-            .ToArray();
+        int totalCount = matchingClients.Count;
+        ClientListItemResponse[] items =
+        [
+            .. matchingClients
+                .OrderBy(client => client.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(client => client.Id)
+                .Skip((requestedPage - 1) * requestedPageSize)
+                .Take(requestedPageSize)
+        ];
 
-        var totalPages = totalCount == 0
+        int totalPages = totalCount == 0
             ? 0
             : (int)Math.Ceiling(totalCount / (double)requestedPageSize);
 
-        return HttpResults.Ok(new PagedResponse<ClientListItemResponse>(
-            items,
-            requestedPage,
-            requestedPageSize,
-            totalCount,
-            totalPages));
+        return HttpResults.Ok(new PagedResponse<ClientListItemResponse>(items, requestedPage, requestedPageSize,
+            totalCount, totalPages));
     }
 }
 
-public sealed record ClientListItemResponse(
-    Guid Id,
-    string Name,
-    string? City,
-    string? State,
-    string? PostalCode,
+public sealed record ClientListItemResponse(Guid Id, string Name, string? City, string? State, string? PostalCode,
     bool IsDeleted);
 
-public sealed record PagedResponse<T>(
-    IReadOnlyList<T> Items,
-    int Page,
-    int PageSize,
-    int TotalCount,
-    int TotalPages);
+public sealed record PagedResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount, int TotalPages);
