@@ -55,6 +55,45 @@ public sealed class ClientListingEndpointIntegrationTests : ExampleDatabaseTestF
         });
     }
 
+    [Test]
+    public async Task ExampleDatabaseFixture_SeedsRelatedEntitiesAndIsolatesTenants()
+    {
+        var tenantId = Guid.NewGuid();
+        var client = new Client
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Fixture isolation client"
+        };
+
+        await SeedTenantAsync(tenantId, [client]);
+
+        await using var ownTenantContext = CreateDbContext(tenantId);
+        await using var otherTenantContext = CreateDbContext(Guid.NewGuid());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ownTenantContext.Clients.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.Providers.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.Products.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.Warehouses.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.WarehouseStocks.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.Invoices.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.InvoiceLines.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.ProdInvoices.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.ProdInvoiceLines.Count(), Is.EqualTo(1));
+            Assert.That(otherTenantContext.Clients.Count(), Is.Zero);
+            Assert.That(otherTenantContext.Providers.Count(), Is.Zero);
+            Assert.That(otherTenantContext.Products.Count(), Is.Zero);
+            Assert.That(otherTenantContext.Warehouses.Count(), Is.Zero);
+            Assert.That(otherTenantContext.WarehouseStocks.Count(), Is.Zero);
+            Assert.That(otherTenantContext.Invoices.Count(), Is.Zero);
+            Assert.That(otherTenantContext.InvoiceLines.Count(), Is.Zero);
+            Assert.That(otherTenantContext.ProdInvoices.Count(), Is.Zero);
+            Assert.That(otherTenantContext.ProdInvoiceLines.Count(), Is.Zero);
+        });
+    }
+
     private static string CreateAccessToken(Guid tenantId)
     {
         var credentials = new SigningCredentials(
