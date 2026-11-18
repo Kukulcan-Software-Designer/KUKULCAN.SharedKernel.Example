@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http;
@@ -20,9 +22,29 @@ public static class ClientEndpoints
         return endpoints;
     }
 
+    private static string NormalizeSearchText(string value)
+    {
+        var decomposed = value.Normalize(NormalizationForm.FormD);
+        var normalized = new StringBuilder(decomposed.Length);
+
+        foreach (var rune in decomposed.EnumerateRunes())
+        {
+            if (Rune.GetUnicodeCategory(rune) != UnicodeCategory.NonSpacingMark)
+            {
+                normalized.Append(rune);
+            }
+        }
+
+        return normalized
+            .ToString()
+            .Normalize(NormalizationForm.FormC)
+            .ToUpperInvariant();
+    }
+
     private static async Task<IResult> GetClientsAsync(
         int? page,
         int? pageSize,
+        string? name,
         [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
         ITenantContext tenantContext,
         CancellationToken cancellationToken)
@@ -57,12 +79,10 @@ public static class ClientEndpoints
                 client.TenantId == tenantContext.TenantId
                 && !client.IsDeleted);
 
-        var totalCount = await clientsQuery.CountAsync(cancellationToken);
-        var items = await clientsQuery
-            .OrderBy(client => client.Name)
-            .ThenBy(client => client.Id)
-            .Skip((requestedPage - 1) * requestedPageSize)
-            .Take(requestedPageSize)
+        // Normalize the optional name filter in application code so its
+        // case- and accent-insensitive behavior is identical across all supported
+        // database providers. Tenant and soft-delete restrictions remain in SQL.
+        var matchingClients = await clientsQuery
             .Select(client => new ClientListItemResponse(
                 client.Id,
                 client.Name,
@@ -71,6 +91,23 @@ public static class ClientEndpoints
                 client.PostalCode,
                 client.IsDeleted))
             .ToListAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            var normalizedName = NormalizeSearchText(name);
+            matchingClients = matchingClients
+                .Where(client => NormalizeSearchText(client.Name)
+                    .Contains(normalizedName, StringComparison.Ordinal))
+                .ToList();
+        }
+
+        var totalCount = matchingClients.Count;
+        var items = matchingClients
+            .OrderBy(client => client.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(client => client.Id)
+            .Skip((requestedPage - 1) * requestedPageSize)
+            .Take(requestedPageSize)
+            .ToArray();
 
         var totalPages = totalCount == 0
             ? 0
