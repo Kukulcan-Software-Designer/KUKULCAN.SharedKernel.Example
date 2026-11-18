@@ -56,9 +56,10 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
     public async Task MySqlTcpConnection_WorksWithAndWithoutConfiguredPooling(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
         await MySqlTestDiagnostics.DiagnoseTcpConfigurationAsync(database);
 
-        var connectionString = database.GetConnectionString();
+        var connectionString = TestcontainersConnectionStringScope.Current;
         var mappedPort = database.GetMappedPublicPort(3306);
         var parsedConnection = new MySqlConnectionStringBuilder(connectionString);
 
@@ -182,8 +183,9 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
     public async Task MySqlMigrations_InitializeExampleTablesAndCanBeReappliedWithoutLosingData(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(database.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
 
         await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
         var appliedAfterFirstMigration = (await context.Database.GetAppliedMigrationsAsync(cancellationToken)).ToArray();
@@ -238,8 +240,9 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
     public async Task MySqlBusinessPersistence_PersistsCommercialRelationshipsAndPreservesHistoricalSnapshots(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(database.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var client = new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Current client name" };
@@ -324,9 +327,10 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
     public async Task MySqlTenantQueries_IsolateDataAndSoftDeletePreservesMasterRecords(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
-        await using var context = CreateContext(database.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var ownClient = new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Tenant client" };
@@ -360,11 +364,12 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
     public async Task MySqlTransactions_RollbackPartialChangesAndKeepPreviouslyCommittedData(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
         var tenantId = Guid.NewGuid();
         var committedId = Guid.NewGuid();
         var rolledBackId = Guid.NewGuid();
 
-        await using (var context = CreateContext(database.GetConnectionString(), tenantId))
+        await using (var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId))
         {
             await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
             context.DatabaseIntegrationRecords.Add(new DatabaseIntegrationRecord
@@ -387,7 +392,7 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
             });
         }
 
-        await using var verificationContext = CreateContext(database.GetConnectionString(), tenantId);
+        await using var verificationContext = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         var committed = await verificationContext.DatabaseIntegrationRecords.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == committedId, cancellationToken);
         var rolledBack = await verificationContext.DatabaseIntegrationRecords.IgnoreQueryFilters()
@@ -404,8 +409,9 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
     public async Task MySqlDecimalColumns_PreserveConfiguredPrecisionAndScale(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(database.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var client = new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Decimal client" };
@@ -442,8 +448,9 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
     public async Task MySqlConstraints_RejectDuplicateCommercialKeysAndMissingReferences(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(database.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var client = new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Constraint client" };
@@ -475,8 +482,9 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
     public async Task MySqlBusinessSoftDelete_PreservesHistoricalSalesAndPurchaseDocuments(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(database.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var client = new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Customer before deletion" };
@@ -551,9 +559,10 @@ public sealed class MySqlDatabasePersistenceIntegrationTests
     public async Task MySqlCompositeForeignKeys_RejectCrossTenantCommercialReferences(CancellationToken cancellationToken)
     {
         await using var database = await StartDatabaseAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
         var tenantA = Guid.NewGuid();
         var tenantB = Guid.NewGuid();
-        await using var context = CreateContext(database.GetConnectionString(), tenantA);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantA);
         await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var tenantAClient = new Client { Id = Guid.NewGuid(), TenantId = tenantA, Name = "Tenant A client" };
