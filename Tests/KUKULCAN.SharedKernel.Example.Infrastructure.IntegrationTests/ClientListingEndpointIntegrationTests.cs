@@ -119,7 +119,7 @@ public sealed class ClientListingEndpointIntegrationTests : ExampleDatabaseTestF
         {
             var settings = new Dictionary<string, string?>
             {
-                [$"{KukulcanDatabaseOptions.SectionKey}:Provider"] = "PostgresSql",
+                [$"{KukulcanDatabaseOptions.SectionKey}:Provider"] = ProviderName,
                 [$"{KukulcanDatabaseOptions.SectionKey}:ConnectionString"] = connectionString,
                 [$"{KukulcanDatabaseOptions.SectionKey}:Migration:AutoMigrateOnStartup"] = "false",
                 [$"{KukulcanDatabaseOptions.SectionKey}:Migration:SeedDataOnStartup"] = "false",
