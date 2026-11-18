@@ -61,9 +61,10 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
 
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(DatabaseProvider.PostgresSql, postgres.GetConnectionString(), tenantId);
+        await using var context = CreateContext(DatabaseProvider.PostgresSql, TestcontainersConnectionStringScope.Current, tenantId);
 
         Assert.That(
             context.Database.GetMigrations().Any(migration => migration.EndsWith("_InitialExampleSchema", StringComparison.Ordinal)),
@@ -489,9 +490,10 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
 
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(DatabaseProvider.PostgresSql, postgres.GetConnectionString(), tenantId);
+        await using var context = CreateContext(DatabaseProvider.PostgresSql, TestcontainersConnectionStringScope.Current, tenantId);
         await context.Database.MigrateAsync();
 
         var clientId = Guid.NewGuid();
@@ -743,10 +745,11 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
 
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
-        await using var context = CreateContext(DatabaseProvider.PostgresSql, postgres.GetConnectionString(), tenantId);
+        await using var context = CreateContext(DatabaseProvider.PostgresSql, TestcontainersConnectionStringScope.Current, tenantId);
         await context.Database.MigrateAsync();
 
         var clientId = Guid.NewGuid();
@@ -905,9 +908,10 @@ public sealed class ExampleDatabaseMigrationIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
 
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(DatabaseProvider.PostgresSql, postgres.GetConnectionString(), tenantId);
+        await using var context = CreateContext(DatabaseProvider.PostgresSql, TestcontainersConnectionStringScope.Current, tenantId);
         await context.Database.MigrateAsync();
 
         var clientId = Guid.NewGuid();
