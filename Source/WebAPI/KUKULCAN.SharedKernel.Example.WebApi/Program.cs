@@ -14,6 +14,7 @@ using KUKULCAN.SharedKernel.Example.WebApi.JsonEngine;
 using KUKULCAN.SharedKernel.JsonEngine.SQL;
 using KUKULCAN.SharedKernel.JsonEngine.SQL.Interfaces;
 using KUKULCAN.SharedKernel.Example.WebApi.Authentication;
+using KUKULCAN.SharedKernel.Example.WebApi.Clients;
 using KUKULCAN.SharedKernel.Results;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -209,6 +210,8 @@ app.MapJsonEngineQueryEndpoints();
 app.MapI18nTranslationEndpoints();
 
 app.MapAuthenticationEndpoints();
+
+app.MapClientEndpoints();
 
 if (exampleDatabaseConfigured)
 {
