@@ -205,6 +205,11 @@ public sealed class ClientListingEndpointIntegrationTests : ExampleDatabaseTestF
         {
             Id = Guid.NewGuid(), TenantId = tenantId, Name = "Carla Soto",
             City = "Málaga", State = "Cataluña", PostalCode = "08001"
+        },
+        new Client
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, Name = "Carla Soto",
+            City = "Zaragoza", State = "Aragón", PostalCode = "50001"
         }
     ];
 
