@@ -3,6 +3,7 @@ using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using HttpResults = Microsoft.AspNetCore.Http.Results;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.Clients;
 
@@ -42,12 +43,12 @@ public static class ClientEndpoints
 
         if (validationErrors.Count > 0)
         {
-            return Results.ValidationProblem(validationErrors);
+            return HttpResults.ValidationProblem(validationErrors);
         }
 
         if (tenantContext.TenantId == Guid.Empty)
         {
-            return Results.Forbid();
+            return HttpResults.Forbid();
         }
 
         var clientsQuery = context.Clients
@@ -75,7 +76,7 @@ public static class ClientEndpoints
             ? 0
             : (int)Math.Ceiling(totalCount / (double)requestedPageSize);
 
-        return Results.Ok(new PagedResponse<ClientListItemResponse>(
+        return HttpResults.Ok(new PagedResponse<ClientListItemResponse>(
             items,
             requestedPage,
             requestedPageSize,
