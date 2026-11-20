@@ -39,6 +39,7 @@ public static class ClientEndpoints
     }
 
     private static async Task<IResult> GetClientsAsync(int? page, int? pageSize, string? name,
+        string? city, string? state, string? postalCode,
         [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
         CancellationToken cancellationToken)
     {
@@ -88,6 +89,42 @@ public static class ClientEndpoints
                 .. matchingClients
                     .Where(client => NormalizeSearchText(client.Name)
                         .Contains(normalizedName, StringComparison.Ordinal))
+            ];
+        }
+
+        if (!string.IsNullOrWhiteSpace(city))
+        {
+            string normalizedCity = NormalizeSearchText(city.Trim());
+            matchingClients =
+            [
+                .. matchingClients
+                    .Where(client => client.City is not null
+                        && NormalizeSearchText(client.City.Trim())
+                            .Equals(normalizedCity, StringComparison.Ordinal))
+            ];
+        }
+
+        if (!string.IsNullOrWhiteSpace(state))
+        {
+            string normalizedState = NormalizeSearchText(state.Trim());
+            matchingClients =
+            [
+                .. matchingClients
+                    .Where(client => client.State is not null
+                        && NormalizeSearchText(client.State.Trim())
+                            .Equals(normalizedState, StringComparison.Ordinal))
+            ];
+        }
+
+        if (!string.IsNullOrWhiteSpace(postalCode))
+        {
+            string normalizedPostalCode = postalCode.Trim();
+            matchingClients =
+            [
+                .. matchingClients
+                    .Where(client => client.PostalCode is not null
+                        && client.PostalCode.Trim()
+                            .Equals(normalizedPostalCode, StringComparison.Ordinal))
             ];
         }
 
