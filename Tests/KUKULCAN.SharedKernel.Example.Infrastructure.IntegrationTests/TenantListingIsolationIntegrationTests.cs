@@ -90,17 +90,74 @@ public sealed class TenantListingIsolationIntegrationTests : ExampleDatabaseTest
             seeded.Own.ProdInvoiceId, seeded.Foreign.ProdInvoiceId);
     }
 
+
+    [TestCase("/api/example/clients")]
+    [TestCase("/api/example/providers")]
+    [TestCase("/api/example/products")]
+    [TestCase("/api/example/warehouses")]
+    [TestCase("/api/example/warehouse-stocks")]
+    public async Task GetListings_WithTenantIdQueryParameter_ReturnsBadRequest(string path)
+    {
+        var seeded = await SeedTwoTenantsAsync();
+        await using var factory = new TenantListingTestApplicationFactory(
+            ConnectionString, ProviderName, seeded.OwnTenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", CreateAccessToken(seeded.OwnTenantId));
+
+        using var response = await client.GetAsync($"{path}?tenantId={seeded.Foreign.ClientId}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest),
+            $"The {path} endpoint must reject tenantId as an unsupported query parameter.");
+    }
+
+    [TestCase("/api/example/clients")]
+    [TestCase("/api/example/providers")]
+    [TestCase("/api/example/products")]
+    [TestCase("/api/example/warehouses")]
+    [TestCase("/api/example/warehouse-stocks")]
+    [TestCase("/api/example/invoices")]
+    [TestCase("/api/example/prod-invoices")]
+    public async Task GetListings_WithForgedTenantHeader_UsesAuthenticatedTenant(string path)
+    {
+        var seeded = await SeedTwoTenantsAsync();
+        await AssertTenantListingAsync(
+            seeded.OwnTenantId,
+            path,
+            GetResourceId(seeded.Own, path),
+            GetResourceId(seeded.Foreign, path),
+            seeded.ForeignTenantId);
+    }
+
+    private static Guid GetResourceId(TenantResourceIds ids, string path) =>
+        path switch
+        {
+            "/api/example/clients" => ids.ClientId,
+            "/api/example/providers" => ids.ProviderId,
+            "/api/example/products" => ids.ProductId,
+            "/api/example/warehouses" => ids.WarehouseId,
+            "/api/example/warehouse-stocks" => ids.WarehouseStockId,
+            "/api/example/invoices" => ids.InvoiceId,
+            "/api/example/prod-invoices" => ids.ProdInvoiceId,
+            _ => throw new ArgumentOutOfRangeException(nameof(path), path, "Unknown commercial listing path.")
+        };
+
     private async Task AssertTenantListingAsync(
         Guid tenantId,
         string path,
         Guid expectedResourceId,
-        Guid foreignResourceId)
+        Guid foreignResourceId,
+        Guid? forgedTenantHeaderTenantId = null)
     {
         await using var factory = new TenantListingTestApplicationFactory(
             ConnectionString, ProviderName, tenantId);
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", CreateAccessToken(tenantId));
+        if (forgedTenantHeaderTenantId.HasValue)
+        {
+            client.DefaultRequestHeaders.Add("X-Tenant-Id", forgedTenantHeaderTenantId.Value.ToString());
+        }
 
         using var response = await client.GetAsync(path);
 
@@ -145,6 +202,7 @@ public sealed class TenantListingIsolationIntegrationTests : ExampleDatabaseTest
 
         return new SeededTenants(
             ownTenantId,
+            foreignTenantId,
             await ReadTenantResourceIdsAsync(ownTenantId),
             await ReadTenantResourceIdsAsync(foreignTenantId));
     }
@@ -182,6 +240,7 @@ public sealed class TenantListingIsolationIntegrationTests : ExampleDatabaseTest
 
     private sealed record SeededTenants(
         Guid OwnTenantId,
+        Guid ForeignTenantId,
         TenantResourceIds Own,
         TenantResourceIds Foreign);
 
