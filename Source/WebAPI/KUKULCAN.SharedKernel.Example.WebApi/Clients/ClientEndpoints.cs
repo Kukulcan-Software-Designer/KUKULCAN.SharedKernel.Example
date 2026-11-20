@@ -9,6 +9,16 @@ namespace KUKULCAN.SharedKernel.Example.WebApi.Clients;
 
 public static class ClientEndpoints
 {
+    private static readonly HashSet<string> AllowedQueryParameters = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "page",
+        "pageSize",
+        "name",
+        "city",
+        "state",
+        "postalCode"
+    };
+
     public static IEndpointRouteBuilder MapClientEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/example/clients", GetClientsAsync)
@@ -71,10 +81,23 @@ public static class ClientEndpoints
             .ToUpperInvariant();
     }
 
-    private static async Task<IResult> GetClientsAsync(int? page, int? pageSize, string? name, string? city,
+    private static async Task<IResult> GetClientsAsync(HttpRequest request, int? page, int? pageSize, string? name, string? city,
         string? state, string? postalCode, [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
         ITenantContext tenantContext, CancellationToken cancellationToken)
     {
+        string[] unsupportedParameters = request.Query.Keys
+            .Where(key => !AllowedQueryParameters.Contains(key))
+            .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (unsupportedParameters.Length > 0)
+        {
+            return HttpResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["query"] = [$"Unsupported query parameter(s): {string.Join(", ", unsupportedParameters)}."]
+            });
+        }
+
         int requestedPage = page ?? 1;
         int requestedPageSize = pageSize ?? 25;
 
