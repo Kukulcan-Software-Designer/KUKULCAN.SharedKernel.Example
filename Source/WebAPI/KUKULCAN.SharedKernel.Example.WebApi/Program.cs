@@ -55,6 +55,7 @@ if (!string.IsNullOrWhiteSpace(bootstrapPassword)
         "Administrator bootstrap requires database configuration, a non-empty default tenant, and Kukulcan:Auth:Administrator:Email. Supply the bootstrap password through a secure secret source.");
 }
 
+builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient<I18nServiceTokenHandler>();
 builder.Services.AddHttpClient("KukulcanI18N", client =>
@@ -163,6 +164,13 @@ builder.Services.AddAuthorization(options =>
 });
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi().AllowAnonymous();
+    app.UseSwaggerUI(options =>
+        options.SwaggerEndpoint("/openapi/v1.json", "KUKULCAN.SharedKernel.Example.WebApi"));
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
