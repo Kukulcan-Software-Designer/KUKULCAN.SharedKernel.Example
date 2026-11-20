@@ -40,20 +40,20 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
             new(Guid.NewGuid(), "delta", "sevilla", "andalucia", "41001"),
             new(Guid.NewGuid(), "alpha", "madrid", "madrid", "28001"),
             new(Guid.NewGuid(), "alpha", "barcelona", "cataluna", "08001"),
-            new(Guid.NewGuid(), "charlie", "valencia", "valencia", "46001")
+            new(Guid.NewGuid(), "charlie", "sevilla", "andalucia", "41001")
         ];
         _providerSeeds =
         [
             new(Guid.NewGuid(), "delta", "sevilla", "andalucia", "41001"),
             new(Guid.NewGuid(), "alpha", "madrid", "madrid", "28001"),
             new(Guid.NewGuid(), "alpha", "barcelona", "cataluna", "08001"),
-            new(Guid.NewGuid(), "charlie", "valencia", "valencia", "46001")
+            new(Guid.NewGuid(), "charlie", "sevilla", "andalucia", "41001")
         ];
         _stockSeeds =
         [
             new(Guid.NewGuid(), "P-400", "delta", 40m),
             new(Guid.NewGuid(), "P-100", "alpha", 10m),
-            new(Guid.NewGuid(), "P-100", "bravo", 10m),
+            new(Guid.NewGuid(), "P-100", "alpha", 10m),
             new(Guid.NewGuid(), "P-300", "charlie", 30m)
         ];
     }
