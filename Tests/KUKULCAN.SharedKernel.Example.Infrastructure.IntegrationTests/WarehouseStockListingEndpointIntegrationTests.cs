@@ -58,6 +58,111 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
             Is.EquivalentTo(new[] { "Café molido", "Cafetera" }));
     }
 
+    [Test]
+    public async Task GetWarehouseStocks_WithUnknownQueryParameter_ReturnsBadRequest()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehouseStocksAsync(tenantId);
+
+        await using var factory = new WarehouseStockListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync("/api/example/warehouse-stocks?unexpected=value");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.BadRequest));
+    }
+
+    [Test]
+    public async Task PostWarehouseStocks_WithValidPayload_CreatesStockForAuthenticatedTenant()
+    {
+        var tenantId = Guid.NewGuid();
+        var forgedTenantId = Guid.NewGuid();
+        await SeedWarehouseStocksAsync(tenantId);
+
+        Guid warehouseId;
+        Guid productId;
+        await using (var context = CreateDbContext(tenantId))
+        {
+            warehouseId = await context.Warehouses
+                .Where(warehouse => warehouse.TenantId == tenantId)
+                .Select(warehouse => warehouse.Id)
+                .SingleAsync();
+
+            var product = new Product
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Code = "POST-STOCK-001",
+                Name = "New stock product",
+                Description = "Created through the Example API"
+            };
+            productId = product.Id;
+            context.Products.Add(product);
+            await context.SaveChangesAsync();
+        }
+
+        await using var factory = new WarehouseStockListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.PostAsJsonAsync("/api/example/warehouse-stocks", new
+        {
+            warehouseId,
+            productId,
+            quantity = 12.375m,
+            tenantId = forgedTenantId
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.Created));
+        Assert.That(response.Headers.Location, Is.Not.Null);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var stockId = payload.GetProperty("id").GetGuid();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Headers.Location!.ToString(), Does.EndWith(stockId.ToString()));
+            Assert.That(payload.GetProperty("warehouseId").GetGuid(), Is.EqualTo(warehouseId));
+            Assert.That(payload.GetProperty("productId").GetGuid(), Is.EqualTo(productId));
+            Assert.That(payload.GetProperty("productCode").GetString(), Is.EqualTo("POST-STOCK-001"));
+            Assert.That(payload.GetProperty("productName").GetString(), Is.EqualTo("New stock product"));
+            Assert.That(payload.GetProperty("quantity").GetDecimal(), Is.EqualTo(12.375m));
+            Assert.That(payload.TryGetProperty("tenantId", out _), Is.False);
+        });
+
+        await using var verificationContext = CreateDbContext(tenantId);
+        var persistedStock = await verificationContext.WarehouseStocks
+            .SingleAsync(stock => stock.Id == stockId);
+        Assert.That(persistedStock.TenantId, Is.EqualTo(tenantId));
+        Assert.That(persistedStock.TenantId, Is.Not.EqualTo(forgedTenantId));
+    }
+
+    [Test]
+    public async Task PostWarehouseStocks_WithExistingWarehouseAndProductPair_ReturnsConflict()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehouseStocksAsync(tenantId);
+
+        Guid warehouseId;
+        Guid productId;
+        await using (var context = CreateDbContext(tenantId))
+        {
+            var existingStock = await context.WarehouseStocks
+                .Where(stock => stock.TenantId == tenantId)
+                .Select(stock => new { stock.WarehouseId, stock.ProductId })
+                .FirstAsync();
+            warehouseId = existingStock.WarehouseId;
+            productId = existingStock.ProductId;
+        }
+
+        await using var factory = new WarehouseStockListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.PostAsJsonAsync("/api/example/warehouse-stocks", new
+        {
+            warehouseId,
+            productId,
+            quantity = 5m
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.Conflict));
+    }
+
     private async Task SeedWarehouseStocksAsync(Guid tenantId)
     {
         var seedClient = new Client
