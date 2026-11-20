@@ -17,7 +17,44 @@ public static class ClientEndpoints
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden);
 
+        endpoints.MapGet("/api/example/clients/{id}", GetClientByIdAsync)
+            .WithName("GetClientById")
+            .Produces<ClientListItemResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
+
         return endpoints;
+    }
+
+    private static async Task<IResult> GetClientByIdAsync(
+        Guid id,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        ITenantContext tenantContext,
+        CancellationToken cancellationToken)
+    {
+        if (tenantContext.TenantId == Guid.Empty)
+        {
+            return HttpResults.Forbid();
+        }
+
+        ClientListItemResponse? client = await context.Clients
+            .AsNoTracking()
+            .Where(entity =>
+                entity.Id == id
+                && entity.TenantId == tenantContext.TenantId
+                && !entity.IsDeleted)
+            .Select(entity => new ClientListItemResponse(
+                entity.Id,
+                entity.Name,
+                entity.City,
+                entity.State,
+                entity.PostalCode,
+                entity.IsDeleted))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return client is null
+            ? HttpResults.NotFound()
+            : HttpResults.Ok(client);
     }
 
     private static string NormalizeSearchText(string value)
