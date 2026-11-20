@@ -17,7 +17,41 @@ public static class ProductEndpoints
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden);
 
+        endpoints.MapGet("/api/example/products/{id}", GetProductByIdAsync)
+            .WithName("GetProductById")
+            .Produces<ProductListItemResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
+
         return endpoints;
+    }
+
+    private static async Task<IResult> GetProductByIdAsync(
+        Guid id,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        ITenantContext tenantContext,
+        CancellationToken cancellationToken)
+    {
+        if (tenantContext.TenantId == Guid.Empty)
+        {
+            return HttpResults.Forbid();
+        }
+
+        ProductListItemResponse? product = await context.Products
+            .AsNoTracking()
+            .Where(entity =>
+                entity.Id == id
+                && entity.TenantId == tenantContext.TenantId)
+            .Select(entity => new ProductListItemResponse(
+                entity.Id,
+                entity.Code,
+                entity.Name,
+                entity.Description))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return product is null
+            ? HttpResults.NotFound()
+            : HttpResults.Ok(product);
     }
 
     private static string NormalizeSearchText(string value)
