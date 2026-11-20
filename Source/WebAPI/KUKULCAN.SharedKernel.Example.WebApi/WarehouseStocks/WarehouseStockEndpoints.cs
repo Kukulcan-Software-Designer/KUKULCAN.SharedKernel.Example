@@ -17,7 +17,44 @@ public static class WarehouseStockEndpoints
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden);
 
+        endpoints.MapGet("/api/example/warehouse-stocks/{id}", GetWarehouseStockByIdAsync)
+            .WithName("GetWarehouseStockById")
+            .Produces<WarehouseStockListItemResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
+
         return endpoints;
+    }
+
+    private static async Task<IResult> GetWarehouseStockByIdAsync(
+        Guid id,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        ITenantContext tenantContext,
+        CancellationToken cancellationToken)
+    {
+        if (tenantContext.TenantId == Guid.Empty)
+        {
+            return HttpResults.Forbid();
+        }
+
+        WarehouseStockListItemResponse? stock = await context.WarehouseStocks
+            .AsNoTracking()
+            .Where(entity =>
+                entity.Id == id
+                && entity.TenantId == tenantContext.TenantId)
+            .Select(entity => new WarehouseStockListItemResponse(
+                entity.Id,
+                entity.WarehouseId,
+                entity.Warehouse.Name,
+                entity.ProductId,
+                entity.Product.Code,
+                entity.Product.Name,
+                entity.Quantity))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return stock is null
+            ? HttpResults.NotFound()
+            : HttpResults.Ok(stock);
     }
 
     private static string NormalizeSearchText(string value)
