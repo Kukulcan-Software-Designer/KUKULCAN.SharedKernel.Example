@@ -16,6 +16,7 @@ using KUKULCAN.SharedKernel.JsonEngine.SQL.Interfaces;
 using KUKULCAN.SharedKernel.Example.WebApi.Authentication;
 using KUKULCAN.SharedKernel.Example.WebApi.Clients;
 using KUKULCAN.SharedKernel.Example.WebApi.Providers;
+using KUKULCAN.SharedKernel.Example.WebApi.Products;
 using KUKULCAN.SharedKernel.Example.WebApi.Warehouses;
 using KUKULCAN.SharedKernel.Results;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -215,6 +216,7 @@ app.MapAuthenticationEndpoints();
 
 app.MapClientEndpoints();
 app.MapProviderEndpoints();
+app.MapProductEndpoints();
 app.MapWarehouseEndpoints();
 
 if (exampleDatabaseConfigured)
