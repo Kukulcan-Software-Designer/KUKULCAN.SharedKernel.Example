@@ -11,7 +11,7 @@
       <AssemblyName>KUKULCAN.SharedKernel.Example</AssemblyName>
       <SolutionDir>$(MSBuildThisFileDirectory)</SolutionDir>
       <BaseOutputPath>$(SolutionDir)Bin\$(MSBuildProjectName)\</BaseOutputPath>
-      <GenerateDocumentationFile>false</GenerateDocumentationFile>
+      <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
