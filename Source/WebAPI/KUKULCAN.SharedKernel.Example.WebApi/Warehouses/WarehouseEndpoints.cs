@@ -17,7 +17,42 @@ public static class WarehouseEndpoints
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden);
 
+        endpoints.MapGet("/api/example/warehouses/{id}", GetWarehouseByIdAsync)
+            .WithName("GetWarehouseById")
+            .Produces<WarehouseListItemResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
+
         return endpoints;
+    }
+
+    private static async Task<IResult> GetWarehouseByIdAsync(
+        Guid id,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        ITenantContext tenantContext,
+        CancellationToken cancellationToken)
+    {
+        if (tenantContext.TenantId == Guid.Empty)
+        {
+            return HttpResults.Forbid();
+        }
+
+        WarehouseListItemResponse? warehouse = await context.Warehouses
+            .AsNoTracking()
+            .Where(entity =>
+                entity.Id == id
+                && entity.TenantId == tenantContext.TenantId)
+            .Select(entity => new WarehouseListItemResponse(
+                entity.Id,
+                entity.Name,
+                entity.City,
+                entity.State,
+                entity.PostalCode))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return warehouse is null
+            ? HttpResults.NotFound()
+            : HttpResults.Ok(warehouse);
     }
 
     private static string NormalizeSearchText(string value)
