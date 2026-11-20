@@ -17,6 +17,16 @@ public static class ProviderEndpoints
         "name",
         "city",
         "state",
+        "postalCode",
+        "sortBy",
+        "sortDirection"
+    };
+
+    private static readonly HashSet<string> AllowedSortFields = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "name",
+        "city",
+        "state",
         "postalCode"
     };
 
@@ -88,7 +98,8 @@ public static class ProviderEndpoints
     }
 
     private static async Task<IResult> GetProvidersAsync(HttpRequest request, int? page, int? pageSize, string? name, string? city,
-        string? state, string? postalCode, [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        string? state, string? postalCode, string? sortBy, string? sortDirection,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
         ITenantContext tenantContext, CancellationToken cancellationToken)
     {
         string[] unsupportedParameters = request.Query.Keys
@@ -116,6 +127,21 @@ public static class ProviderEndpoints
         if (requestedPageSize is < 1 or > 100)
         {
             validationErrors[nameof(pageSize)] = ["PageSize must be between 1 and 100."];
+        }
+
+        string? normalizedSortBy = string.IsNullOrWhiteSpace(sortBy) ? null : sortBy.Trim();
+        string? normalizedSortDirection = string.IsNullOrWhiteSpace(sortDirection)
+            ? null
+            : sortDirection.Trim().ToLowerInvariant();
+
+        if (normalizedSortBy is not null && !AllowedSortFields.Contains(normalizedSortBy))
+        {
+            validationErrors[nameof(sortBy)] = ["SortBy must be one of: name, city, state, postalCode."];
+        }
+
+        if (normalizedSortDirection is not null && normalizedSortDirection is not ("asc" or "desc"))
+        {
+            validationErrors[nameof(sortDirection)] = ["SortDirection must be either 'asc' or 'desc'."];
         }
 
         if (validationErrors.Count > 0)
@@ -189,12 +215,24 @@ public static class ProviderEndpoints
             ];
         }
 
+        bool descending = normalizedSortDirection == "desc";
+        string sortField = normalizedSortBy?.ToLowerInvariant() ?? "name";
+        IOrderedEnumerable<ProviderListItemResponse> orderedProviders = (sortField, descending) switch
+        {
+            ("city", true) => matchingProviders.OrderByDescending(provider => NormalizeSearchText(provider.City ?? string.Empty), StringComparer.Ordinal).ThenByDescending(provider => provider.Id),
+            ("city", false) => matchingProviders.OrderBy(provider => NormalizeSearchText(provider.City ?? string.Empty), StringComparer.Ordinal).ThenBy(provider => provider.Id),
+            ("state", true) => matchingProviders.OrderByDescending(provider => NormalizeSearchText(provider.State ?? string.Empty), StringComparer.Ordinal).ThenByDescending(provider => provider.Id),
+            ("state", false) => matchingProviders.OrderBy(provider => NormalizeSearchText(provider.State ?? string.Empty), StringComparer.Ordinal).ThenBy(provider => provider.Id),
+            ("postalCode", true) => matchingProviders.OrderByDescending(provider => provider.PostalCode ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenByDescending(provider => provider.Id),
+            ("postalCode", false) => matchingProviders.OrderBy(provider => provider.PostalCode ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenBy(provider => provider.Id),
+            ("name", true) => matchingProviders.OrderByDescending(provider => NormalizeSearchText(provider.Name), StringComparer.Ordinal).ThenByDescending(provider => provider.Id),
+            _ => matchingProviders.OrderBy(provider => NormalizeSearchText(provider.Name), StringComparer.Ordinal).ThenBy(provider => provider.Id)
+        };
+
         int totalCount = matchingProviders.Count;
         ProviderListItemResponse[] items =
         [
-            .. matchingProviders
-                .OrderBy(provider => provider.Name, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(provider => provider.Id)
+            .. orderedProviders
                 .Skip((requestedPage - 1) * requestedPageSize)
                 .Take(requestedPageSize)
         ];
