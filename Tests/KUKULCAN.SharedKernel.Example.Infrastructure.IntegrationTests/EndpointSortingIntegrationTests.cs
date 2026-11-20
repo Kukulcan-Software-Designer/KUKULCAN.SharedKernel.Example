@@ -200,14 +200,18 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
     private async Task SeedWarehouseStocksAsync()
     {
         await using var context = CreateDbContext(_tenantId);
-        var products = _stockSeeds.Select((seed, index) => new Product
-        {
-            Id = Guid.NewGuid(),
-            TenantId = _tenantId,
-            Code = seed.ProductCode,
-            Name = seed.ProductName,
-            Description = "Issue #8 sorting integration-test product"
-        }).ToArray();
+        var products = _stockSeeds
+            .GroupBy(seed => seed.ProductCode, StringComparer.Ordinal)
+            .Select(group => new Product
+            {
+                Id = Guid.NewGuid(),
+                TenantId = _tenantId,
+                Code = group.Key,
+                Name = group.First().ProductName,
+                Description = "Issue #8 sorting integration-test product"
+            })
+            .ToArray();
+        var productsByCode = products.ToDictionary(product => product.Code, StringComparer.Ordinal);
         var warehouses = _stockSeeds.Select((_, index) => new Warehouse
         {
             Id = Guid.NewGuid(),
@@ -224,7 +228,7 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         {
             Id = seed.Id,
             TenantId = _tenantId,
-            ProductId = products[index].Id,
+            ProductId = productsByCode[seed.ProductCode].Id,
             WarehouseId = warehouses[index].Id,
             Quantity = seed.Quantity
         }));
