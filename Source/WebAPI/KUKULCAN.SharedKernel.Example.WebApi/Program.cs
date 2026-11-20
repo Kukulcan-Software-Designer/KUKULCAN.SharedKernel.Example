@@ -20,6 +20,7 @@ using KUKULCAN.SharedKernel.Example.WebApi.Products;
 using KUKULCAN.SharedKernel.Example.WebApi.Warehouses;
 using KUKULCAN.SharedKernel.Example.WebApi.WarehouseStocks;
 using KUKULCAN.SharedKernel.Example.WebApi.Invoices;
+using KUKULCAN.SharedKernel.Example.WebApi.ProdInvoices;
 using KUKULCAN.SharedKernel.Results;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -222,6 +223,7 @@ app.MapProductEndpoints();
 app.MapWarehouseEndpoints();
 app.MapWarehouseStockEndpoints();
 app.MapInvoiceEndpoints();
+app.MapProdInvoiceEndpoints();
 
 if (exampleDatabaseConfigured)
 {
