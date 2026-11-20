@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using KUKULCAN.SharedKernel.Database.Abstractions;
+using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using HttpResults = Microsoft.AspNetCore.Http.Results;
@@ -9,6 +10,23 @@ namespace KUKULCAN.SharedKernel.Example.WebApi.Warehouses;
 
 public static class WarehouseEndpoints
 {
+    private static readonly HashSet<string> AllowedQueryParameters = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "page",
+        "pageSize",
+        "name",
+        "city",
+        "state",
+        "postalCode",
+        "sortBy",
+        "sortDirection"
+    };
+
+    private static readonly HashSet<string> AllowedSortFields = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "name"
+    };
+
     public static IEndpointRouteBuilder MapWarehouseEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/example/warehouses", GetWarehousesAsync)
@@ -22,6 +40,12 @@ public static class WarehouseEndpoints
             .Produces<WarehouseListItemResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
+
+        endpoints.MapPost("/api/example/warehouses", CreateWarehouseAsync)
+            .WithName("CreateWarehouse")
+            .Produces<WarehouseListItemResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden);
 
         return endpoints;
     }
@@ -70,14 +94,28 @@ public static class WarehouseEndpoints
             .ToUpperInvariant();
     }
 
-    private static async Task<IResult> GetWarehousesAsync(int? page, int? pageSize, string? name, string? city,
-        string? state, string? postalCode, [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
-        ITenantContext tenantContext, CancellationToken cancellationToken)
+    private static async Task<IResult> GetWarehousesAsync(HttpRequest request, int? page, int? pageSize,
+        string? name, string? city, string? state, string? postalCode, string? sortBy, string? sortDirection,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
+        CancellationToken cancellationToken)
     {
+        string[] unsupportedParameters = request.Query.Keys
+            .Where(key => !AllowedQueryParameters.Contains(key))
+            .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (unsupportedParameters.Length > 0)
+        {
+            return HttpResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["query"] = [$"Unsupported query parameter(s): {string.Join(", ", unsupportedParameters)}."]
+            });
+        }
+
         int requestedPage = page ?? 1;
         int requestedPageSize = pageSize ?? 25;
-
         var validationErrors = new Dictionary<string, string[]>();
+
         if (requestedPage < 1)
         {
             validationErrors[nameof(page)] = ["Page must be greater than or equal to 1."];
@@ -86,6 +124,21 @@ public static class WarehouseEndpoints
         if (requestedPageSize is < 1 or > 100)
         {
             validationErrors[nameof(pageSize)] = ["PageSize must be between 1 and 100."];
+        }
+
+        string? normalizedSortBy = string.IsNullOrWhiteSpace(sortBy) ? null : sortBy.Trim();
+        string? normalizedSortDirection = string.IsNullOrWhiteSpace(sortDirection)
+            ? null
+            : sortDirection.Trim().ToLowerInvariant();
+
+        if (normalizedSortBy is not null && !AllowedSortFields.Contains(normalizedSortBy))
+        {
+            validationErrors[nameof(sortBy)] = ["SortBy must be: name."];
+        }
+
+        if (normalizedSortDirection is not null && normalizedSortDirection is not ("asc" or "desc"))
+        {
+            validationErrors[nameof(sortDirection)] = ["SortDirection must be either 'asc' or 'desc'."];
         }
 
         if (validationErrors.Count > 0)
@@ -98,8 +151,8 @@ public static class WarehouseEndpoints
             return HttpResults.Forbid();
         }
 
-        // Keep tenant isolation in SQL. Text normalization is applied consistently
-        // in memory so case/accent behavior does not depend on database collation.
+        // Normalize filters and sort keys in application code to guarantee identical
+        // case- and accent-insensitive semantics across PostgreSQL, SQL Server and MySQL.
         List<WarehouseListItemResponse> matchingWarehouses = await context.Warehouses
             .AsNoTracking()
             .Where(warehouse => warehouse.TenantId == tenantContext.TenantId)
@@ -157,15 +210,20 @@ public static class WarehouseEndpoints
             ];
         }
 
+        bool descending = normalizedSortDirection == "desc";
+        IOrderedEnumerable<WarehouseListItemResponse> orderedWarehouses = descending
+            ? matchingWarehouses
+                .OrderByDescending(warehouse => NormalizeSearchText(warehouse.Name), StringComparer.Ordinal)
+                .ThenByDescending(warehouse => warehouse.Id)
+            : matchingWarehouses
+                .OrderBy(warehouse => NormalizeSearchText(warehouse.Name), StringComparer.Ordinal)
+                .ThenBy(warehouse => warehouse.Id);
+
         int totalCount = matchingWarehouses.Count;
-        WarehouseListItemResponse[] items =
-        [
-            .. matchingWarehouses
-                .OrderBy(warehouse => warehouse.Name, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(warehouse => warehouse.Id)
-                .Skip((requestedPage - 1) * requestedPageSize)
-                .Take(requestedPageSize)
-        ];
+        long offset = (long)(requestedPage - 1) * requestedPageSize;
+        WarehouseListItemResponse[] items = offset > int.MaxValue
+            ? []
+            : [.. orderedWarehouses.Skip((int)offset).Take(requestedPageSize)];
 
         int totalPages = totalCount == 0
             ? 0
@@ -174,7 +232,76 @@ public static class WarehouseEndpoints
         return HttpResults.Ok(new WarehousePagedResponse<WarehouseListItemResponse>(
             items, requestedPage, requestedPageSize, totalCount, totalPages));
     }
+
+    private static async Task<IResult> CreateWarehouseAsync(WarehouseCreateRequest request,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
+        CancellationToken cancellationToken)
+    {
+        var validationErrors = new Dictionary<string, string[]>();
+        string name = request.Name?.Trim() ?? string.Empty;
+        string? city = string.IsNullOrWhiteSpace(request.City) ? null : request.City.Trim();
+        string? state = string.IsNullOrWhiteSpace(request.State) ? null : request.State.Trim();
+        string? postalCode = string.IsNullOrWhiteSpace(request.PostalCode) ? null : request.PostalCode.Trim();
+
+        if (name.Length == 0)
+        {
+            validationErrors[nameof(request.Name)] = ["Name is required."];
+        }
+        else if (name.Length > 160)
+        {
+            validationErrors[nameof(request.Name)] = ["Name must not exceed 160 characters."];
+        }
+
+        if (city?.Length > 120)
+        {
+            validationErrors[nameof(request.City)] = ["City must not exceed 120 characters."];
+        }
+
+        if (state?.Length > 120)
+        {
+            validationErrors[nameof(request.State)] = ["State must not exceed 120 characters."];
+        }
+
+        if (postalCode?.Length > 32)
+        {
+            validationErrors[nameof(request.PostalCode)] = ["PostalCode must not exceed 32 characters."];
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            return HttpResults.ValidationProblem(validationErrors);
+        }
+
+        if (tenantContext.TenantId == Guid.Empty)
+        {
+            return HttpResults.Forbid();
+        }
+
+        var warehouse = new Warehouse
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantContext.TenantId,
+            Name = name,
+            City = city,
+            State = state,
+            PostalCode = postalCode
+        };
+
+        context.Warehouses.Add(warehouse);
+        await context.SaveChangesAsync(cancellationToken);
+
+        var response = new WarehouseListItemResponse(
+            warehouse.Id,
+            warehouse.Name,
+            warehouse.City,
+            warehouse.State,
+            warehouse.PostalCode);
+
+        return HttpResults.Created($"/api/example/warehouses/{warehouse.Id}", response);
+    }
 }
+
+public sealed record WarehouseCreateRequest(string? Name, string? City, string? State, string? PostalCode);
 
 public sealed record WarehouseListItemResponse(Guid Id, string Name, string? City, string? State, string? PostalCode);
 
