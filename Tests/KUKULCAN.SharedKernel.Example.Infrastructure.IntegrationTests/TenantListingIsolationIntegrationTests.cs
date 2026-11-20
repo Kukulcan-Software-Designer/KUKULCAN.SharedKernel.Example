@@ -105,7 +105,7 @@ public sealed class TenantListingIsolationIntegrationTests : ExampleDatabaseTest
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", CreateAccessToken(seeded.OwnTenantId));
 
-        using var response = await client.GetAsync($"{path}?tenantId={seeded.Foreign.ClientId}");
+        using var response = await client.GetAsync($"{path}?tenantId={seeded.ForeignTenantId}");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest),
             $"The {path} endpoint must reject tenantId as an unsupported query parameter.");
