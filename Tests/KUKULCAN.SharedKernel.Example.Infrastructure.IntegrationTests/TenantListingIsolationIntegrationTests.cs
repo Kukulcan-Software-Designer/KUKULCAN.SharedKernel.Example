@@ -111,22 +111,238 @@ public sealed class TenantListingIsolationIntegrationTests : ExampleDatabaseTest
             $"The {path} endpoint must reject tenantId as an unsupported query parameter.");
     }
 
-    [TestCase("/api/example/clients")]
-    [TestCase("/api/example/providers")]
-    [TestCase("/api/example/products")]
-    [TestCase("/api/example/warehouses")]
-    [TestCase("/api/example/warehouse-stocks")]
-    [TestCase("/api/example/invoices")]
-    [TestCase("/api/example/prod-invoices")]
-    public async Task GetListings_WithForgedTenantHeader_UsesAuthenticatedTenant(string path)
+    [TestCase("GET", "/api/example/clients", "list")]
+    [TestCase("GET", "/api/example/providers", "list")]
+    [TestCase("GET", "/api/example/products", "list")]
+    [TestCase("GET", "/api/example/warehouses", "list")]
+    [TestCase("GET", "/api/example/warehouse-stocks", "list")]
+    [TestCase("GET", "/api/example/invoices", "list")]
+    [TestCase("GET", "/api/example/prod-invoices", "list")]
+    [TestCase("GET", "/api/example/clients/{id}", "detail")]
+    [TestCase("GET", "/api/example/providers/{id}", "detail")]
+    [TestCase("GET", "/api/example/products/{id}", "detail")]
+    [TestCase("GET", "/api/example/warehouses/{id}", "detail")]
+    [TestCase("GET", "/api/example/warehouse-stocks/{id}", "detail")]
+    [TestCase("GET", "/api/example/invoices/{id}", "detail")]
+    [TestCase("GET", "/api/example/prod-invoices/{id}", "detail")]
+    [TestCase("POST", "/api/example/products", "create")]
+    [TestCase("POST", "/api/example/warehouses", "create")]
+    [TestCase("POST", "/api/example/warehouse-stocks", "create")]
+    public async Task CommercialEndpoints_WithForgedTenantHeader_CannotSwitchTenant(
+        string method,
+        string path,
+        string operation)
     {
         var seeded = await SeedTwoTenantsAsync();
-        await AssertTenantListingAsync(
-            seeded.OwnTenantId,
-            path,
-            GetResourceId(seeded.Own, path),
-            GetResourceId(seeded.Foreign, path),
-            seeded.ForeignTenantId);
+        await using var factory = new TenantListingTestApplicationFactory(
+            ConnectionString, ProviderName, seeded.OwnTenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", CreateAccessToken(seeded.OwnTenantId));
+        client.DefaultRequestHeaders.Add("X-Tenant-Id", seeded.ForeignTenantId.ToString());
+        client.DefaultRequestHeaders.Add("TenantId", seeded.ForeignTenantId.ToString());
+
+        string collectionPath = path.EndsWith("/{id}", StringComparison.Ordinal)
+            ? path[..^5]
+            : path;
+
+        if (operation == "list")
+        {
+            using var response = await client.GetAsync(path);
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+
+            var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+            var returnedIds = payload.GetProperty("items")
+                .EnumerateArray()
+                .Select(item => item.GetProperty("id").GetGuid())
+                .ToArray();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(returnedIds, Is.EquivalentTo(new[] { GetResourceId(seeded.Own, collectionPath) }));
+                Assert.That(returnedIds, Does.Not.Contain(GetResourceId(seeded.Foreign, collectionPath)));
+            });
+            return;
+        }
+
+        if (operation == "detail")
+        {
+            using var ownResponse = await client.GetAsync(
+                path.Replace("{id}", GetResourceId(seeded.Own, collectionPath).ToString(), StringComparison.Ordinal));
+            using var foreignResponse = await client.GetAsync(
+                path.Replace("{id}", GetResourceId(seeded.Foreign, collectionPath).ToString(), StringComparison.Ordinal));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(ownResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+                    "The forged tenant header must not hide a resource belonging to the authenticated tenant.");
+                Assert.That(foreignResponse.StatusCode, Is.EqualTo(HttpStatusCode.NotFound),
+                    "The forged tenant header must not disclose a resource belonging to another tenant.");
+            });
+            return;
+        }
+
+        HttpResponseMessage createResponse;
+        if (path == "/api/example/products")
+        {
+            createResponse = await client.PostAsJsonAsync(path, new
+            {
+                code = "HDR-" + Guid.NewGuid().ToString("N"),
+                name = "Created with forged tenant header",
+                description = "Tenant context must come from the authenticated request."
+            });
+        }
+        else if (path == "/api/example/warehouses")
+        {
+            createResponse = await client.PostAsJsonAsync(path, new
+            {
+                name = "Created with forged tenant header",
+                city = "Barcelona",
+                state = "Cataluña",
+                postalCode = "08001"
+            });
+        }
+        else if (path == "/api/example/warehouse-stocks")
+        {
+            var productId = Guid.NewGuid();
+            await using (var seedContext = CreateDbContext(seeded.OwnTenantId))
+            {
+                seedContext.Products.Add(new Product
+                {
+                    Id = productId,
+                    TenantId = seeded.OwnTenantId,
+                    Code = "HDR-STOCK-" + Guid.NewGuid().ToString("N"),
+                    Name = "Header spoofing stock product"
+                });
+                await seedContext.SaveChangesAsync();
+            }
+
+            createResponse = await client.PostAsJsonAsync(path, new
+            {
+                warehouseId = seeded.Own.WarehouseId,
+                productId,
+                quantity = 2.5m
+            });
+        }
+        else
+        {
+            throw new ArgumentOutOfRangeException(nameof(path), path, "Unsupported commercial create path.");
+        }
+
+        using (createResponse)
+        {
+            Assert.That(createResponse.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+            var createdPayload = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            var createdId = createdPayload.GetProperty("id").GetGuid();
+
+            await using var verificationContext = CreateDbContext(seeded.OwnTenantId);
+            Guid persistedTenantId = path switch
+            {
+                "/api/example/products" => await verificationContext.Products
+                    .IgnoreQueryFilters()
+                    .Where(entity => entity.Id == createdId)
+                    .Select(entity => entity.TenantId)
+                    .SingleAsync(),
+                "/api/example/warehouses" => await verificationContext.Warehouses
+                    .IgnoreQueryFilters()
+                    .Where(entity => entity.Id == createdId)
+                    .Select(entity => entity.TenantId)
+                    .SingleAsync(),
+                "/api/example/warehouse-stocks" => await verificationContext.WarehouseStocks
+                    .IgnoreQueryFilters()
+                    .Where(entity => entity.Id == createdId)
+                    .Select(entity => entity.TenantId)
+                    .SingleAsync(),
+                _ => throw new ArgumentOutOfRangeException(nameof(path), path, "Unsupported commercial create path.")
+            };
+
+            Assert.That(persistedTenantId, Is.EqualTo(seeded.OwnTenantId),
+                "The forged tenant header must not determine the tenant persisted by a commercial POST.");
+        }
+    }
+
+    [Test]
+    public async Task GetClients_ListingExcludesSoftDeletedRecords()
+    {
+        var seeded = await SeedTwoTenantsAsync();
+        var deletedClientId = Guid.NewGuid();
+
+        await using (var context = CreateDbContext(seeded.OwnTenantId))
+        {
+            context.Clients.Add(new Client
+            {
+                Id = deletedClientId,
+                TenantId = seeded.OwnTenantId,
+                Name = "Issue 8 deleted client",
+                IsDeleted = true,
+                DeletedOn = DateTimeOffset.UtcNow
+            });
+            await context.SaveChangesAsync();
+        }
+
+        await using var factory = new TenantListingTestApplicationFactory(
+            ConnectionString, ProviderName, seeded.OwnTenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", CreateAccessToken(seeded.OwnTenantId));
+        using var response = await client.GetAsync("/api/example/clients");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var returnedIds = payload.GetProperty("items")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid())
+            .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(returnedIds, Is.EquivalentTo(new[] { seeded.Own.ClientId }));
+            Assert.That(returnedIds, Does.Not.Contain(deletedClientId));
+            Assert.That(returnedIds, Does.Not.Contain(seeded.Foreign.ClientId));
+            Assert.That(payload.GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public async Task GetProviders_ListingExcludesSoftDeletedRecords()
+    {
+        var seeded = await SeedTwoTenantsAsync();
+        var deletedProviderId = Guid.NewGuid();
+
+        await using (var context = CreateDbContext(seeded.OwnTenantId))
+        {
+            context.Providers.Add(new Provider
+            {
+                Id = deletedProviderId,
+                TenantId = seeded.OwnTenantId,
+                Name = "Issue 8 deleted provider",
+                IsDeleted = true,
+                DeletedOn = DateTimeOffset.UtcNow
+            });
+            await context.SaveChangesAsync();
+        }
+
+        await using var factory = new TenantListingTestApplicationFactory(
+            ConnectionString, ProviderName, seeded.OwnTenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", CreateAccessToken(seeded.OwnTenantId));
+        using var response = await client.GetAsync("/api/example/providers");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var returnedIds = payload.GetProperty("items")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid())
+            .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(returnedIds, Is.EquivalentTo(new[] { seeded.Own.ProviderId }));
+            Assert.That(returnedIds, Does.Not.Contain(deletedProviderId));
+            Assert.That(returnedIds, Does.Not.Contain(seeded.Foreign.ProviderId));
+            Assert.That(payload.GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+        });
     }
 
     [Test]
