@@ -1,8 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latestmajor</LangVersion>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <RootNamespace>KUKULCAN.SharedKernel.Example.WebApi</RootNamespace>
+    <AssemblyName>KUKULCAN.SharedKernel.Example</AssemblyName>
+    <SolutionDir>$(MSBuildThisFileDirectory)</SolutionDir>
+    <BaseOutputPath>$(SolutionDir)Bin\$(MSBuildProjectName)\</BaseOutputPath>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,5 +24,9 @@
     <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL\KUKULCAN.SharedKernel.Example.Migrations.PostgreSQL.csproj" />
     <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Migrations.SQLServer\KUKULCAN.SharedKernel.Example.Migrations.SQLServer.csproj" />
     <ProjectReference Include="..\KUKULCAN.SharedKernel.Example.Migrations.MySQL\KUKULCAN.SharedKernel.Example.Migrations.MySQL.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Properties\" />
   </ItemGroup>
 </Project>
