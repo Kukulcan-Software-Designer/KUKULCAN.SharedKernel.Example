@@ -68,9 +68,9 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
         var thirdId = Guid.Parse("00000000-0000-0000-0000-000000000103");
         await SeedProductsForOrderingAsync(tenantId,
         [
-            new Product { Id = thirdId, TenantId = tenantId, Code = "C-300", Name = "Zulu" },
+            new Product { Id = thirdId, TenantId = tenantId, Code = "A-100", Name = "Zulu" },
             new Product { Id = secondId, TenantId = tenantId, Code = "B-200", Name = "Alpha" },
-            new Product { Id = firstId, TenantId = tenantId, Code = "A-100", Name = "Alpha" }
+            new Product { Id = firstId, TenantId = tenantId, Code = "C-300", Name = "Alpha" }
         ]);
 
         await using var factory = new ProductListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
