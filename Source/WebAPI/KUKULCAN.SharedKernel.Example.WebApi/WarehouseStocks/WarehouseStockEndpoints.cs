@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using KUKULCAN.SharedKernel.Database.Abstractions;
+using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using HttpResults = Microsoft.AspNetCore.Http.Results;
@@ -9,6 +10,14 @@ namespace KUKULCAN.SharedKernel.Example.WebApi.WarehouseStocks;
 
 public static class WarehouseStockEndpoints
 {
+    private static readonly HashSet<string> AllowedQueryParameters = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "page",
+        "pageSize",
+        "productCode",
+        "productName"
+    };
+
     public static IEndpointRouteBuilder MapWarehouseStockEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/example/warehouse-stocks", GetWarehouseStocksAsync)
@@ -22,6 +31,14 @@ public static class WarehouseStockEndpoints
             .Produces<WarehouseStockListItemResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
+
+        endpoints.MapPost("/api/example/warehouse-stocks", CreateWarehouseStockAsync)
+            .WithName("CreateWarehouseStock")
+            .Produces<WarehouseStockListItemResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
         return endpoints;
     }
@@ -72,10 +89,23 @@ public static class WarehouseStockEndpoints
             .ToUpperInvariant();
     }
 
-    private static async Task<IResult> GetWarehouseStocksAsync(int? page, int? pageSize, string? productCode,
+    private static async Task<IResult> GetWarehouseStocksAsync(HttpRequest request, int? page, int? pageSize, string? productCode,
         string? productName, [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
         ITenantContext tenantContext, CancellationToken cancellationToken)
     {
+        string[] unsupportedParameters = request.Query.Keys
+            .Where(key => !AllowedQueryParameters.Contains(key))
+            .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (unsupportedParameters.Length > 0)
+        {
+            return HttpResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["query"] = [$"Unsupported query parameter(s): {string.Join(", ", unsupportedParameters)}."]
+            });
+        }
+
         int requestedPage = page ?? 1;
         int requestedPageSize = pageSize ?? 25;
 
@@ -153,7 +183,105 @@ public static class WarehouseStockEndpoints
         return HttpResults.Ok(new WarehouseStockPagedResponse<WarehouseStockListItemResponse>(
             items, requestedPage, requestedPageSize, totalCount, totalPages));
     }
+
+    private static async Task<IResult> CreateWarehouseStockAsync(WarehouseStockCreateRequest request,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
+        CancellationToken cancellationToken)
+    {
+        var validationErrors = new Dictionary<string, string[]>();
+
+        if (request.WarehouseId == Guid.Empty)
+        {
+            validationErrors[nameof(request.WarehouseId)] = ["WarehouseId is required."];
+        }
+
+        if (request.ProductId == Guid.Empty)
+        {
+            validationErrors[nameof(request.ProductId)] = ["ProductId is required."];
+        }
+
+        if (request.Quantity < 0)
+        {
+            validationErrors[nameof(request.Quantity)] = ["Quantity must be greater than or equal to zero."];
+        }
+        else
+        {
+            int scale = (decimal.GetBits(request.Quantity)[3] >> 16) & 0x7F;
+            if (scale > 3 || request.Quantity > 999999999999999.999m)
+            {
+                validationErrors[nameof(request.Quantity)] =
+                    ["Quantity must fit the supported decimal precision of 18,3."];
+            }
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            return HttpResults.ValidationProblem(validationErrors);
+        }
+
+        if (tenantContext.TenantId == Guid.Empty)
+        {
+            return HttpResults.Forbid();
+        }
+
+        bool warehouseExists = await context.Warehouses
+            .AnyAsync(warehouse =>
+                warehouse.Id == request.WarehouseId
+                && warehouse.TenantId == tenantContext.TenantId,
+                cancellationToken);
+
+        bool productExists = await context.Products
+            .AnyAsync(product =>
+                product.Id == request.ProductId
+                && product.TenantId == tenantContext.TenantId,
+                cancellationToken);
+
+        if (!warehouseExists || !productExists)
+        {
+            return HttpResults.NotFound();
+        }
+
+        bool stockAlreadyExists = await context.WarehouseStocks
+            .AnyAsync(stock =>
+                stock.WarehouseId == request.WarehouseId
+                && stock.ProductId == request.ProductId,
+                cancellationToken);
+
+        if (stockAlreadyExists)
+        {
+            return HttpResults.Conflict();
+        }
+
+        var stock = new WarehouseStock
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantContext.TenantId,
+            WarehouseId = request.WarehouseId,
+            ProductId = request.ProductId,
+            Quantity = request.Quantity
+        };
+
+        context.WarehouseStocks.Add(stock);
+        await context.SaveChangesAsync(cancellationToken);
+
+        var response = await context.WarehouseStocks
+            .AsNoTracking()
+            .Where(entity => entity.Id == stock.Id && entity.TenantId == tenantContext.TenantId)
+            .Select(entity => new WarehouseStockListItemResponse(
+                entity.Id,
+                entity.WarehouseId,
+                entity.Warehouse.Name,
+                entity.ProductId,
+                entity.Product.Code,
+                entity.Product.Name,
+                entity.Quantity))
+            .SingleAsync(cancellationToken);
+
+        return HttpResults.Created($"/api/example/warehouse-stocks/{stock.Id}", response);
+    }
 }
+
+public sealed record WarehouseStockCreateRequest(Guid WarehouseId, Guid ProductId, decimal Quantity);
 
 public sealed record WarehouseStockListItemResponse(Guid Id, Guid WarehouseId, string WarehouseName, Guid ProductId,
     string ProductCode, string ProductName, decimal Quantity);
