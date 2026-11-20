@@ -223,8 +223,8 @@ public static class ProviderEndpoints
             ("city", false) => matchingProviders.OrderBy(provider => NormalizeSearchText(provider.City ?? string.Empty), StringComparer.Ordinal).ThenBy(provider => provider.Id),
             ("state", true) => matchingProviders.OrderByDescending(provider => NormalizeSearchText(provider.State ?? string.Empty), StringComparer.Ordinal).ThenByDescending(provider => provider.Id),
             ("state", false) => matchingProviders.OrderBy(provider => NormalizeSearchText(provider.State ?? string.Empty), StringComparer.Ordinal).ThenBy(provider => provider.Id),
-            ("postalCode", true) => matchingProviders.OrderByDescending(provider => provider.PostalCode ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenByDescending(provider => provider.Id),
-            ("postalCode", false) => matchingProviders.OrderBy(provider => provider.PostalCode ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenBy(provider => provider.Id),
+            ("postalcode", true) => matchingProviders.OrderByDescending(provider => provider.PostalCode ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenByDescending(provider => provider.Id),
+            ("postalcode", false) => matchingProviders.OrderBy(provider => provider.PostalCode ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenBy(provider => provider.Id),
             ("name", true) => matchingProviders.OrderByDescending(provider => NormalizeSearchText(provider.Name), StringComparer.Ordinal).ThenByDescending(provider => provider.Id),
             _ => matchingProviders.OrderBy(provider => NormalizeSearchText(provider.Name), StringComparer.Ordinal).ThenBy(provider => provider.Id)
         };
