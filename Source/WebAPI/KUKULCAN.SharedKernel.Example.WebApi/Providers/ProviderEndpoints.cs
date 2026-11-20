@@ -17,7 +17,44 @@ public static class ProviderEndpoints
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden);
 
+        endpoints.MapGet("/api/example/providers/{id}", GetProviderByIdAsync)
+            .WithName("GetProviderById")
+            .Produces<ProviderListItemResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
+
         return endpoints;
+    }
+
+    private static async Task<IResult> GetProviderByIdAsync(
+        Guid id,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        ITenantContext tenantContext,
+        CancellationToken cancellationToken)
+    {
+        if (tenantContext.TenantId == Guid.Empty)
+        {
+            return HttpResults.Forbid();
+        }
+
+        ProviderListItemResponse? provider = await context.Providers
+            .AsNoTracking()
+            .Where(entity =>
+                entity.Id == id
+                && entity.TenantId == tenantContext.TenantId
+                && !entity.IsDeleted)
+            .Select(entity => new ProviderListItemResponse(
+                entity.Id,
+                entity.Name,
+                entity.City,
+                entity.State,
+                entity.PostalCode,
+                entity.IsDeleted))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return provider is null
+            ? HttpResults.NotFound()
+            : HttpResults.Ok(provider);
     }
 
     private static string NormalizeSearchText(string value)
