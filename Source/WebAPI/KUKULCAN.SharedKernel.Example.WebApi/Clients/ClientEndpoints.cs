@@ -2,8 +2,6 @@ using System.Globalization;
 using System.Text;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using HttpResults = Microsoft.AspNetCore.Http.Results;
 
@@ -38,10 +36,9 @@ public static class ClientEndpoints
             .ToUpperInvariant();
     }
 
-    private static async Task<IResult> GetClientsAsync(int? page, int? pageSize, string? name,
-        string? city, string? state, string? postalCode,
-        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
-        CancellationToken cancellationToken)
+    private static async Task<IResult> GetClientsAsync(int? page, int? pageSize, string? name, string? city,
+        string? state, string? postalCode, [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        ITenantContext tenantContext, CancellationToken cancellationToken)
     {
         int requestedPage = page ?? 1;
         int requestedPageSize = pageSize ?? 25;
