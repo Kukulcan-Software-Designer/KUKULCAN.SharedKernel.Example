@@ -223,8 +223,8 @@ public static class ClientEndpoints
             ("city", false) => matchingClients.OrderBy(client => NormalizeSearchText(client.City ?? string.Empty), StringComparer.Ordinal).ThenBy(client => client.Id),
             ("state", true) => matchingClients.OrderByDescending(client => NormalizeSearchText(client.State ?? string.Empty), StringComparer.Ordinal).ThenByDescending(client => client.Id),
             ("state", false) => matchingClients.OrderBy(client => NormalizeSearchText(client.State ?? string.Empty), StringComparer.Ordinal).ThenBy(client => client.Id),
-            ("postalCode", true) => matchingClients.OrderByDescending(client => client.PostalCode ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenByDescending(client => client.Id),
-            ("postalCode", false) => matchingClients.OrderBy(client => client.PostalCode ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenBy(client => client.Id),
+            ("postalcode", true) => matchingClients.OrderByDescending(client => client.PostalCode ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenByDescending(client => client.Id),
+            ("postalcode", false) => matchingClients.OrderBy(client => client.PostalCode ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenBy(client => client.Id),
             ("name", true) => matchingClients.OrderByDescending(client => NormalizeSearchText(client.Name), StringComparer.Ordinal).ThenByDescending(client => client.Id),
             _ => matchingClients.OrderBy(client => NormalizeSearchText(client.Name), StringComparer.Ordinal).ThenBy(client => client.Id)
         };
