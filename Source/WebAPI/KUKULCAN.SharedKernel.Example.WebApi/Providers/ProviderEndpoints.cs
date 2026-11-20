@@ -7,6 +7,7 @@ using HttpResults = Microsoft.AspNetCore.Http.Results;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.Providers;
 
+/// <summary>Provides route mappings for the provider API.</summary>
 public static class ProviderEndpoints
 {
     private static readonly HashSet<string> AllowedQueryParameters = new(StringComparer.OrdinalIgnoreCase)
@@ -19,6 +20,9 @@ public static class ProviderEndpoints
         "postalCode"
     };
 
+    /// <summary>Maps the provider endpoints HTTP endpoints.</summary>
+    /// <param name="endpoints">The route builder to extend.</param>
+    /// <returns>The route builder, allowing additional endpoint mappings to be chained.</returns>
     public static IEndpointRouteBuilder MapProviderEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/example/providers", GetProvidersAsync)
@@ -204,8 +208,21 @@ public static class ProviderEndpoints
     }
 }
 
+/// <summary>Represents provider list item response data.</summary>
+/// <param name="Id">The id value.</param>
+/// <param name="Name">The name value.</param>
+/// <param name="City">The city value.</param>
+/// <param name="State">The state value.</param>
+/// <param name="PostalCode">The postal code value.</param>
+/// <param name="IsDeleted">The is deleted value.</param>
 public sealed record ProviderListItemResponse(Guid Id, string Name, string? City, string? State, string? PostalCode,
     bool IsDeleted);
 
+/// <summary>Represents provider paged response data.</summary>
+/// <param name="Items">The items value.</param>
+/// <param name="Page">The page value.</param>
+/// <param name="PageSize">The page size value.</param>
+/// <param name="TotalCount">The total count value.</param>
+/// <param name="TotalPages">The total pages value.</param>
 public sealed record ProviderPagedResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount,
     int TotalPages);

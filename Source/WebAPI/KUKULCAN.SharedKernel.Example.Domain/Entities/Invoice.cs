@@ -1,7 +1,7 @@
 namespace KUKULCAN.SharedKernel.Example.Domain.Entities;
 
 /// <summary>
-/// Sales document. ClientName is a point-in-time snapshot for historical display.
+/// Represents a sales document. <see cref="ClientName"/> is a point-in-time snapshot for historical display.
 /// </summary>
 public sealed class Invoice
 {

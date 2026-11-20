@@ -3,7 +3,7 @@ using KUKULCAN.SharedKernel.Abstractions.Capabilities;
 namespace KUKULCAN.SharedKernel.Example.Domain.Entities;
 
 /// <summary>
-/// Customer master data. Deletion is logical so sales history remains available.
+/// Represents customer master data. Deletion is logical so that sales history remains available.
 /// </summary>
 public sealed class Client : ISoftDelete
 {

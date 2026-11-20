@@ -8,6 +8,7 @@ using HttpResults = Microsoft.AspNetCore.Http.Results;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.WarehouseStocks;
 
+/// <summary>Provides route mappings for the warehousestock API.</summary>
 public static class WarehouseStockEndpoints
 {
     private static readonly HashSet<string> AllowedQueryParameters = new(StringComparer.OrdinalIgnoreCase)
@@ -18,6 +19,9 @@ public static class WarehouseStockEndpoints
         "productName"
     };
 
+    /// <summary>Maps the warehouse stock endpoints HTTP endpoints.</summary>
+    /// <param name="endpoints">The route builder to extend.</param>
+    /// <returns>The route builder, allowing additional endpoint mappings to be chained.</returns>
     public static IEndpointRouteBuilder MapWarehouseStockEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/example/warehouse-stocks", GetWarehouseStocksAsync)
@@ -284,10 +288,28 @@ public static class WarehouseStockEndpoints
     }
 }
 
+/// <summary>Represents warehouse stock create request data.</summary>
+/// <param name="WarehouseId">The warehouse id value.</param>
+/// <param name="ProductId">The product id value.</param>
+/// <param name="Quantity">The quantity value.</param>
 public sealed record WarehouseStockCreateRequest(Guid WarehouseId, Guid ProductId, decimal Quantity);
 
+/// <summary>Represents warehouse stock list item response data.</summary>
+/// <param name="Id">The id value.</param>
+/// <param name="WarehouseId">The warehouse id value.</param>
+/// <param name="WarehouseName">The warehouse name value.</param>
+/// <param name="ProductId">The product id value.</param>
+/// <param name="ProductCode">The product code value.</param>
+/// <param name="ProductName">The product name value.</param>
+/// <param name="Quantity">The quantity value.</param>
 public sealed record WarehouseStockListItemResponse(Guid Id, Guid WarehouseId, string WarehouseName, Guid ProductId,
     string ProductCode, string ProductName, decimal Quantity);
 
+/// <summary>Represents warehouse stock paged response data.</summary>
+/// <param name="Items">The items value.</param>
+/// <param name="Page">The page value.</param>
+/// <param name="PageSize">The page size value.</param>
+/// <param name="TotalCount">The total count value.</param>
+/// <param name="TotalPages">The total pages value.</param>
 public sealed record WarehouseStockPagedResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount,
     int TotalPages);

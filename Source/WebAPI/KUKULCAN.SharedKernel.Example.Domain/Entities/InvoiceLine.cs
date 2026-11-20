@@ -1,7 +1,7 @@
 namespace KUKULCAN.SharedKernel.Example.Domain.Entities;
 
 /// <summary>
-/// Sales line. Product code/name are snapshots so later catalogue edits do not rewrite history.
+/// Represents a sales invoice line. Product code and name are snapshots so later catalogue edits do not rewrite history.
 /// </summary>
 public sealed class InvoiceLine
 {

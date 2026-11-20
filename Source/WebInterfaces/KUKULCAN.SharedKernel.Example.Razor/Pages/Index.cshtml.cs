@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace KUKULCAN.SharedKernel.Example.Razor.Pages;
 
+/// <summary>Provides the page model for the index page.</summary>
 public class IndexModel : PageModel
 {
+    /// <summary>Handles the HTTP GET request for the page.</summary>
     public void OnGet()
     {
     }

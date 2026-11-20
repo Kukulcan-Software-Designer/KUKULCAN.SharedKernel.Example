@@ -8,6 +8,7 @@ using HttpResults = Microsoft.AspNetCore.Http.Results;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.Products;
 
+/// <summary>Provides route mappings for the product API.</summary>
 public static class ProductEndpoints
 {
     private static readonly HashSet<string> AllowedQueryParameters = new(StringComparer.OrdinalIgnoreCase)
@@ -26,6 +27,9 @@ public static class ProductEndpoints
         "name"
     };
 
+    /// <summary>Maps the product endpoints HTTP endpoints.</summary>
+    /// <param name="endpoints">The route builder to extend.</param>
+    /// <returns>The route builder, allowing additional endpoint mappings to be chained.</returns>
     public static IEndpointRouteBuilder MapProductEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/example/products", GetProductsAsync)
@@ -293,9 +297,24 @@ public static class ProductEndpoints
     }
 }
 
+/// <summary>Represents product create request data.</summary>
+/// <param name="Code">The code value.</param>
+/// <param name="Name">The name value.</param>
+/// <param name="Description">The description value.</param>
 public sealed record ProductCreateRequest(string? Code, string? Name, string? Description);
 
+/// <summary>Represents product list item response data.</summary>
+/// <param name="Id">The id value.</param>
+/// <param name="Code">The code value.</param>
+/// <param name="Name">The name value.</param>
+/// <param name="Description">The description value.</param>
 public sealed record ProductListItemResponse(Guid Id, string Code, string Name, string? Description);
 
+/// <summary>Represents product paged response data.</summary>
+/// <param name="Items">The items value.</param>
+/// <param name="Page">The page value.</param>
+/// <param name="PageSize">The page size value.</param>
+/// <param name="TotalCount">The total count value.</param>
+/// <param name="TotalPages">The total pages value.</param>
 public sealed record ProductPagedResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount,
     int TotalPages);
