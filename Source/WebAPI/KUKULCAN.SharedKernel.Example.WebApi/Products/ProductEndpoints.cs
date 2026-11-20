@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using KUKULCAN.SharedKernel.Database.Abstractions;
+using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using HttpResults = Microsoft.AspNetCore.Http.Results;
@@ -9,6 +10,22 @@ namespace KUKULCAN.SharedKernel.Example.WebApi.Products;
 
 public static class ProductEndpoints
 {
+    private static readonly HashSet<string> AllowedQueryParameters = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "page",
+        "pageSize",
+        "code",
+        "name",
+        "sortBy",
+        "sortDirection"
+    };
+
+    private static readonly HashSet<string> AllowedSortFields = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "code",
+        "name"
+    };
+
     public static IEndpointRouteBuilder MapProductEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/example/products", GetProductsAsync)
@@ -22,6 +39,13 @@ public static class ProductEndpoints
             .Produces<ProductListItemResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
+
+        endpoints.MapPost("/api/example/products", CreateProductAsync)
+            .WithName("CreateProduct")
+            .Produces<ProductListItemResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict);
 
         return endpoints;
     }
@@ -69,14 +93,28 @@ public static class ProductEndpoints
             .ToUpperInvariant();
     }
 
-    private static async Task<IResult> GetProductsAsync(int? page, int? pageSize, string? code, string? name,
+    private static async Task<IResult> GetProductsAsync(HttpRequest request, int? page, int? pageSize,
+        string? code, string? name, string? sortBy, string? sortDirection,
         [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
         CancellationToken cancellationToken)
     {
+        string[] unsupportedParameters = request.Query.Keys
+            .Where(key => !AllowedQueryParameters.Contains(key))
+            .OrderBy(key => key, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (unsupportedParameters.Length > 0)
+        {
+            return HttpResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["query"] = [$"Unsupported query parameter(s): {string.Join(", ", unsupportedParameters)}."]
+            });
+        }
+
         int requestedPage = page ?? 1;
         int requestedPageSize = pageSize ?? 25;
-
         var validationErrors = new Dictionary<string, string[]>();
+
         if (requestedPage < 1)
         {
             validationErrors[nameof(page)] = ["Page must be greater than or equal to 1."];
@@ -85,6 +123,21 @@ public static class ProductEndpoints
         if (requestedPageSize is < 1 or > 100)
         {
             validationErrors[nameof(pageSize)] = ["PageSize must be between 1 and 100."];
+        }
+
+        string? normalizedSortBy = string.IsNullOrWhiteSpace(sortBy) ? null : sortBy.Trim();
+        string? normalizedSortDirection = string.IsNullOrWhiteSpace(sortDirection)
+            ? null
+            : sortDirection.Trim().ToLowerInvariant();
+
+        if (normalizedSortBy is not null && !AllowedSortFields.Contains(normalizedSortBy))
+        {
+            validationErrors[nameof(sortBy)] = ["SortBy must be one of: code, name."];
+        }
+
+        if (normalizedSortDirection is not null && normalizedSortDirection is not ("asc" or "desc"))
+        {
+            validationErrors[nameof(sortDirection)] = ["SortDirection must be either 'asc' or 'desc'."];
         }
 
         if (validationErrors.Count > 0)
@@ -97,9 +150,8 @@ public static class ProductEndpoints
             return HttpResults.Forbid();
         }
 
-        // Normalize filters in application code to guarantee identical matching
-        // semantics across PostgreSQL, SQL Server and MySQL. Tenant isolation
-        // remains part of the database query.
+        // Normalize filters and sort keys in application code to guarantee identical
+        // case- and accent-insensitive semantics across PostgreSQL, SQL Server and MySQL.
         List<ProductListItemResponse> matchingProducts = await context.Products
             .AsNoTracking()
             .Where(product => product.TenantId == tenantContext.TenantId)
@@ -130,15 +182,30 @@ public static class ProductEndpoints
             ];
         }
 
-        int totalCount = matchingProducts.Count;
-        ProductListItemResponse[] items =
-        [
-            .. matchingProducts
-                .OrderBy(product => product.Code, StringComparer.OrdinalIgnoreCase)
+        bool descending = normalizedSortDirection == "desc";
+        string sortField = normalizedSortBy?.ToLowerInvariant() ?? "code";
+
+        IOrderedEnumerable<ProductListItemResponse> orderedProducts = (sortField, descending) switch
+        {
+            ("name", true) => matchingProducts
+                .OrderByDescending(product => NormalizeSearchText(product.Name), StringComparer.Ordinal)
+                .ThenByDescending(product => product.Id),
+            ("name", false) => matchingProducts
+                .OrderBy(product => NormalizeSearchText(product.Name), StringComparer.Ordinal)
+                .ThenBy(product => product.Id),
+            (_, true) => matchingProducts
+                .OrderByDescending(product => NormalizeSearchText(product.Code), StringComparer.Ordinal)
+                .ThenByDescending(product => product.Id),
+            _ => matchingProducts
+                .OrderBy(product => NormalizeSearchText(product.Code), StringComparer.Ordinal)
                 .ThenBy(product => product.Id)
-                .Skip((requestedPage - 1) * requestedPageSize)
-                .Take(requestedPageSize)
-        ];
+        };
+
+        int totalCount = matchingProducts.Count;
+        long offset = (long)(requestedPage - 1) * requestedPageSize;
+        ProductListItemResponse[] items = offset > int.MaxValue
+            ? []
+            : [.. orderedProducts.Skip((int)offset).Take(requestedPageSize)];
 
         int totalPages = totalCount == 0
             ? 0
@@ -147,7 +214,83 @@ public static class ProductEndpoints
         return HttpResults.Ok(new ProductPagedResponse<ProductListItemResponse>(
             items, requestedPage, requestedPageSize, totalCount, totalPages));
     }
+
+    private static async Task<IResult> CreateProductAsync(ProductCreateRequest request,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
+        CancellationToken cancellationToken)
+    {
+        var validationErrors = new Dictionary<string, string[]>();
+        string code = request.Code?.Trim() ?? string.Empty;
+        string name = request.Name?.Trim() ?? string.Empty;
+        string? description = string.IsNullOrWhiteSpace(request.Description)
+            ? null
+            : request.Description.Trim();
+
+        if (code.Length == 0)
+        {
+            validationErrors[nameof(request.Code)] = ["Code is required."];
+        }
+        else if (code.Length > 64)
+        {
+            validationErrors[nameof(request.Code)] = ["Code must not exceed 64 characters."];
+        }
+
+        if (name.Length == 0)
+        {
+            validationErrors[nameof(request.Name)] = ["Name is required."];
+        }
+        else if (name.Length > 200)
+        {
+            validationErrors[nameof(request.Name)] = ["Name must not exceed 200 characters."];
+        }
+
+        if (description?.Length > 1000)
+        {
+            validationErrors[nameof(request.Description)] = ["Description must not exceed 1000 characters."];
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            return HttpResults.ValidationProblem(validationErrors);
+        }
+
+        if (tenantContext.TenantId == Guid.Empty)
+        {
+            return HttpResults.Forbid();
+        }
+
+        bool codeAlreadyExists = await context.Products
+            .AnyAsync(product => product.TenantId == tenantContext.TenantId && product.Code == code,
+                cancellationToken);
+
+        if (codeAlreadyExists)
+        {
+            return HttpResults.Conflict();
+        }
+
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantContext.TenantId,
+            Code = code,
+            Name = name,
+            Description = description
+        };
+
+        context.Products.Add(product);
+        await context.SaveChangesAsync(cancellationToken);
+
+        var response = new ProductListItemResponse(
+            product.Id,
+            product.Code,
+            product.Name,
+            product.Description);
+
+        return HttpResults.Created($"/api/example/products/{product.Id}", response);
+    }
 }
+
+public sealed record ProductCreateRequest(string? Code, string? Name, string? Description);
 
 public sealed record ProductListItemResponse(Guid Id, string Code, string Name, string? Description);
 
