@@ -7,6 +7,7 @@ using HttpResults = Microsoft.AspNetCore.Http.Results;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.Clients;
 
+/// <summary>Provides route mappings for the client API.</summary>
 public static class ClientEndpoints
 {
     private static readonly HashSet<string> AllowedQueryParameters = new(StringComparer.OrdinalIgnoreCase)
@@ -19,6 +20,9 @@ public static class ClientEndpoints
         "postalCode"
     };
 
+    /// <summary>Maps the client endpoints HTTP endpoints.</summary>
+    /// <param name="endpoints">The route builder to extend.</param>
+    /// <returns>The route builder, allowing additional endpoint mappings to be chained.</returns>
     public static IEndpointRouteBuilder MapClientEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/example/clients", GetClientsAsync)
@@ -204,7 +208,20 @@ public static class ClientEndpoints
     }
 }
 
+/// <summary>Represents client list item response data.</summary>
+/// <param name="Id">The id value.</param>
+/// <param name="Name">The name value.</param>
+/// <param name="City">The city value.</param>
+/// <param name="State">The state value.</param>
+/// <param name="PostalCode">The postal code value.</param>
+/// <param name="IsDeleted">The is deleted value.</param>
 public sealed record ClientListItemResponse(Guid Id, string Name, string? City, string? State, string? PostalCode,
     bool IsDeleted);
 
+/// <summary>Represents paged response data.</summary>
+/// <param name="Items">The items value.</param>
+/// <param name="Page">The page value.</param>
+/// <param name="PageSize">The page size value.</param>
+/// <param name="TotalCount">The total count value.</param>
+/// <param name="TotalPages">The total pages value.</param>
 public sealed record PagedResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount, int TotalPages);

@@ -13,16 +13,34 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.Authentication;
 
+/// <summary>Represents login request data.</summary>
+/// <param name="Email">The email value.</param>
+/// <param name="Password">The password value.</param>
 public sealed record LoginRequest(string? Email, string? Password);
 
+/// <summary>Represents change password request data.</summary>
+/// <param name="CurrentPassword">The current password value.</param>
+/// <param name="NewPassword">The new password value.</param>
 public sealed record ChangePasswordRequest(string? CurrentPassword, string? NewPassword);
 
+/// <summary>Represents login response data.</summary>
+/// <param name="AccessToken">The access token value.</param>
+/// <param name="TokenType">The token type value.</param>
+/// <param name="ExpiresAtUtc">The expires at utc value.</param>
+/// <param name="User">The user value.</param>
 public sealed record LoginResponse(
     string AccessToken,
     string TokenType,
     DateTimeOffset ExpiresAtUtc,
     CurrentUserResponse User);
 
+/// <summary>Represents current user response data.</summary>
+/// <param name="UserId">The user id value.</param>
+/// <param name="Email">The email value.</param>
+/// <param name="DisplayName">The display name value.</param>
+/// <param name="IsAdministrator">The is administrator value.</param>
+/// <param name="MustChangePassword">The must change password value.</param>
+/// <param name="TenantIds">The tenant ids value.</param>
 public sealed record CurrentUserResponse(
     Guid UserId,
     string Email,
@@ -31,6 +49,12 @@ public sealed record CurrentUserResponse(
     bool MustChangePassword,
     IReadOnlyCollection<Guid> TenantIds);
 
+/// <summary>Represents issued access token data.</summary>
+/// <param name="Value">The value value.</param>
+/// <param name="ExpiresAtUtc">The expires at utc value.</param>
+/// <param name="IsAdministrator">The is administrator value.</param>
+/// <param name="MustChangePassword">The must change password value.</param>
+/// <param name="DisplayName">The display name value.</param>
 public sealed record IssuedAccessToken(
     string Value,
     DateTimeOffset ExpiresAtUtc,
@@ -38,13 +62,19 @@ public sealed record IssuedAccessToken(
     bool MustChangePassword,
     string DisplayName);
 
+/// <summary>Defines the contract for issuing authenticated-user access tokens.</summary>
 public interface IAccessTokenIssuer
 {
     bool IsConfigured { get; }
 
+    /// <summary>Issues a signed access token for an authenticated user.</summary>
+    /// <param name="user">The user value.</param>
+    /// <param name="suppliedPassword">The supplied password value.</param>
+    /// <returns>The issued access token.</returns>
     IssuedAccessToken Issue(AuthenticatedUser user, string suppliedPassword);
 }
 
+/// <summary>Creates signed JWT access tokens for authenticated users.</summary>
 public sealed class AccessTokenIssuer(IConfiguration configuration, IClock clock) : IAccessTokenIssuer
 {
     private const string DefaultIssuer = "KUKULCAN.SharedKernel.Example.WebApi";
@@ -59,6 +89,10 @@ public sealed class AccessTokenIssuer(IConfiguration configuration, IClock clock
                                 && !string.IsNullOrWhiteSpace(Issuer)
                                 && !string.IsNullOrWhiteSpace(Audience);
 
+    /// <summary>Issues a signed access token for an authenticated user.</summary>
+    /// <param name="user">The user value.</param>
+    /// <param name="suppliedPassword">The supplied password value.</param>
+    /// <returns>The issued access token.</returns>
     public IssuedAccessToken Issue(AuthenticatedUser user, string suppliedPassword)
     {
         ArgumentNullException.ThrowIfNull(user);
@@ -148,6 +182,7 @@ public sealed class AccessTokenIssuer(IConfiguration configuration, IClock clock
     }
 }
 
+/// <summary>Indicates that an authenticated user is not a member of the configured tenant.</summary>
 public sealed class TenantAccessDeniedException : InvalidOperationException
 {
     public TenantAccessDeniedException()
@@ -156,6 +191,7 @@ public sealed class TenantAccessDeniedException : InvalidOperationException
     }
 }
 
+/// <summary>Resolves the current tenant from the authenticated request or configured default.</summary>
 public sealed class HttpTenantContext(
     IHttpContextAccessor httpContextAccessor,
     IConfiguration configuration) : ITenantContext
@@ -183,6 +219,7 @@ public sealed class HttpTenantContext(
     }
 }
 
+/// <summary>Provides the current UTC time.</summary>
 public sealed class SystemClock : IClock
 {
     public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
@@ -194,6 +231,10 @@ public sealed class SystemClock : IClock
 /// </summary>
 public sealed class NoOpDomainEventDispatcher : IDomainEventDispatcher
 {
+    /// <summary>Dispatches a domain event. This implementation intentionally performs no handler work.</summary>
+    /// <param name="domainEvent">The domain event value.</param>
+    /// <param name="cancellationToken">The cancellation token value.</param>
+    /// <returns>A task representing the asynchronous operation and its outcome.</returns>
     public Task DispatchAsync(IDomainEvent domainEvent, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(domainEvent);
@@ -202,6 +243,7 @@ public sealed class NoOpDomainEventDispatcher : IDomainEventDispatcher
     }
 }
 
+/// <summary>Indicates that authentication persistence is not configured.</summary>
 public sealed class AuthenticationNotConfiguredException : InvalidOperationException
 {
     public AuthenticationNotConfiguredException()
@@ -210,14 +252,20 @@ public sealed class AuthenticationNotConfiguredException : InvalidOperationExcep
     }
 }
 
+/// <summary>Represents a local user store unavailable in the current deployment.</summary>
 public sealed class UnconfiguredLocalUserStore : ILocalUserStore
 {
+    /// <summary>Finds a local user by email address when authentication persistence is configured.</summary>
+    /// <param name="email">The email value.</param>
+    /// <param name="cancellationToken">The cancellation token value.</param>
+    /// <returns>A task representing the asynchronous operation and its outcome.</returns>
     public Task<LocalUser?> FindByEmailAsync(
         string email,
         CancellationToken cancellationToken = default)
         => throw new AuthenticationNotConfiguredException();
 }
 
+/// <summary>Defines the possible outcomes of a password change operation.</summary>
 public enum PasswordChangeStatus
 {
     Changed,
@@ -228,8 +276,15 @@ public enum PasswordChangeStatus
     NotConfigured
 }
 
+/// <summary>Defines the contract for changing a user's password.</summary>
 public interface IUserPasswordChanger
 {
+    /// <summary>Changes a user's password and returns the operation outcome.</summary>
+    /// <param name="userId">The user id value.</param>
+    /// <param name="currentPassword">The current password value.</param>
+    /// <param name="newPassword">The new password value.</param>
+    /// <param name="cancellationToken">The cancellation token value.</param>
+    /// <returns>A task representing the asynchronous operation and its outcome.</returns>
     Task<PasswordChangeStatus> ChangeAsync(
         Guid userId,
         string currentPassword,
@@ -237,12 +292,19 @@ public interface IUserPasswordChanger
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>Changes user passwords in the authentication database.</summary>
 public sealed class AuthDatabasePasswordChanger(
     AuthDbContext context,
     IPasswordHasher passwordHasher) : IUserPasswordChanger
 {
     private const int MinimumPasswordLength = 12;
 
+    /// <summary>Changes a user's password and returns the operation outcome.</summary>
+    /// <param name="userId">The user id value.</param>
+    /// <param name="currentPassword">The current password value.</param>
+    /// <param name="newPassword">The new password value.</param>
+    /// <param name="cancellationToken">The cancellation token value.</param>
+    /// <returns>A task representing the asynchronous operation and its outcome.</returns>
     public async Task<PasswordChangeStatus> ChangeAsync(
         Guid userId,
         string currentPassword,
@@ -278,8 +340,15 @@ public sealed class AuthDatabasePasswordChanger(
     }
 }
 
+/// <summary>Represents a password changer unavailable in the current deployment.</summary>
 public sealed class UnconfiguredUserPasswordChanger : IUserPasswordChanger
 {
+    /// <summary>Changes a user's password and returns the operation outcome.</summary>
+    /// <param name="userId">The user id value.</param>
+    /// <param name="currentPassword">The current password value.</param>
+    /// <param name="newPassword">The new password value.</param>
+    /// <param name="cancellationToken">The cancellation token value.</param>
+    /// <returns>A task representing the asynchronous operation and its outcome.</returns>
     public Task<PasswordChangeStatus> ChangeAsync(
         Guid userId,
         string currentPassword,
@@ -288,12 +357,23 @@ public sealed class UnconfiguredUserPasswordChanger : IUserPasswordChanger
         => Task.FromResult(PasswordChangeStatus.NotConfigured);
 }
 
+/// <summary>Defines persistence operations for the initial administrator account.</summary>
 public interface IAdministratorBootstrapStore
 {
+    /// <summary>Determines whether an account with the specified email address exists.</summary>
+    /// <param name="email">The email value.</param>
+    /// <param name="cancellationToken">The cancellation token value.</param>
+    /// <returns>A task representing the asynchronous operation and its outcome.</returns>
     Task<bool> ExistsByEmailAsync(
         string email,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Attempts to create the initial administrator account and its tenant membership.</summary>
+    /// <param name="email">The email value.</param>
+    /// <param name="passwordHash">The password hash value.</param>
+    /// <param name="tenantId">The tenant id value.</param>
+    /// <param name="cancellationToken">The cancellation token value.</param>
+    /// <returns>A task representing the asynchronous operation and its outcome.</returns>
     Task<bool> TryCreateAsync(
         string email,
         string passwordHash,
@@ -301,9 +381,14 @@ public interface IAdministratorBootstrapStore
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>Persists the initial administrator account in the authentication database.</summary>
 public sealed class AuthDatabaseAdministratorBootstrapStore(AuthDbContext context)
     : IAdministratorBootstrapStore
 {
+    /// <summary>Determines whether an account with the specified email address exists.</summary>
+    /// <param name="email">The email value.</param>
+    /// <param name="cancellationToken">The cancellation token value.</param>
+    /// <returns>A task representing the asynchronous operation and its outcome.</returns>
     public Task<bool> ExistsByEmailAsync(
         string email,
         CancellationToken cancellationToken = default)
@@ -316,6 +401,12 @@ public sealed class AuthDatabaseAdministratorBootstrapStore(AuthDbContext contex
             cancellationToken);
     }
 
+    /// <summary>Attempts to create the initial administrator account and its tenant membership.</summary>
+    /// <param name="email">The email value.</param>
+    /// <param name="passwordHash">The password hash value.</param>
+    /// <param name="tenantId">The tenant id value.</param>
+    /// <param name="cancellationToken">The cancellation token value.</param>
+    /// <returns>A task representing the asynchronous operation and its outcome.</returns>
     public async Task<bool> TryCreateAsync(
         string email,
         string passwordHash,
@@ -371,11 +462,15 @@ public sealed class AuthDatabaseAdministratorBootstrapStore(AuthDbContext contex
         => email.Trim().ToLowerInvariant();
 }
 
+/// <summary>Ensures that the configured initial administrator account exists.</summary>
 public sealed class AdministratorBootstrapper(
     IAdministratorBootstrapStore store,
     IPasswordHasher passwordHasher,
     IConfiguration configuration)
 {
+    /// <summary>Creates the configured administrator account when it does not already exist.</summary>
+    /// <param name="cancellationToken">The cancellation token value.</param>
+    /// <returns>A task representing the asynchronous operation and its outcome.</returns>
     public async Task<bool> EnsureAdministratorAsync(CancellationToken cancellationToken = default)
     {
         var email = configuration["Kukulcan:Auth:Administrator:Email"]?.Trim().ToLowerInvariant();
@@ -409,10 +504,14 @@ public sealed class AdministratorBootstrapper(
     }
 }
 
+/// <summary>Runs administrator account bootstrap during application startup.</summary>
 public sealed class AdministratorBootstrapHostedService(
     IServiceScopeFactory scopeFactory,
     ILogger<AdministratorBootstrapHostedService> logger) : IHostedService
 {
+    /// <summary>Runs the administrator bootstrap operation when the hosted service starts.</summary>
+    /// <param name="cancellationToken">The cancellation token value.</param>
+    /// <returns>A task representing the asynchronous operation and its outcome.</returns>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
@@ -425,5 +524,8 @@ public sealed class AdministratorBootstrapHostedService(
                 : "Administrator bootstrap was already satisfied; no account was created.");
     }
 
+    /// <summary>Stops the hosted service.</summary>
+    /// <param name="cancellationToken">The cancellation token value.</param>
+    /// <returns>A task representing the asynchronous operation and its outcome.</returns>
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

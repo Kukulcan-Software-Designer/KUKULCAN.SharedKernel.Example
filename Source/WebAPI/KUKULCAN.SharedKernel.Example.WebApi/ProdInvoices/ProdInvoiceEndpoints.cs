@@ -9,6 +9,7 @@ using HttpResults = Microsoft.AspNetCore.Http.Results;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.ProdInvoices;
 
+/// <summary>Provides route mappings for the prodinvoice API.</summary>
 public static class ProdInvoiceEndpoints
 {
     private static readonly HashSet<string> AllowedQueryParameters = new(StringComparer.OrdinalIgnoreCase)
@@ -31,6 +32,9 @@ public static class ProdInvoiceEndpoints
         "providerName"
     };
 
+    /// <summary>Maps the prod invoice endpoints HTTP endpoints.</summary>
+    /// <param name="endpoints">The route builder to extend.</param>
+    /// <returns>The route builder, allowing additional endpoint mappings to be chained.</returns>
     public static IEndpointRouteBuilder MapProdInvoiceEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/example/prod-invoices", GetProdInvoicesAsync)
@@ -323,14 +327,41 @@ public static class ProdInvoiceEndpoints
     }
 }
 
+/// <summary>Represents prod invoice list item response data.</summary>
+/// <param name="Id">The id value.</param>
+/// <param name="InvoiceNumber">The invoice number value.</param>
+/// <param name="IssuedAt">The issued at value.</param>
+/// <param name="ProviderId">The provider id value.</param>
+/// <param name="ProviderName">The provider name value.</param>
 public sealed record ProdInvoiceListItemResponse(Guid Id, string InvoiceNumber, DateTimeOffset IssuedAt, Guid ProviderId,
     string ProviderName);
 
+/// <summary>Represents prod invoice details response data.</summary>
+/// <param name="Id">The id value.</param>
+/// <param name="InvoiceNumber">The invoice number value.</param>
+/// <param name="IssuedAt">The issued at value.</param>
+/// <param name="ProviderId">The provider id value.</param>
+/// <param name="ProviderName">The provider name value.</param>
+/// <param name="Lines">The lines value.</param>
 public sealed record ProdInvoiceDetailsResponse(Guid Id, string InvoiceNumber, DateTimeOffset IssuedAt, Guid ProviderId,
     string ProviderName, IReadOnlyList<ProdInvoiceLineResponse> Lines);
 
+/// <summary>Represents prod invoice line response data.</summary>
+/// <param name="Id">The id value.</param>
+/// <param name="LineNumber">The line number value.</param>
+/// <param name="ProductId">The product id value.</param>
+/// <param name="ProductCode">The product code value.</param>
+/// <param name="ProductName">The product name value.</param>
+/// <param name="Quantity">The quantity value.</param>
+/// <param name="UnitPrice">The unit price value.</param>
 public sealed record ProdInvoiceLineResponse(Guid Id, int LineNumber, Guid ProductId, string ProductCode,
     string ProductName, decimal Quantity, decimal UnitPrice);
 
+/// <summary>Represents prod invoice paged response data.</summary>
+/// <param name="Items">The items value.</param>
+/// <param name="Page">The page value.</param>
+/// <param name="PageSize">The page size value.</param>
+/// <param name="TotalCount">The total count value.</param>
+/// <param name="TotalPages">The total pages value.</param>
 public sealed record ProdInvoicePagedResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount,
     int TotalPages);

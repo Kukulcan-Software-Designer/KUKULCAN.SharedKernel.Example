@@ -9,6 +9,7 @@ using HttpResults = Microsoft.AspNetCore.Http.Results;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.Invoices;
 
+/// <summary>Provides route mappings for the invoice API.</summary>
 public static class InvoiceEndpoints
 {
     private static readonly HashSet<string> AllowedQueryParameters = new(StringComparer.OrdinalIgnoreCase)
@@ -31,6 +32,9 @@ public static class InvoiceEndpoints
         "clientName"
     };
 
+    /// <summary>Maps the invoice endpoints HTTP endpoints.</summary>
+    /// <param name="endpoints">The route builder to extend.</param>
+    /// <returns>The route builder, allowing additional endpoint mappings to be chained.</returns>
     public static IEndpointRouteBuilder MapInvoiceEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/example/invoices", GetInvoicesAsync)
@@ -320,14 +324,41 @@ public static class InvoiceEndpoints
     }
 }
 
+/// <summary>Represents invoice list item response data.</summary>
+/// <param name="Id">The id value.</param>
+/// <param name="InvoiceNumber">The invoice number value.</param>
+/// <param name="IssuedAt">The issued at value.</param>
+/// <param name="ClientId">The client id value.</param>
+/// <param name="ClientName">The client name value.</param>
 public sealed record InvoiceListItemResponse(Guid Id, string InvoiceNumber, DateTimeOffset IssuedAt, Guid ClientId,
     string ClientName);
 
+/// <summary>Represents invoice details response data.</summary>
+/// <param name="Id">The id value.</param>
+/// <param name="InvoiceNumber">The invoice number value.</param>
+/// <param name="IssuedAt">The issued at value.</param>
+/// <param name="ClientId">The client id value.</param>
+/// <param name="ClientName">The client name value.</param>
+/// <param name="Lines">The lines value.</param>
 public sealed record InvoiceDetailsResponse(Guid Id, string InvoiceNumber, DateTimeOffset IssuedAt, Guid ClientId,
     string ClientName, IReadOnlyList<InvoiceLineResponse> Lines);
 
+/// <summary>Represents invoice line response data.</summary>
+/// <param name="Id">The id value.</param>
+/// <param name="LineNumber">The line number value.</param>
+/// <param name="ProductId">The product id value.</param>
+/// <param name="ProductCode">The product code value.</param>
+/// <param name="ProductName">The product name value.</param>
+/// <param name="Quantity">The quantity value.</param>
+/// <param name="UnitPrice">The unit price value.</param>
 public sealed record InvoiceLineResponse(Guid Id, int LineNumber, Guid ProductId, string ProductCode, string ProductName,
     decimal Quantity, decimal UnitPrice);
 
+/// <summary>Represents invoice paged response data.</summary>
+/// <param name="Items">The items value.</param>
+/// <param name="Page">The page value.</param>
+/// <param name="PageSize">The page size value.</param>
+/// <param name="TotalCount">The total count value.</param>
+/// <param name="TotalPages">The total pages value.</param>
 public sealed record InvoicePagedResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount,
     int TotalPages);
