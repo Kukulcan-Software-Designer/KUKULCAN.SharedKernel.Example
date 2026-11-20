@@ -18,6 +18,7 @@ using KUKULCAN.SharedKernel.Example.WebApi.Clients;
 using KUKULCAN.SharedKernel.Example.WebApi.Providers;
 using KUKULCAN.SharedKernel.Example.WebApi.Products;
 using KUKULCAN.SharedKernel.Example.WebApi.Warehouses;
+using KUKULCAN.SharedKernel.Example.WebApi.WarehouseStocks;
 using KUKULCAN.SharedKernel.Results;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -218,6 +219,7 @@ app.MapClientEndpoints();
 app.MapProviderEndpoints();
 app.MapProductEndpoints();
 app.MapWarehouseEndpoints();
+app.MapWarehouseStockEndpoints();
 
 if (exampleDatabaseConfigured)
 {
