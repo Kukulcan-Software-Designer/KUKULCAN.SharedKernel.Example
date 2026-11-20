@@ -6,6 +6,8 @@
       <Nullable>enable</Nullable>
       <ImplicitUsings>enable</ImplicitUsings>
       <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+      <!-- CS1591 is not enforced because this project's XML documentation scope excludes public properties, enum values, and Program.cs. -->
+      <NoWarn>$(NoWarn);CS1591</NoWarn>
       <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
       <RootNamespace>KUKULCAN.SharedKernel.Example.WebApi</RootNamespace>
       <AssemblyName>KUKULCAN.SharedKernel.Example</AssemblyName>

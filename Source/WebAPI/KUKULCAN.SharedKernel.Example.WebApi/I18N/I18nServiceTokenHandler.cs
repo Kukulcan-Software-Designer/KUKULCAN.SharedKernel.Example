@@ -11,6 +11,10 @@ namespace KUKULCAN.SharedKernel.Example.WebApi.I18N;
 /// </summary>
 public sealed class I18nServiceTokenHandler(IConfiguration configuration) : DelegatingHandler
 {
+    /// <summary>Sends an HTTP request with a short-lived service authentication token.</summary>
+    /// <param name="request">The HTTP request to send.</param>
+    /// <param name="cancellationToken">The cancellation token for the operation.</param>
+    /// <returns>A task containing the HTTP response.</returns>
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)

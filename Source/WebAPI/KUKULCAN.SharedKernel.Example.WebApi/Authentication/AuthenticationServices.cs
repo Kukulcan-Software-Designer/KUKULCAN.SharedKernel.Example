@@ -185,6 +185,7 @@ public sealed class AccessTokenIssuer(IConfiguration configuration, IClock clock
 /// <summary>Indicates that an authenticated user is not a member of the configured tenant.</summary>
 public sealed class TenantAccessDeniedException : InvalidOperationException
 {
+        /// <summary>Initializes a new instance of the <see cref="TenantAccessDeniedException"/> class.</summary>
     public TenantAccessDeniedException()
         : base("The authenticated user is not a member of the configured default tenant.")
     {
@@ -246,6 +247,7 @@ public sealed class NoOpDomainEventDispatcher : IDomainEventDispatcher
 /// <summary>Indicates that authentication persistence is not configured.</summary>
 public sealed class AuthenticationNotConfiguredException : InvalidOperationException
 {
+        /// <summary>Initializes a new instance of the <see cref="AuthenticationNotConfiguredException"/> class.</summary>
     public AuthenticationNotConfiguredException()
         : base("Authentication persistence is not configured for this deployment.")
     {
