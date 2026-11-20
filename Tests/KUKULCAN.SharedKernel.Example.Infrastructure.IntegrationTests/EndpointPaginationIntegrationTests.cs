@@ -132,6 +132,32 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
         });
     }
 
+    [TestCase("/api/example/clients", "name=missing-pagination-record")]
+    [TestCase("/api/example/providers", "name=missing-pagination-record")]
+    [TestCase("/api/example/products", "code=missing-pagination-record")]
+    [TestCase("/api/example/warehouses", "name=missing-pagination-record")]
+    [TestCase("/api/example/warehouse-stocks", "productCode=missing-pagination-record")]
+    public async Task Listing_WithNoMatchingRecords_ReturnsEmptyPageAndZeroTotals(string route, string filter)
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedPaginationDataAsync(tenantId);
+        await using var factory = CreateFactory(tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+
+        using var response = await client.GetAsync($"{route}?{filter}&page=1&pageSize=10");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(payload.GetProperty("items").GetArrayLength(), Is.Zero);
+            Assert.That(payload.GetProperty("page").GetInt32(), Is.EqualTo(1));
+            Assert.That(payload.GetProperty("pageSize").GetInt32(), Is.EqualTo(10));
+            Assert.That(payload.GetProperty("totalCount").GetInt32(), Is.Zero);
+            Assert.That(payload.GetProperty("totalPages").GetInt32(), Is.Zero);
+        });
+    }
+
     private async Task SeedPaginationDataAsync(Guid tenantId)
     {
         Client[] clients =
