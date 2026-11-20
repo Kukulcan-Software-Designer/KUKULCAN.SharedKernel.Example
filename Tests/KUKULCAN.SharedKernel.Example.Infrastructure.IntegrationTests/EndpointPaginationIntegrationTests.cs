@@ -143,7 +143,6 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
         await SeedTenantAsync(tenantId, clients);
 
         await using var context = CreateDbContext(tenantId);
-        var existingProduct = await context.Products.SingleAsync(product => product.TenantId == tenantId);
         var existingWarehouse = await context.Warehouses.SingleAsync(warehouse => warehouse.TenantId == tenantId);
 
         context.Providers.AddRange(
@@ -174,7 +173,6 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
         }));
 
         await context.SaveChangesAsync();
-        _ = existingProduct;
     }
 
     private WebApplicationFactory<Program> CreateFactory(Guid tenantId) =>
