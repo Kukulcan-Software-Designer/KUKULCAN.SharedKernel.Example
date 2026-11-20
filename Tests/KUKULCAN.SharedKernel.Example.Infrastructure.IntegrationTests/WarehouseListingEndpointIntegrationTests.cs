@@ -106,6 +106,160 @@ public sealed class WarehouseListingEndpointIntegrationTests : ExampleDatabaseTe
             Is.EquivalentTo(new[] { "Centro Sur" }));
     }
 
+    [Test]
+    public async Task GetWarehouses_WithNameFilter_UsesPartialCaseAndAccentInsensitiveMatching()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehousesAsync(tenantId);
+
+        await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync("/api/example/warehouses?name=alvaro");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var items = await ReadItemsAsync(response);
+        Assert.That(items.Select(item => item.GetProperty("name").GetString()),
+            Is.EquivalentTo(new[] { "Álvaro Núñez", "Alvaro Rios" }));
+    }
+
+    [Test]
+    public async Task GetWarehouses_WithUnknownQueryParameter_ReturnsBadRequest()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehousesAsync(tenantId);
+
+        await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync("/api/example/warehouses?unexpected=value");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.BadRequest));
+    }
+
+    [Test]
+    public async Task GetWarehouses_WithUnsupportedSortBy_ReturnsBadRequest()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehousesAsync(tenantId);
+
+        await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync("/api/example/warehouses?sortBy=tenantId");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.BadRequest));
+    }
+
+    [Test]
+    public async Task GetWarehouses_WithUnsupportedSortDirection_ReturnsBadRequest()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehousesAsync(tenantId);
+
+        await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync("/api/example/warehouses?sortDirection=random");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.BadRequest));
+    }
+
+    [Test]
+    public async Task GetWarehouses_WithNameDescendingSort_UsesStableIdentifierTieBreaker()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehousesAsync(tenantId);
+
+        await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync("/api/example/warehouses?city=malaga&sortBy=name&sortDirection=desc");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var items = await ReadItemsAsync(response);
+        var actualIds = items.Select(item => item.GetProperty("id").GetGuid()).ToArray();
+
+        await using var context = CreateDbContext(tenantId);
+        var expectedIds = await context.Warehouses
+            .Where(warehouse => warehouse.TenantId == tenantId && warehouse.City == "Málaga")
+            .OrderByDescending(warehouse => warehouse.Name)
+            .ThenByDescending(warehouse => warehouse.Id)
+            .Select(warehouse => warehouse.Id)
+            .ToArrayAsync();
+
+        Assert.That(actualIds, Is.EqualTo(expectedIds));
+    }
+
+    [Test]
+    public async Task PostWarehouses_WithValidPayload_CreatesWarehouseForAuthenticatedTenant()
+    {
+        var tenantId = Guid.NewGuid();
+        var forgedTenantId = Guid.NewGuid();
+        await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+
+        using var response = await client.PostAsJsonAsync("/api/example/warehouses", new
+        {
+            name = "New distribution warehouse",
+            city = "Barcelona",
+            state = "Cataluña",
+            postalCode = "08001",
+            tenantId = forgedTenantId
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.Created));
+        Assert.That(response.Headers.Location, Is.Not.Null);
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var warehouseId = payload.GetProperty("id").GetGuid();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Headers.Location!.ToString(), Does.EndWith(warehouseId.ToString()));
+            Assert.That(payload.GetProperty("name").GetString(), Is.EqualTo("New distribution warehouse"));
+            Assert.That(payload.GetProperty("city").GetString(), Is.EqualTo("Barcelona"));
+            Assert.That(payload.GetProperty("state").GetString(), Is.EqualTo("Cataluña"));
+            Assert.That(payload.GetProperty("postalCode").GetString(), Is.EqualTo("08001"));
+            Assert.That(payload.TryGetProperty("tenantId", out _), Is.False);
+        });
+
+        await using var context = CreateDbContext(tenantId);
+        var persistedWarehouse = await context.Warehouses.SingleAsync(warehouse => warehouse.Id == warehouseId);
+        Assert.That(persistedWarehouse.TenantId, Is.EqualTo(tenantId));
+        Assert.That(persistedWarehouse.TenantId, Is.Not.EqualTo(forgedTenantId));
+    }
+
+    [TestCase("")]
+    [TestCase("   ")]
+    public async Task PostWarehouses_WithMissingOrBlankName_ReturnsBadRequest(string name)
+    {
+        var tenantId = Guid.NewGuid();
+        await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+
+        using var response = await client.PostAsJsonAsync("/api/example/warehouses", new { name });
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.BadRequest));
+    }
+
+    [TestCase("name", 161)]
+    [TestCase("city", 121)]
+    [TestCase("state", 121)]
+    [TestCase("postalCode", 33)]
+    public async Task PostWarehouses_WithOverlongField_ReturnsBadRequest(string field, int length)
+    {
+        var tenantId = Guid.NewGuid();
+        await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var payload = new Dictionary<string, string>
+        {
+            ["name"] = "Valid warehouse",
+            ["city"] = "Barcelona",
+            ["state"] = "Cataluña",
+            ["postalCode"] = "08001"
+        };
+        payload[field] = new string('x', length);
+
+        using var response = await client.PostAsJsonAsync("/api/example/warehouses", payload);
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.BadRequest));
+    }
+
     private async Task SeedWarehousesAsync(Guid tenantId)
     {
         var seedClient = new Client
