@@ -168,23 +168,45 @@ public sealed class WarehouseListingEndpointIntegrationTests : ExampleDatabaseTe
         var tenantId = Guid.NewGuid();
         await SeedWarehousesAsync(tenantId);
 
+        var duplicateNameIds = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        await using (var context = CreateDbContext(tenantId))
+        {
+            context.Warehouses.AddRange(duplicateNameIds.Select(id => new Warehouse
+            {
+                Id = id,
+                TenantId = tenantId,
+                Name = "Tie breaker warehouse",
+                City = "Málaga",
+                State = "Andalucía",
+                PostalCode = "29001"
+            }));
+            await context.SaveChangesAsync();
+        }
+
         await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
         using var client = CreateAuthenticatedClient(factory, tenantId);
         using var response = await client.GetAsync("/api/example/warehouses?city=malaga&sortBy=name&sortDirection=desc");
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
         var items = await ReadItemsAsync(response);
-        var actualIds = items.Select(item => item.GetProperty("id").GetGuid()).ToArray();
+        var actualNames = items.Select(item => item.GetProperty("name").GetString()).ToArray();
+        var actualDuplicateIds = items
+            .Where(item => item.GetProperty("name").GetString() == "Tie breaker warehouse")
+            .Select(item => item.GetProperty("id").GetGuid())
+            .ToArray();
 
-        await using var context = CreateDbContext(tenantId);
-        var expectedIds = await context.Warehouses
-            .Where(warehouse => warehouse.TenantId == tenantId && warehouse.City == "Málaga")
-            .OrderByDescending(warehouse => warehouse.Name)
-            .ThenByDescending(warehouse => warehouse.Id)
-            .Select(warehouse => warehouse.Id)
-            .ToArrayAsync();
-
-        Assert.That(actualIds, Is.EqualTo(expectedIds));
+        Assert.Multiple(() =>
+        {
+            Assert.That(actualNames, Is.EqualTo(new[]
+            {
+                "Tie breaker warehouse",
+                "Tie breaker warehouse",
+                "Centro Sur",
+                "Centro Norte",
+                "Álvaro Núñez"
+            }));
+            Assert.That(actualDuplicateIds, Is.EqualTo(duplicateNameIds.OrderByDescending(id => id)));
+        });
     }
 
     [Test]
