@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
 using System.Text;
 using KUKULCAN.SharedKernel.Database.Configuration;
@@ -58,6 +61,90 @@ public sealed class CommercialEndpointSecurityIntegrationTests : ExampleDatabase
             response.StatusCode,
             Is.EqualTo(HttpStatusCode.Unauthorized),
             $"Expected an unauthenticated {method} request to {path} to be rejected.");
+    }
+
+
+    [TestCase("invalid", "GET", "/api/example/clients")]
+    [TestCase("invalid", "GET", "/api/example/clients/00000000-0000-0000-0000-000000000001")]
+    [TestCase("invalid", "GET", "/api/example/providers")]
+    [TestCase("invalid", "GET", "/api/example/providers/00000000-0000-0000-0000-000000000001")]
+    [TestCase("invalid", "GET", "/api/example/products")]
+    [TestCase("invalid", "GET", "/api/example/products/00000000-0000-0000-0000-000000000001")]
+    [TestCase("invalid", "POST", "/api/example/products")]
+    [TestCase("invalid", "GET", "/api/example/warehouses")]
+    [TestCase("invalid", "GET", "/api/example/warehouses/00000000-0000-0000-0000-000000000001")]
+    [TestCase("invalid", "POST", "/api/example/warehouses")]
+    [TestCase("invalid", "GET", "/api/example/warehouse-stocks")]
+    [TestCase("invalid", "GET", "/api/example/warehouse-stocks/00000000-0000-0000-0000-000000000001")]
+    [TestCase("invalid", "POST", "/api/example/warehouse-stocks")]
+    [TestCase("invalid", "GET", "/api/example/invoices/00000000-0000-0000-0000-000000000001")]
+    [TestCase("invalid", "GET", "/api/example/prod-invoices")]
+    [TestCase("invalid", "GET", "/api/example/prod-invoices/00000000-0000-0000-0000-000000000001")]
+    [TestCase("expired", "GET", "/api/example/clients")]
+    [TestCase("expired", "GET", "/api/example/clients/00000000-0000-0000-0000-000000000001")]
+    [TestCase("expired", "GET", "/api/example/providers")]
+    [TestCase("expired", "GET", "/api/example/providers/00000000-0000-0000-0000-000000000001")]
+    [TestCase("expired", "GET", "/api/example/products")]
+    [TestCase("expired", "GET", "/api/example/products/00000000-0000-0000-0000-000000000001")]
+    [TestCase("expired", "POST", "/api/example/products")]
+    [TestCase("expired", "GET", "/api/example/warehouses")]
+    [TestCase("expired", "GET", "/api/example/warehouses/00000000-0000-0000-0000-000000000001")]
+    [TestCase("expired", "POST", "/api/example/warehouses")]
+    [TestCase("expired", "GET", "/api/example/warehouse-stocks")]
+    [TestCase("expired", "GET", "/api/example/warehouse-stocks/00000000-0000-0000-0000-000000000001")]
+    [TestCase("expired", "POST", "/api/example/warehouse-stocks")]
+    [TestCase("expired", "GET", "/api/example/invoices/00000000-0000-0000-0000-000000000001")]
+    [TestCase("expired", "GET", "/api/example/prod-invoices")]
+    [TestCase("expired", "GET", "/api/example/prod-invoices/00000000-0000-0000-0000-000000000001")]
+    public async Task CommercialEndpoints_WithInvalidOrExpiredToken_ReturnsUnauthorized(
+        string tokenKind,
+        string method,
+        string path)
+    {
+        var tenantId = Guid.NewGuid();
+        await using var factory = new CommercialEndpointTestApplicationFactory(
+            ConnectionString,
+            ProviderName,
+            tenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", CreateBearerToken(tokenKind));
+        using var request = new HttpRequestMessage(new HttpMethod(method), path);
+
+        if (HttpMethod.Post.Method.Equals(method, StringComparison.OrdinalIgnoreCase))
+        {
+            request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
+        }
+
+        using var response = await client.SendAsync(request);
+
+        Assert.That(
+            response.StatusCode,
+            Is.EqualTo(HttpStatusCode.Unauthorized),
+            $"Expected a request with a {tokenKind} bearer token to {method} {path} to be rejected.");
+    }
+
+    private static string CreateBearerToken(string tokenKind)
+    {
+        var now = DateTime.UtcNow;
+        var signingKey = tokenKind == "invalid"
+            ? Convert.ToBase64String(RandomNumberGenerator.GetBytes(64))
+            : SigningKey;
+        var credentials = new SigningCredentials(
+            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
+            SecurityAlgorithms.HmacSha256);
+        var expires = tokenKind == "expired"
+            ? now.AddMinutes(-5)
+            : now.AddMinutes(5);
+        var token = new JwtSecurityToken(
+            issuer: Issuer,
+            audience: Audience,
+            claims: [new Claim("sub", Guid.NewGuid().ToString())],
+            notBefore: now.AddMinutes(-10),
+            expires: expires,
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     private sealed class CommercialEndpointTestApplicationFactory(
