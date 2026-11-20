@@ -78,6 +78,7 @@ public sealed class CommercialEndpointSecurityIntegrationTests : ExampleDatabase
     [TestCase("invalid", "GET", "/api/example/warehouse-stocks/00000000-0000-0000-0000-000000000001")]
     [TestCase("invalid", "POST", "/api/example/warehouse-stocks")]
     [TestCase("invalid", "GET", "/api/example/invoices/00000000-0000-0000-0000-000000000001")]
+    [TestCase("invalid", "GET", "/api/example/invoices")]
     [TestCase("invalid", "GET", "/api/example/prod-invoices")]
     [TestCase("invalid", "GET", "/api/example/prod-invoices/00000000-0000-0000-0000-000000000001")]
     [TestCase("expired", "GET", "/api/example/clients")]
@@ -94,6 +95,7 @@ public sealed class CommercialEndpointSecurityIntegrationTests : ExampleDatabase
     [TestCase("expired", "GET", "/api/example/warehouse-stocks/00000000-0000-0000-0000-000000000001")]
     [TestCase("expired", "POST", "/api/example/warehouse-stocks")]
     [TestCase("expired", "GET", "/api/example/invoices/00000000-0000-0000-0000-000000000001")]
+    [TestCase("expired", "GET", "/api/example/invoices")]
     [TestCase("expired", "GET", "/api/example/prod-invoices")]
     [TestCase("expired", "GET", "/api/example/prod-invoices/00000000-0000-0000-0000-000000000001")]
     public async Task CommercialEndpoints_WithInvalidOrExpiredToken_ReturnsUnauthorized(
