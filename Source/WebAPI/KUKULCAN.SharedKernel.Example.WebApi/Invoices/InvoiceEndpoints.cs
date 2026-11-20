@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using KUKULCAN.SharedKernel.Database.Abstractions;
+using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using HttpResults = Microsoft.AspNetCore.Http.Results;
@@ -192,7 +193,7 @@ public static class InvoiceEndpoints
             return HttpResults.Forbid();
         }
 
-        IQueryable<Domain.Entities.Invoice> invoicesQuery = context.Invoices
+        IQueryable<Invoice> invoicesQuery = context.Invoices
             .AsNoTracking()
             .Where(invoice => invoice.TenantId == tenantContext.TenantId);
 
@@ -274,8 +275,8 @@ public static class InvoiceEndpoints
                     .OrderByDescending(invoice => invoice.IssuedAt)
                     .ThenByDescending(invoice => invoice.Id),
                 _ => matchingInvoices
-                    .OrderByDescending(invoice => invoice.IssuedAt)
-                    .ThenByDescending(invoice => invoice.Id)
+                    .OrderBy(invoice => invoice.IssuedAt)
+                    .ThenBy(invoice => invoice.Id)
             };
 
         int totalCount = matchingInvoices.Count;
@@ -302,6 +303,7 @@ public static class InvoiceEndpoints
         bool hasExplicitOffset = trimmed.EndsWith("Z", StringComparison.OrdinalIgnoreCase)
             || Regex.IsMatch(trimmed, @"[+-]\d{2}:\d{2}$", RegexOptions.CultureInvariant);
 
+        result = default;
         return hasExplicitOffset
             && DateTimeOffset.TryParse(
                 trimmed,
