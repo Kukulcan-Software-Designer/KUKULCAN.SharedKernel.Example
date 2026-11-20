@@ -173,7 +173,7 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         context.Clients.AddRange(_clientSeeds.Select(seed => new Client
         {
             Id = seed.Id,
-            _tenantId = _tenantId,
+            TenantId = _tenantId,
             Name = seed.Name,
             City = seed.City,
             State = seed.State,
@@ -188,7 +188,7 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         context.Providers.AddRange(_providerSeeds.Select(seed => new Provider
         {
             Id = seed.Id,
-            _tenantId = _tenantId,
+            TenantId = _tenantId,
             Name = seed.Name,
             City = seed.City,
             State = seed.State,
@@ -202,8 +202,8 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         await using var context = CreateDbContext(_tenantId);
         var products = _stockSeeds.Select((seed, index) => new Product
         {
-            Id = Guid.Parse($"50000000-0000-0000-0000-{index + 1:000000000000}"),
-            _tenantId = _tenantId,
+            Id = Guid.NewGuid(),
+            TenantId = _tenantId,
             Code = seed.ProductCode,
             Name = seed.ProductName,
             Description = "Issue #8 sorting integration-test product"
@@ -211,7 +211,7 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         var warehouses = _stockSeeds.Select((_, index) => new Warehouse
         {
             Id = Guid.NewGuid(),
-            _tenantId = _tenantId,
+            TenantId = _tenantId,
             Name = $"warehouse-{index + 1}",
             City = "madrid",
             State = "madrid",
@@ -223,7 +223,7 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         context.WarehouseStocks.AddRange(_stockSeeds.Select((seed, index) => new WarehouseStock
         {
             Id = seed.Id,
-            _tenantId = _tenantId,
+            TenantId = _tenantId,
             ProductId = products[index].Id,
             WarehouseId = warehouses[index].Id,
             Quantity = seed.Quantity
@@ -236,7 +236,7 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         return new SortingTestApplicationFactory(ConnectionString, ProviderName, _tenantId);
     }
 
-    private static HttpClient CreateAuthenticatedClient(WebApplicationFactory<Program> factory)
+    private HttpClient CreateAuthenticatedClient(WebApplicationFactory<Program> factory)
     {
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
@@ -330,7 +330,7 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
                 [$"{KukulcanDatabaseOptions.SectionKey}:ConnectionString"] = connectionString,
                 [$"{KukulcanDatabaseOptions.SectionKey}:Migration:AutoMigrateOnStartup"] = "false",
                 [$"{KukulcanDatabaseOptions.SectionKey}:Migration:SeedDataOnStartup"] = "false",
-                ["Kukulcan:Auth:Default_tenantId"] = tenantId.ToString(),
+                ["Kukulcan:Auth:DefaultTenantId"] = tenantId.ToString(),
                 ["Kukulcan:Auth:Jwt:SigningKey"] = SigningKey,
                 ["Kukulcan:Auth:Jwt:Issuer"] = Issuer,
                 ["Kukulcan:Auth:Jwt:Audience"] = Audience
