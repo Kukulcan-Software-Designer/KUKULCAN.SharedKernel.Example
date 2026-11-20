@@ -31,18 +31,21 @@ public static class WarehouseEndpoints
     {
         endpoints.MapGet("/api/example/warehouses", GetWarehousesAsync)
             .WithName("GetWarehouses")
+            .WithTags("Warehouses")
             .Produces<WarehousePagedResponse<WarehouseListItemResponse>>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden);
 
         endpoints.MapGet("/api/example/warehouses/{id}", GetWarehouseByIdAsync)
             .WithName("GetWarehouseById")
+            .WithTags("Warehouses")
             .Produces<WarehouseListItemResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
         endpoints.MapPost("/api/example/warehouses", CreateWarehouseAsync)
             .WithName("CreateWarehouse")
+            .WithTags("Warehouses")
             .Produces<WarehouseListItemResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden);

@@ -30,18 +30,21 @@ public static class ProductEndpoints
     {
         endpoints.MapGet("/api/example/products", GetProductsAsync)
             .WithName("GetProducts")
+            .WithTags("Products")
             .Produces<ProductPagedResponse<ProductListItemResponse>>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden);
 
         endpoints.MapGet("/api/example/products/{id}", GetProductByIdAsync)
             .WithName("GetProductById")
+            .WithTags("Products")
             .Produces<ProductListItemResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
         endpoints.MapPost("/api/example/products", CreateProductAsync)
             .WithName("CreateProduct")
+            .WithTags("Products")
             .Produces<ProductListItemResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden)

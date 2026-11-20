@@ -23,12 +23,14 @@ public static class ProviderEndpoints
     {
         endpoints.MapGet("/api/example/providers", GetProvidersAsync)
             .WithName("GetProviders")
+            .WithTags("Providers")
             .Produces<ProviderPagedResponse<ProviderListItemResponse>>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden);
 
         endpoints.MapGet("/api/example/providers/{id}", GetProviderByIdAsync)
             .WithName("GetProviderById")
+            .WithTags("Providers")
             .Produces<ProviderListItemResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);

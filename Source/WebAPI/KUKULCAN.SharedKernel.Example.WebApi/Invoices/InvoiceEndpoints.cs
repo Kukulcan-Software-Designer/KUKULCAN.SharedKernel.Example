@@ -35,12 +35,14 @@ public static class InvoiceEndpoints
     {
         endpoints.MapGet("/api/example/invoices", GetInvoicesAsync)
             .WithName("GetInvoices")
+            .WithTags("Invoices")
             .Produces<InvoicePagedResponse<InvoiceListItemResponse>>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden);
 
         endpoints.MapGet("/api/example/invoices/{id}", GetInvoiceByIdAsync)
             .WithName("GetInvoiceById")
+            .WithTags("Invoices")
             .Produces<InvoiceDetailsResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);

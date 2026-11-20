@@ -23,12 +23,14 @@ public static class ClientEndpoints
     {
         endpoints.MapGet("/api/example/clients", GetClientsAsync)
             .WithName("GetClients")
+            .WithTags("Clients")
             .Produces<PagedResponse<ClientListItemResponse>>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden);
 
         endpoints.MapGet("/api/example/clients/{id}", GetClientByIdAsync)
             .WithName("GetClientById")
+            .WithTags("Clients")
             .Produces<ClientListItemResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);

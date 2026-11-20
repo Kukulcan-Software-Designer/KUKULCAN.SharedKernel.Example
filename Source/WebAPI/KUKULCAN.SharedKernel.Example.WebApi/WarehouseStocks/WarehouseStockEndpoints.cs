@@ -22,18 +22,21 @@ public static class WarehouseStockEndpoints
     {
         endpoints.MapGet("/api/example/warehouse-stocks", GetWarehouseStocksAsync)
             .WithName("GetWarehouseStocks")
+            .WithTags("WarehouseStocks")
             .Produces<WarehouseStockPagedResponse<WarehouseStockListItemResponse>>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden);
 
         endpoints.MapGet("/api/example/warehouse-stocks/{id}", GetWarehouseStockByIdAsync)
             .WithName("GetWarehouseStockById")
+            .WithTags("WarehouseStocks")
             .Produces<WarehouseStockListItemResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
         endpoints.MapPost("/api/example/warehouse-stocks", CreateWarehouseStockAsync)
             .WithName("CreateWarehouseStock")
+            .WithTags("WarehouseStocks")
             .Produces<WarehouseStockListItemResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden)
