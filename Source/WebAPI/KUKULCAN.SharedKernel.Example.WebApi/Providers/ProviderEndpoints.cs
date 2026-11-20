@@ -26,10 +26,8 @@ public static class ProviderEndpoints
         return endpoints;
     }
 
-    private static async Task<IResult> GetProviderByIdAsync(
-        Guid id,
-        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
-        ITenantContext tenantContext,
+    private static async Task<IResult> GetProviderByIdAsync(Guid id,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
         CancellationToken cancellationToken)
     {
         if (tenantContext.TenantId == Guid.Empty)

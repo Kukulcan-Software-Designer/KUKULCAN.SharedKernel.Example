@@ -26,10 +26,8 @@ public static class ProductEndpoints
         return endpoints;
     }
 
-    private static async Task<IResult> GetProductByIdAsync(
-        Guid id,
-        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
-        ITenantContext tenantContext,
+    private static async Task<IResult> GetProductByIdAsync(Guid id,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
         CancellationToken cancellationToken)
     {
         if (tenantContext.TenantId == Guid.Empty)
@@ -71,13 +69,8 @@ public static class ProductEndpoints
             .ToUpperInvariant();
     }
 
-    private static async Task<IResult> GetProductsAsync(
-        int? page,
-        int? pageSize,
-        string? code,
-        string? name,
-        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
-        ITenantContext tenantContext,
+    private static async Task<IResult> GetProductsAsync(int? page, int? pageSize, string? code, string? name,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
         CancellationToken cancellationToken)
     {
         int requestedPage = page ?? 1;
@@ -158,9 +151,5 @@ public static class ProductEndpoints
 
 public sealed record ProductListItemResponse(Guid Id, string Code, string Name, string? Description);
 
-public sealed record ProductPagedResponse<T>(
-    IReadOnlyList<T> Items,
-    int Page,
-    int PageSize,
-    int TotalCount,
+public sealed record ProductPagedResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount,
     int TotalPages);

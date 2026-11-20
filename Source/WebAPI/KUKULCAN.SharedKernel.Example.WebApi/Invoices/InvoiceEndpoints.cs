@@ -48,10 +48,8 @@ public static class InvoiceEndpoints
         return endpoints;
     }
 
-    private static async Task<IResult> GetInvoiceByIdAsync(
-        Guid id,
-        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
-        ITenantContext tenantContext,
+    private static async Task<IResult> GetInvoiceByIdAsync(Guid id,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
         CancellationToken cancellationToken)
     {
         if (tenantContext.TenantId == Guid.Empty)
@@ -95,20 +93,10 @@ public static class InvoiceEndpoints
             lines));
     }
 
-    private static async Task<IResult> GetInvoicesAsync(
-        HttpRequest request,
-        Guid? clientId,
-        string? clientName,
-        string? invoiceNumber,
-        string? issuedFrom,
-        string? issuedTo,
-        int? page,
-        int? pageSize,
-        string? sortBy,
-        string? sortDirection,
-        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
-        ITenantContext tenantContext,
-        CancellationToken cancellationToken)
+    private static async Task<IResult> GetInvoicesAsync(HttpRequest request, Guid? clientId, string? clientName,
+        string? invoiceNumber, string? issuedFrom, string? issuedTo, int? page, int? pageSize, string? sortBy,
+        string? sortDirection, [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        ITenantContext tenantContext, CancellationToken cancellationToken)
     {
         string[] unsupportedParameters = request.Query.Keys
             .Where(key => !AllowedQueryParameters.Contains(key))
@@ -330,33 +318,14 @@ public static class InvoiceEndpoints
     }
 }
 
-public sealed record InvoiceListItemResponse(
-    Guid Id,
-    string InvoiceNumber,
-    DateTimeOffset IssuedAt,
-    Guid ClientId,
+public sealed record InvoiceListItemResponse(Guid Id, string InvoiceNumber, DateTimeOffset IssuedAt, Guid ClientId,
     string ClientName);
 
-public sealed record InvoiceDetailsResponse(
-    Guid Id,
-    string InvoiceNumber,
-    DateTimeOffset IssuedAt,
-    Guid ClientId,
-    string ClientName,
-    IReadOnlyList<InvoiceLineResponse> Lines);
+public sealed record InvoiceDetailsResponse(Guid Id, string InvoiceNumber, DateTimeOffset IssuedAt, Guid ClientId,
+    string ClientName, IReadOnlyList<InvoiceLineResponse> Lines);
 
-public sealed record InvoiceLineResponse(
-    Guid Id,
-    int LineNumber,
-    Guid ProductId,
-    string ProductCode,
-    string ProductName,
-    decimal Quantity,
-    decimal UnitPrice);
+public sealed record InvoiceLineResponse(Guid Id, int LineNumber, Guid ProductId, string ProductCode, string ProductName,
+    decimal Quantity, decimal UnitPrice);
 
-public sealed record InvoicePagedResponse<T>(
-    IReadOnlyList<T> Items,
-    int Page,
-    int PageSize,
-    int TotalCount,
+public sealed record InvoicePagedResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount,
     int TotalPages);

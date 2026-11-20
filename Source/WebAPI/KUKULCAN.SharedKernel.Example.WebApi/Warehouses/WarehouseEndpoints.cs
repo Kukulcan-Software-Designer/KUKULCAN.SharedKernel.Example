@@ -26,10 +26,8 @@ public static class WarehouseEndpoints
         return endpoints;
     }
 
-    private static async Task<IResult> GetWarehouseByIdAsync(
-        Guid id,
-        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
-        ITenantContext tenantContext,
+    private static async Task<IResult> GetWarehouseByIdAsync(Guid id,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
         CancellationToken cancellationToken)
     {
         if (tenantContext.TenantId == Guid.Empty)
@@ -72,16 +70,9 @@ public static class WarehouseEndpoints
             .ToUpperInvariant();
     }
 
-    private static async Task<IResult> GetWarehousesAsync(
-        int? page,
-        int? pageSize,
-        string? name,
-        string? city,
-        string? state,
-        string? postalCode,
-        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
-        ITenantContext tenantContext,
-        CancellationToken cancellationToken)
+    private static async Task<IResult> GetWarehousesAsync(int? page, int? pageSize, string? name, string? city,
+        string? state, string? postalCode, [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        ITenantContext tenantContext, CancellationToken cancellationToken)
     {
         int requestedPage = page ?? 1;
         int requestedPageSize = pageSize ?? 25;
@@ -185,16 +176,7 @@ public static class WarehouseEndpoints
     }
 }
 
-public sealed record WarehouseListItemResponse(
-    Guid Id,
-    string Name,
-    string? City,
-    string? State,
-    string? PostalCode);
+public sealed record WarehouseListItemResponse(Guid Id, string Name, string? City, string? State, string? PostalCode);
 
-public sealed record WarehousePagedResponse<T>(
-    IReadOnlyList<T> Items,
-    int Page,
-    int PageSize,
-    int TotalCount,
+public sealed record WarehousePagedResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount,
     int TotalPages);

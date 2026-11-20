@@ -26,10 +26,8 @@ public static class WarehouseStockEndpoints
         return endpoints;
     }
 
-    private static async Task<IResult> GetWarehouseStockByIdAsync(
-        Guid id,
-        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
-        ITenantContext tenantContext,
+    private static async Task<IResult> GetWarehouseStockByIdAsync(Guid id,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
         CancellationToken cancellationToken)
     {
         if (tenantContext.TenantId == Guid.Empty)
@@ -74,14 +72,9 @@ public static class WarehouseStockEndpoints
             .ToUpperInvariant();
     }
 
-    private static async Task<IResult> GetWarehouseStocksAsync(
-        int? page,
-        int? pageSize,
-        string? productCode,
-        string? productName,
-        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
-        ITenantContext tenantContext,
-        CancellationToken cancellationToken)
+    private static async Task<IResult> GetWarehouseStocksAsync(int? page, int? pageSize, string? productCode,
+        string? productName, [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        ITenantContext tenantContext, CancellationToken cancellationToken)
     {
         int requestedPage = page ?? 1;
         int requestedPageSize = pageSize ?? 25;
@@ -162,18 +155,8 @@ public static class WarehouseStockEndpoints
     }
 }
 
-public sealed record WarehouseStockListItemResponse(
-    Guid Id,
-    Guid WarehouseId,
-    string WarehouseName,
-    Guid ProductId,
-    string ProductCode,
-    string ProductName,
-    decimal Quantity);
+public sealed record WarehouseStockListItemResponse(Guid Id, Guid WarehouseId, string WarehouseName, Guid ProductId,
+    string ProductCode, string ProductName, decimal Quantity);
 
-public sealed record WarehouseStockPagedResponse<T>(
-    IReadOnlyList<T> Items,
-    int Page,
-    int PageSize,
-    int TotalCount,
+public sealed record WarehouseStockPagedResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount,
     int TotalPages);
