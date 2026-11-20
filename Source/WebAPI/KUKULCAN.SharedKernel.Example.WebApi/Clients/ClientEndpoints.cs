@@ -17,6 +17,16 @@ public static class ClientEndpoints
         "name",
         "city",
         "state",
+        "postalCode",
+        "sortBy",
+        "sortDirection"
+    };
+
+    private static readonly HashSet<string> AllowedSortFields = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "name",
+        "city",
+        "state",
         "postalCode"
     };
 
@@ -88,7 +98,8 @@ public static class ClientEndpoints
     }
 
     private static async Task<IResult> GetClientsAsync(HttpRequest request, int? page, int? pageSize, string? name, string? city,
-        string? state, string? postalCode, [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        string? state, string? postalCode, string? sortBy, string? sortDirection,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
         ITenantContext tenantContext, CancellationToken cancellationToken)
     {
         string[] unsupportedParameters = request.Query.Keys
@@ -116,6 +127,21 @@ public static class ClientEndpoints
         if (requestedPageSize is < 1 or > 100)
         {
             validationErrors[nameof(pageSize)] = ["PageSize must be between 1 and 100."];
+        }
+
+        string? normalizedSortBy = string.IsNullOrWhiteSpace(sortBy) ? null : sortBy.Trim();
+        string? normalizedSortDirection = string.IsNullOrWhiteSpace(sortDirection)
+            ? null
+            : sortDirection.Trim().ToLowerInvariant();
+
+        if (normalizedSortBy is not null && !AllowedSortFields.Contains(normalizedSortBy))
+        {
+            validationErrors[nameof(sortBy)] = ["SortBy must be one of: name, city, state, postalCode."];
+        }
+
+        if (normalizedSortDirection is not null && normalizedSortDirection is not ("asc" or "desc"))
+        {
+            validationErrors[nameof(sortDirection)] = ["SortDirection must be either 'asc' or 'desc'."];
         }
 
         if (validationErrors.Count > 0)
@@ -189,12 +215,24 @@ public static class ClientEndpoints
             ];
         }
 
+        bool descending = normalizedSortDirection == "desc";
+        string sortField = normalizedSortBy?.ToLowerInvariant() ?? "name";
+        IOrderedEnumerable<ClientListItemResponse> orderedClients = (sortField, descending) switch
+        {
+            ("city", true) => matchingClients.OrderByDescending(client => NormalizeSearchText(client.City ?? string.Empty), StringComparer.Ordinal).ThenByDescending(client => client.Id),
+            ("city", false) => matchingClients.OrderBy(client => NormalizeSearchText(client.City ?? string.Empty), StringComparer.Ordinal).ThenBy(client => client.Id),
+            ("state", true) => matchingClients.OrderByDescending(client => NormalizeSearchText(client.State ?? string.Empty), StringComparer.Ordinal).ThenByDescending(client => client.Id),
+            ("state", false) => matchingClients.OrderBy(client => NormalizeSearchText(client.State ?? string.Empty), StringComparer.Ordinal).ThenBy(client => client.Id),
+            ("postalCode", true) => matchingClients.OrderByDescending(client => client.PostalCode ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenByDescending(client => client.Id),
+            ("postalCode", false) => matchingClients.OrderBy(client => client.PostalCode ?? string.Empty, StringComparer.OrdinalIgnoreCase).ThenBy(client => client.Id),
+            ("name", true) => matchingClients.OrderByDescending(client => NormalizeSearchText(client.Name), StringComparer.Ordinal).ThenByDescending(client => client.Id),
+            _ => matchingClients.OrderBy(client => NormalizeSearchText(client.Name), StringComparer.Ordinal).ThenBy(client => client.Id)
+        };
+
         int totalCount = matchingClients.Count;
         ClientListItemResponse[] items =
         [
-            .. matchingClients
-                .OrderBy(client => client.Name, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(client => client.Id)
+            .. orderedClients
                 .Skip((requestedPage - 1) * requestedPageSize)
                 .Take(requestedPageSize)
         ];
