@@ -16,6 +16,15 @@ public static class WarehouseStockEndpoints
         "page",
         "pageSize",
         "productCode",
+        "productName",
+        "sortBy",
+        "sortDirection"
+    };
+
+    private static readonly HashSet<string> AllowedSortFields = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "quantity",
+        "productCode",
         "productName"
     };
 
@@ -97,7 +106,8 @@ public static class WarehouseStockEndpoints
     }
 
     private static async Task<IResult> GetWarehouseStocksAsync(HttpRequest request, int? page, int? pageSize, string? productCode,
-        string? productName, [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        string? productName, string? sortBy, string? sortDirection,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
         ITenantContext tenantContext, CancellationToken cancellationToken)
     {
         string[] unsupportedParameters = request.Query.Keys
@@ -125,6 +135,21 @@ public static class WarehouseStockEndpoints
         if (requestedPageSize is < 1 or > 100)
         {
             validationErrors[nameof(pageSize)] = ["PageSize must be between 1 and 100."];
+        }
+
+        string? normalizedSortBy = string.IsNullOrWhiteSpace(sortBy) ? null : sortBy.Trim();
+        string? normalizedSortDirection = string.IsNullOrWhiteSpace(sortDirection)
+            ? null
+            : sortDirection.Trim().ToLowerInvariant();
+
+        if (normalizedSortBy is not null && !AllowedSortFields.Contains(normalizedSortBy))
+        {
+            validationErrors[nameof(sortBy)] = ["SortBy must be one of: quantity, productCode, productName."];
+        }
+
+        if (normalizedSortDirection is not null && normalizedSortDirection is not ("asc" or "desc"))
+        {
+            validationErrors[nameof(sortDirection)] = ["SortDirection must be either 'asc' or 'desc'."];
         }
 
         if (validationErrors.Count > 0)
@@ -172,13 +197,32 @@ public static class WarehouseStockEndpoints
             ];
         }
 
+        bool descending = normalizedSortDirection == "desc";
+        IOrderedEnumerable<WarehouseStockListItemResponse> orderedStocks;
+        if (normalizedSortBy is null)
+        {
+            orderedStocks = matchingStocks
+                .OrderBy(stock => stock.WarehouseName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(stock => stock.ProductCode, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(stock => stock.Id);
+        }
+        else
+        {
+            orderedStocks = (normalizedSortBy.ToLowerInvariant(), descending) switch
+            {
+                ("quantity", true) => matchingStocks.OrderByDescending(stock => stock.Quantity).ThenByDescending(stock => stock.Id),
+                ("quantity", false) => matchingStocks.OrderBy(stock => stock.Quantity).ThenBy(stock => stock.Id),
+                ("productname", true) => matchingStocks.OrderByDescending(stock => NormalizeSearchText(stock.ProductName), StringComparer.Ordinal).ThenByDescending(stock => stock.Id),
+                ("productname", false) => matchingStocks.OrderBy(stock => NormalizeSearchText(stock.ProductName), StringComparer.Ordinal).ThenBy(stock => stock.Id),
+                ("productcode", true) => matchingStocks.OrderByDescending(stock => NormalizeSearchText(stock.ProductCode), StringComparer.Ordinal).ThenByDescending(stock => stock.Id),
+                _ => matchingStocks.OrderBy(stock => NormalizeSearchText(stock.ProductCode), StringComparer.Ordinal).ThenBy(stock => stock.Id)
+            };
+        }
+
         int totalCount = matchingStocks.Count;
         WarehouseStockListItemResponse[] items =
         [
-            .. matchingStocks
-                .OrderBy(stock => stock.WarehouseName, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(stock => stock.ProductCode, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(stock => stock.Id)
+            .. orderedStocks
                 .Skip((requestedPage - 1) * requestedPageSize)
                 .Take(requestedPageSize)
         ];
