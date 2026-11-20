@@ -129,6 +129,60 @@ public sealed class TenantListingIsolationIntegrationTests : ExampleDatabaseTest
             seeded.ForeignTenantId);
     }
 
+    [Test]
+    public async Task CreateWarehouseStock_WithWarehouseFromAnotherTenant_ReturnsNotFoundAndDoesNotPersist()
+    {
+        var seeded = await SeedTwoTenantsAsync();
+
+        await AssertCrossTenantWarehouseStockCreationRejectedAsync(
+            seeded,
+            seeded.Foreign.WarehouseId,
+            seeded.Own.ProductId);
+    }
+
+    [Test]
+    public async Task CreateWarehouseStock_WithProductFromAnotherTenant_ReturnsNotFoundAndDoesNotPersist()
+    {
+        var seeded = await SeedTwoTenantsAsync();
+
+        await AssertCrossTenantWarehouseStockCreationRejectedAsync(
+            seeded,
+            seeded.Own.WarehouseId,
+            seeded.Foreign.ProductId);
+    }
+
+    private async Task AssertCrossTenantWarehouseStockCreationRejectedAsync(
+        SeededTenants seeded,
+        Guid warehouseId,
+        Guid productId)
+    {
+        await using var factory = new TenantListingTestApplicationFactory(
+            ConnectionString, ProviderName, seeded.OwnTenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", CreateAccessToken(seeded.OwnTenantId));
+
+        using var response = await client.PostAsJsonAsync(
+            "/api/example/warehouse-stocks",
+            new
+            {
+                warehouseId,
+                productId,
+                quantity = 3.5m
+            });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound),
+            "A warehouse stock must not reference a warehouse or product owned by another tenant.");
+
+        await using var context = CreateDbContext(seeded.OwnTenantId);
+        bool persisted = await context.WarehouseStocks
+            .IgnoreQueryFilters()
+            .AnyAsync(stock => stock.WarehouseId == warehouseId && stock.ProductId == productId);
+
+        Assert.That(persisted, Is.False,
+            "A rejected cross-tenant warehouse-stock request must not persist any record.");
+    }
+
     private static Guid GetResourceId(TenantResourceIds ids, string path) =>
         path switch
         {
