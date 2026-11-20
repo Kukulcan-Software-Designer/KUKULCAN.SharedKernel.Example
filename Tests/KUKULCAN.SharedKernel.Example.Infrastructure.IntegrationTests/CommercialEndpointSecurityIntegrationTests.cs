@@ -124,6 +124,68 @@ public sealed class CommercialEndpointSecurityIntegrationTests : ExampleDatabase
             $"Expected a request with a {tokenKind} bearer token to {method} {path} to be rejected.");
     }
 
+    [TestCase("GET", "/api/example/clients")]
+    [TestCase("GET", "/api/example/clients/00000000-0000-0000-0000-000000000001")]
+    [TestCase("GET", "/api/example/providers")]
+    [TestCase("GET", "/api/example/providers/00000000-0000-0000-0000-000000000001")]
+    [TestCase("GET", "/api/example/products")]
+    [TestCase("GET", "/api/example/products/00000000-0000-0000-0000-000000000001")]
+    [TestCase("POST", "/api/example/products")]
+    [TestCase("GET", "/api/example/warehouses")]
+    [TestCase("GET", "/api/example/warehouses/00000000-0000-0000-0000-000000000001")]
+    [TestCase("POST", "/api/example/warehouses")]
+    [TestCase("GET", "/api/example/warehouse-stocks")]
+    [TestCase("GET", "/api/example/warehouse-stocks/00000000-0000-0000-0000-000000000001")]
+    [TestCase("POST", "/api/example/warehouse-stocks")]
+    [TestCase("GET", "/api/example/invoices/00000000-0000-0000-0000-000000000001")]
+    [TestCase("GET", "/api/example/prod-invoices/00000000-0000-0000-0000-000000000001")]
+    public async Task CommercialEndpoints_WithAuthenticatedUserAndNotReadyAccount_ReturnsForbidden(
+        string method,
+        string path)
+    {
+        var tenantId = Guid.NewGuid();
+        await using var factory = new CommercialEndpointTestApplicationFactory(
+            ConnectionString,
+            ProviderName,
+            tenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", CreateNotReadyBearerToken(tenantId));
+        using var request = new HttpRequestMessage(new HttpMethod(method), path);
+
+        if (HttpMethod.Post.Method.Equals(method, StringComparison.OrdinalIgnoreCase))
+        {
+            request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
+        }
+
+        using var response = await client.SendAsync(request);
+
+        Assert.That(
+            response.StatusCode,
+            Is.EqualTo(HttpStatusCode.Forbidden),
+            $"Expected an authenticated request with a not-ready account to be rejected for {method} {path}.");
+    }
+
+    private static string CreateNotReadyBearerToken(Guid tenantId)
+    {
+        var credentials = new SigningCredentials(
+            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)),
+            SecurityAlgorithms.HmacSha256);
+        var claims = new[]
+        {
+            new Claim("sub", Guid.NewGuid().ToString()),
+            new Claim("tenant_id", tenantId.ToString())
+        };
+        var token = new JwtSecurityToken(
+            issuer: Issuer,
+            audience: Audience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(5),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
     private static string CreateBearerToken(string tokenKind)
     {
         var now = DateTime.UtcNow;
