@@ -151,6 +151,51 @@ public sealed class InvoiceEndpointIntegrationTests : ExampleDatabaseTestFixture
     }
 
     [Test]
+    public async Task GetInvoices_WithEquivalentUtcAndOffsetDateRanges_ReturnsSameResults()
+    {
+        var tenantId = Guid.NewGuid();
+        var lowerBoundary = new DateTimeOffset(2026, 7, 5, 10, 0, 0, TimeSpan.Zero);
+        var upperBoundary = lowerBoundary.AddHours(2);
+        var seeded = await SeedInvoicesAsync(
+            tenantId,
+            new InvoiceSeed(null, "SALE-T50-LOWER", "Álvaro Núñez", lowerBoundary),
+            new InvoiceSeed(null, "SALE-T50-MIDDLE", "Álvaro Núñez", lowerBoundary.AddHours(1)),
+            new InvoiceSeed(null, "SALE-T50-UPPER", "Álvaro Núñez", upperBoundary),
+            new InvoiceSeed(null, "SALE-T50-AFTER", "Álvaro Núñez", upperBoundary.AddSeconds(1)));
+
+        await using var factory = new InvoiceTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var utcQuery =
+            $"clientId={seeded.ClientIds["Álvaro Núñez"]}" +
+            $"&issuedFrom={Uri.EscapeDataString("2026-07-05T10:00:00Z")}" +
+            $"&issuedTo={Uri.EscapeDataString("2026-07-05T12:00:00Z")}";
+        var offsetQuery =
+            $"clientId={seeded.ClientIds["Álvaro Núñez"]}" +
+            $"&issuedFrom={Uri.EscapeDataString("2026-07-05T12:00:00+02:00")}" +
+            $"&issuedTo={Uri.EscapeDataString("2026-07-05T14:00:00+02:00")}";
+
+        using var utcResponse = await client.GetAsync($"/api/example/invoices?{utcQuery}");
+        using var offsetResponse = await client.GetAsync($"/api/example/invoices?{offsetQuery}");
+
+        Assert.That(utcResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(offsetResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var utcPayload = await utcResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var offsetPayload = await offsetResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var utcIds = utcPayload.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid()).ToArray();
+        var offsetIds = offsetPayload.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid()).ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(utcIds, Is.EquivalentTo(offsetIds));
+            Assert.That(utcIds, Is.EquivalentTo(seeded.Invoices.Select(invoice => invoice.Id).Take(3)));
+            Assert.That(utcPayload.GetProperty("totalCount").GetInt32(), Is.EqualTo(3));
+            Assert.That(offsetPayload.GetProperty("totalCount").GetInt32(), Is.EqualTo(3));
+        });
+    }
+
+    [Test]
     public async Task GetInvoiceById_ReturnsHeaderAndHistoricalLineSnapshotsEvenWhenClientIsDeleted()
     {
         var tenantId = Guid.NewGuid();
