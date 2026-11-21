@@ -64,6 +64,8 @@ public sealed class ClientListingEndpointIntegrationTests : ExampleDatabaseTestF
         Assert.Multiple(() =>
         {
             Assert.That(items, Has.Length.EqualTo(2));
+            Assert.That(items[0].EnumerateObject().Select(property => property.Name),
+                Is.EquivalentTo(new[] { "id", "name", "city", "state", "postalCode", "isDeleted" }));
             Assert.That(items.Select(item => item.GetProperty("name").GetString()),
                 Is.EquivalentTo(new[] { "Álvaro Núñez", "Alvaro Rios" }));
         });
