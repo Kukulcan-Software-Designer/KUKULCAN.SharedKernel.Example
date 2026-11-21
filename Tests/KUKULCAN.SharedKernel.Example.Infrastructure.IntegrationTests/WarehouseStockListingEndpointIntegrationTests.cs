@@ -38,6 +38,11 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
         var items = await ReadItemsAsync(response);
+        Assert.That(items[0].EnumerateObject().Select(property => property.Name),
+            Is.EquivalentTo(new[]
+            {
+                "id", "warehouseId", "warehouseName", "productId", "productCode", "productName", "quantity"
+            }));
         Assert.That(items.Select(item => item.GetProperty("productCode").GetString()),
             Is.EquivalentTo(new[] { "ÁB-100", "AB-200" }));
     }
