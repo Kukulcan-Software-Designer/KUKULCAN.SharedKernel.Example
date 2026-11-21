@@ -15,6 +15,10 @@ public static class WarehouseStockEndpoints
     {
         "page",
         "pageSize",
+        "warehouseId",
+        "productId",
+        "minQuantity",
+        "maxQuantity",
         "productCode",
         "productName",
         "sortBy",
@@ -105,8 +109,9 @@ public static class WarehouseStockEndpoints
             .ToUpperInvariant();
     }
 
-    private static async Task<IResult> GetWarehouseStocksAsync(HttpRequest request, int? page, int? pageSize, string? productCode,
-        string? productName, string? sortBy, string? sortDirection,
+    private static async Task<IResult> GetWarehouseStocksAsync(HttpRequest request, int? page, int? pageSize,
+        Guid? warehouseId, Guid? productId, decimal? minQuantity, decimal? maxQuantity,
+        string? productCode, string? productName, string? sortBy, string? sortDirection,
         [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
         ITenantContext tenantContext, CancellationToken cancellationToken)
     {
@@ -135,6 +140,12 @@ public static class WarehouseStockEndpoints
         if (requestedPageSize is < 1 or > 100)
         {
             validationErrors[nameof(pageSize)] = ["PageSize must be between 1 and 100."];
+        }
+
+        if (minQuantity.HasValue && maxQuantity.HasValue && minQuantity.Value > maxQuantity.Value)
+        {
+            validationErrors[nameof(minQuantity)] =
+                ["MinQuantity must be less than or equal to maxQuantity."];
         }
 
         string? normalizedSortBy = string.IsNullOrWhiteSpace(sortBy) ? null : sortBy.Trim();
@@ -176,6 +187,34 @@ public static class WarehouseStockEndpoints
                 stock.Product.Name,
                 stock.Quantity))
             .ToListAsync(cancellationToken);
+
+        if (warehouseId.HasValue)
+        {
+            matchingStocks = matchingStocks
+                .Where(stock => stock.WarehouseId == warehouseId.Value)
+                .ToList();
+        }
+
+        if (productId.HasValue)
+        {
+            matchingStocks = matchingStocks
+                .Where(stock => stock.ProductId == productId.Value)
+                .ToList();
+        }
+
+        if (minQuantity.HasValue)
+        {
+            matchingStocks = matchingStocks
+                .Where(stock => stock.Quantity >= minQuantity.Value)
+                .ToList();
+        }
+
+        if (maxQuantity.HasValue)
+        {
+            matchingStocks = matchingStocks
+                .Where(stock => stock.Quantity <= maxQuantity.Value)
+                .ToList();
+        }
 
         if (!string.IsNullOrWhiteSpace(productCode))
         {
