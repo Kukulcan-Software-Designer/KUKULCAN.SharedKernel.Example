@@ -225,7 +225,9 @@ public sealed class WarehouseListingEndpointIntegrationTests : ExampleDatabaseTe
             city = "Barcelona",
             state = "Cataluña",
             postalCode = "08001",
-            tenantId = forgedTenantId
+            tenantId = forgedTenantId,
+            isDeleted = true,
+            deletedOn = DateTimeOffset.UtcNow
         });
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.Created));
@@ -241,6 +243,8 @@ public sealed class WarehouseListingEndpointIntegrationTests : ExampleDatabaseTe
             Assert.That(payload.GetProperty("state").GetString(), Is.EqualTo("Cataluña"));
             Assert.That(payload.GetProperty("postalCode").GetString(), Is.EqualTo("08001"));
             Assert.That(payload.TryGetProperty("tenantId", out _), Is.False);
+            Assert.That(payload.TryGetProperty("isDeleted", out _), Is.False);
+            Assert.That(payload.TryGetProperty("deletedOn", out _), Is.False);
         });
 
         await using var context = CreateDbContext(tenantId);
