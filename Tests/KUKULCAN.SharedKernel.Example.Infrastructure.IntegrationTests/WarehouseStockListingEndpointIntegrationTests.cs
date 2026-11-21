@@ -112,7 +112,11 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
             warehouseId,
             productId,
             quantity = 12.375m,
-            tenantId = forgedTenantId
+            tenantId = forgedTenantId,
+            productCode = "FORGED-CODE",
+            productName = "Forged product name",
+            isDeleted = true,
+            deletedOn = DateTimeOffset.UtcNow
         });
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.Created));
@@ -129,6 +133,8 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
             Assert.That(payload.GetProperty("productName").GetString(), Is.EqualTo("New stock product"));
             Assert.That(payload.GetProperty("quantity").GetDecimal(), Is.EqualTo(12.375m));
             Assert.That(payload.TryGetProperty("tenantId", out _), Is.False);
+            Assert.That(payload.TryGetProperty("isDeleted", out _), Is.False);
+            Assert.That(payload.TryGetProperty("deletedOn", out _), Is.False);
         });
 
         await using var verificationContext = CreateDbContext(tenantId);
