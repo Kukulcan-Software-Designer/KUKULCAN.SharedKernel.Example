@@ -220,12 +220,10 @@ public static class WarehouseStockEndpoints
         }
 
         int totalCount = matchingStocks.Count;
-        WarehouseStockListItemResponse[] items =
-        [
-            .. orderedStocks
-                .Skip((requestedPage - 1) * requestedPageSize)
-                .Take(requestedPageSize)
-        ];
+        long offset = (long)(requestedPage - 1) * requestedPageSize;
+        WarehouseStockListItemResponse[] items = offset > int.MaxValue
+            ? []
+            : [.. orderedStocks.Skip((int)offset).Take(requestedPageSize)];
 
         int totalPages = totalCount == 0
             ? 0
