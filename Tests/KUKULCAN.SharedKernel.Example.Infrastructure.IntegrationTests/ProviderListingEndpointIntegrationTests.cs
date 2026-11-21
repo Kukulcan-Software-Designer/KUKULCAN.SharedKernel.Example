@@ -37,6 +37,8 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
         var items = await ReadItemsAsync(response);
+        Assert.That(items[0].EnumerateObject().Select(property => property.Name),
+            Is.EquivalentTo(new[] { "id", "name", "city", "state", "postalCode", "isDeleted" }));
         Assert.That(items.Select(item => item.GetProperty("name").GetString()),
             Is.EquivalentTo(new[] { "Álvaro Núñez", "Carla Soto" }));
     }
