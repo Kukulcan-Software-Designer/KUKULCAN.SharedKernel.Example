@@ -134,6 +134,7 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
         using var client = CreateAuthenticatedClient(factory, tenantId);
         using var response = await client.GetAsync(
             $"/api/example/warehouse-stocks?warehouseId={warehouseId}&productId={productId}");
+        TestContext.WriteLine(await response.Content.ReadAsStringAsync());
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
         var items = await ReadItemsAsync(response);
@@ -196,6 +197,7 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
         using var client = CreateAuthenticatedClient(factory, tenantId);
         using var response = await client.GetAsync(
             "/api/example/warehouse-stocks?minQuantity=10&maxQuantity=20&pageSize=100");
+        TestContext.WriteLine(await response.Content.ReadAsStringAsync());
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
         var items = await ReadItemsAsync(response);
@@ -213,6 +215,7 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
         using var client = CreateAuthenticatedClient(factory, tenantId);
         using var response = await client.GetAsync(
             "/api/example/warehouse-stocks?minQuantity=20&maxQuantity=10");
+        TestContext.WriteLine(await response.Content.ReadAsStringAsync());
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.BadRequest));
         using var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -247,6 +250,7 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
         using var client = CreateAuthenticatedClient(factory, tenantId);
         using var response = await client.GetAsync(
             $"/api/example/warehouse-stocks?warehouseId={warehouseId}&productCode=ab&productName=cafe&minQuantity=10&maxQuantity=10&pageSize=100");
+        TestContext.WriteLine(await response.Content.ReadAsStringAsync());
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
         var items = await ReadItemsAsync(response);
