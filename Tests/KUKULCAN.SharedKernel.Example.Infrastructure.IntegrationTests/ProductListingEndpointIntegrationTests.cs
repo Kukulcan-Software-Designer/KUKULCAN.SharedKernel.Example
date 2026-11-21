@@ -38,6 +38,8 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
         var items = await ReadItemsAsync(response);
+        Assert.That(items[0].EnumerateObject().Select(property => property.Name),
+            Is.EquivalentTo(new[] { "id", "code", "name", "description" }));
         Assert.That(items.Select(item => item.GetProperty("code").GetString()),
             Is.EquivalentTo(new[] { "ÁB-100", "AB-200" }));
     }
