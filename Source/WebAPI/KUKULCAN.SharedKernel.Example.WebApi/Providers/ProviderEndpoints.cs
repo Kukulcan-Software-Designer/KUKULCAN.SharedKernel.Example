@@ -230,12 +230,10 @@ public static class ProviderEndpoints
         };
 
         int totalCount = matchingProviders.Count;
-        ProviderListItemResponse[] items =
-        [
-            .. orderedProviders
-                .Skip((requestedPage - 1) * requestedPageSize)
-                .Take(requestedPageSize)
-        ];
+        long offset = (long)(requestedPage - 1) * requestedPageSize;
+        ProviderListItemResponse[] items = offset > int.MaxValue
+            ? []
+            : [.. orderedProviders.Skip((int)offset).Take(requestedPageSize)];
 
         int totalPages = totalCount == 0
             ? 0
