@@ -77,6 +77,187 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
     }
 
     [Test]
+    public async Task GetWarehouseStocks_WithWarehouseAndProductFilters_CombinesPredicatesWithAnd()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehouseStocksAsync(tenantId);
+
+        Guid warehouseId;
+        Guid productId;
+        await using (var context = CreateDbContext(tenantId))
+        {
+            warehouseId = await context.Warehouses
+                .Where(warehouse => warehouse.TenantId == tenantId)
+                .Select(warehouse => warehouse.Id)
+                .SingleAsync();
+
+            var secondWarehouse = new Warehouse
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = "Second warehouse",
+                City = "Barcelona",
+                State = "Cataluña",
+                PostalCode = "08001"
+            };
+            context.Warehouses.Add(secondWarehouse);
+
+            var products = await context.Products
+                .Where(product => product.TenantId == tenantId)
+                .OrderBy(product => product.Code)
+                .ToListAsync();
+            productId = products.Single(product => product.Code == "ÁB-100").Id;
+            var otherProductId = products.Single(product => product.Code == "AB-200").Id;
+
+            context.WarehouseStocks.AddRange(
+                new WarehouseStock
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    WarehouseId = secondWarehouse.Id,
+                    ProductId = productId,
+                    Quantity = 10m
+                },
+                new WarehouseStock
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    WarehouseId = secondWarehouse.Id,
+                    ProductId = otherProductId,
+                    Quantity = 10m
+                });
+            await context.SaveChangesAsync();
+            warehouseId = secondWarehouse.Id;
+        }
+
+        await using var factory = new WarehouseStockListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync(
+            $"/api/example/warehouse-stocks?warehouseId={warehouseId}&productId={productId}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var items = await ReadItemsAsync(response);
+        Assert.That(items, Has.Length.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(items[0].GetProperty("warehouseId").GetGuid(), Is.EqualTo(warehouseId));
+            Assert.That(items[0].GetProperty("productId").GetGuid(), Is.EqualTo(productId));
+        });
+    }
+
+    [Test]
+    public async Task GetWarehouseStocks_WithInclusiveQuantityRange_IncludesBothBoundaries()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehouseStocksAsync(tenantId);
+
+        await using (var context = CreateDbContext(tenantId))
+        {
+            var stocks = await context.WarehouseStocks
+                .Where(stock => stock.TenantId == tenantId)
+                .ToListAsync();
+            foreach (var stock in stocks)
+            {
+                var productCode = await context.Products
+                    .Where(product => product.Id == stock.ProductId)
+                    .Select(product => product.Code)
+                    .SingleAsync();
+                stock.Quantity = productCode switch
+                {
+                    "ÁB-100" => 5m,
+                    "AB-200" => 10m,
+                    "ZZ-AB-300" => 20m,
+                    "XY-400" => 25m,
+                    _ => stock.Quantity
+                };
+            }
+
+            var warehouseId = stocks[0].WarehouseId;
+            var inRangeProduct = new Product
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Code = "IN-015",
+                Name = "Inside quantity range"
+            };
+            context.Products.Add(inRangeProduct);
+            context.WarehouseStocks.Add(new WarehouseStock
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                WarehouseId = warehouseId,
+                ProductId = inRangeProduct.Id,
+                Quantity = 15m
+            });
+            await context.SaveChangesAsync();
+        }
+
+        await using var factory = new WarehouseStockListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync(
+            "/api/example/warehouse-stocks?minQuantity=10&maxQuantity=20&pageSize=100");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var items = await ReadItemsAsync(response);
+        Assert.That(items.Select(item => item.GetProperty("quantity").GetDecimal()),
+            Is.EquivalentTo(new[] { 10m, 15m, 20m }));
+    }
+
+    [Test]
+    public async Task GetWarehouseStocks_WithMinimumQuantityGreaterThanMaximum_ReturnsRangeValidationError()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehouseStocksAsync(tenantId);
+
+        await using var factory = new WarehouseStockListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync(
+            "/api/example/warehouse-stocks?minQuantity=20&maxQuantity=10");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.BadRequest));
+        var error = await response.Content.ReadAsStringAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(error, Does.Contain("minQuantity").IgnoreCase);
+            Assert.That(error, Does.Contain("maxQuantity").IgnoreCase);
+            Assert.That(error, Does.Not.Contain("unknown query parameter").IgnoreCase);
+            Assert.That(error, Does.Not.Contain("unsupported query parameter").IgnoreCase);
+        });
+    }
+
+    [Test]
+    public async Task GetWarehouseStocks_WithAllSupportedFilters_CombinesPredicatesWithAnd()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehouseStocksAsync(tenantId);
+
+        Guid warehouseId;
+        await using (var context = CreateDbContext(tenantId))
+        {
+            warehouseId = await context.Warehouses
+                .Where(warehouse => warehouse.TenantId == tenantId)
+                .Select(warehouse => warehouse.Id)
+                .SingleAsync();
+        }
+
+        await using var factory = new WarehouseStockListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync(
+            $"/api/example/warehouse-stocks?warehouseId={warehouseId}&productCode=ab&productName=cafe&minQuantity=10&maxQuantity=10&pageSize=100");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var items = await ReadItemsAsync(response);
+        Assert.That(items, Has.Length.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(items.All(item => item.GetProperty("warehouseId").GetGuid() == warehouseId), Is.True);
+            Assert.That(items.Select(item => item.GetProperty("productCode").GetString()),
+                Is.EquivalentTo(new[] { "ÁB-100", "AB-200" }));
+            Assert.That(items.All(item => item.GetProperty("quantity").GetDecimal() == 10m), Is.True);
+        });
+    }
+
+    [Test]
     public async Task PostWarehouseStocks_WithValidPayload_CreatesStockForAuthenticatedTenant()
     {
         var tenantId = Guid.NewGuid();
