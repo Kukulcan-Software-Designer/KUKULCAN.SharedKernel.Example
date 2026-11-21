@@ -215,13 +215,19 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
             "/api/example/warehouse-stocks?minQuantity=20&maxQuantity=10");
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.BadRequest));
-        var error = await response.Content.ReadAsStringAsync();
+        using var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var errors = error.RootElement.GetProperty("errors");
+
         Assert.Multiple(() =>
         {
-            Assert.That(error, Does.Contain("minQuantity").IgnoreCase);
-            Assert.That(error, Does.Contain("maxQuantity").IgnoreCase);
-            Assert.That(error, Does.Not.Contain("unknown query parameter").IgnoreCase);
-            Assert.That(error, Does.Not.Contain("unsupported query parameter").IgnoreCase);
+            Assert.That(errors.TryGetProperty("minQuantity", out var minimumErrors), Is.True,
+                "The response must associate the invalid range with minQuantity.");
+            Assert.That(errors.TryGetProperty("query", out _), Is.False,
+                "The request must reach range validation instead of being rejected as an unsupported query parameter.");
+            Assert.That(minimumErrors.ValueKind, Is.EqualTo(JsonValueKind.Array));
+            Assert.That(minimumErrors.GetArrayLength(), Is.GreaterThan(0));
+            Assert.That(minimumErrors[0].GetString(), Does.Contain("less than or equal to").IgnoreCase);
+            Assert.That(minimumErrors[0].GetString(), Does.Contain("maxQuantity").IgnoreCase);
         });
     }
 
