@@ -132,6 +132,32 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
         });
     }
 
+    [TestCase("/api/example/clients")]
+    [TestCase("/api/example/providers")]
+    [TestCase("/api/example/products")]
+    [TestCase("/api/example/warehouses")]
+    [TestCase("/api/example/warehouse-stocks")]
+    public async Task Listing_WithMaximumPageNumber_ReturnsEmptyItemsWithoutOffsetOverflow(string route)
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedPaginationDataAsync(tenantId);
+        await using var factory = CreateFactory(tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+
+        using var response = await client.GetAsync($"{route}?page=2147483647&pageSize=100");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(payload.GetProperty("items").GetArrayLength(), Is.Zero);
+            Assert.That(payload.GetProperty("page").GetInt32(), Is.EqualTo(int.MaxValue));
+            Assert.That(payload.GetProperty("pageSize").GetInt32(), Is.EqualTo(100));
+            Assert.That(payload.GetProperty("totalCount").GetInt32(), Is.EqualTo(3));
+            Assert.That(payload.GetProperty("totalPages").GetInt32(), Is.EqualTo(1));
+        });
+    }
+
     [TestCase("/api/example/clients", "name=missing-pagination-record")]
     [TestCase("/api/example/providers", "name=missing-pagination-record")]
     [TestCase("/api/example/products", "code=missing-pagination-record")]
