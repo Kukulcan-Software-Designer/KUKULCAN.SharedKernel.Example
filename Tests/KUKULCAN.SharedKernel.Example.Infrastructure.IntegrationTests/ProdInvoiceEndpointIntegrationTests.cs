@@ -152,6 +152,82 @@ public sealed class ProdInvoiceEndpointIntegrationTests : ExampleDatabaseTestFix
     }
 
     [Test]
+    public async Task GetProdInvoices_WithInvoiceNumberAndProviderId_CombinesExactFiltersWithAnd()
+    {
+        var tenantId = Guid.NewGuid();
+        var seeded = await SeedProdInvoicesAsync(
+            tenantId,
+            new ProdInvoiceSeed(null, "PUR-EXACT-001", "Álvaro Núñez Suministros", DateTimeOffset.UtcNow),
+            new ProdInvoiceSeed(null, "PUR-EXACT-001-EXTRA", "Álvaro Núñez Suministros", DateTimeOffset.UtcNow),
+            new ProdInvoiceSeed(null, "PUR-EXACT-001", "Beatriz García Proveedores", DateTimeOffset.UtcNow));
+
+        await using var factory = new ProdInvoiceTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var query =
+            $"invoiceNumber={Uri.EscapeDataString("PUR-EXACT-001")}" +
+            $"&providerId={seeded.ProviderIds["Álvaro Núñez Suministros"]}";
+        using var response = await client.GetAsync($"/api/example/prod-invoices?{query}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = payload.GetProperty("items").EnumerateArray().ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items, Has.Length.EqualTo(1));
+            Assert.That(items[0].GetProperty("invoiceNumber").GetString(), Is.EqualTo("PUR-EXACT-001"));
+            Assert.That(items[0].GetProperty("providerId").GetGuid(),
+                Is.EqualTo(seeded.ProviderIds["Álvaro Núñez Suministros"]));
+            Assert.That(payload.GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public async Task GetProdInvoices_WithEquivalentUtcAndOffsetDateRanges_ReturnsSameResults()
+    {
+        var tenantId = Guid.NewGuid();
+        var lowerBoundary = new DateTimeOffset(2026, 7, 5, 10, 0, 0, TimeSpan.Zero);
+        var upperBoundary = lowerBoundary.AddHours(2);
+        var seeded = await SeedProdInvoicesAsync(
+            tenantId,
+            new ProdInvoiceSeed(null, "PUR-T50-LOWER", "Álvaro Núñez Suministros", lowerBoundary),
+            new ProdInvoiceSeed(null, "PUR-T50-MIDDLE", "Álvaro Núñez Suministros", lowerBoundary.AddHours(1)),
+            new ProdInvoiceSeed(null, "PUR-T50-UPPER", "Álvaro Núñez Suministros", upperBoundary),
+            new ProdInvoiceSeed(null, "PUR-T50-AFTER", "Álvaro Núñez Suministros", upperBoundary.AddSeconds(1)));
+
+        await using var factory = new ProdInvoiceTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var utcQuery =
+            $"providerId={seeded.ProviderIds["Álvaro Núñez Suministros"]}" +
+            $"&issuedFrom={Uri.EscapeDataString("2026-07-05T10:00:00Z")}" +
+            $"&issuedTo={Uri.EscapeDataString("2026-07-05T12:00:00Z")}";
+        var offsetQuery =
+            $"providerId={seeded.ProviderIds["Álvaro Núñez Suministros"]}" +
+            $"&issuedFrom={Uri.EscapeDataString("2026-07-05T12:00:00+02:00")}" +
+            $"&issuedTo={Uri.EscapeDataString("2026-07-05T14:00:00+02:00")}";
+
+        using var utcResponse = await client.GetAsync($"/api/example/prod-invoices?{utcQuery}");
+        using var offsetResponse = await client.GetAsync($"/api/example/prod-invoices?{offsetQuery}");
+
+        Assert.That(utcResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(offsetResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var utcPayload = await utcResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var offsetPayload = await offsetResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var utcIds = utcPayload.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid()).ToArray();
+        var offsetIds = offsetPayload.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid()).ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(utcIds, Is.EquivalentTo(offsetIds));
+            Assert.That(utcIds, Is.EquivalentTo(seeded.Invoices.Select(invoice => invoice.Id).Take(3)));
+            Assert.That(utcPayload.GetProperty("totalCount").GetInt32(), Is.EqualTo(3));
+            Assert.That(offsetPayload.GetProperty("totalCount").GetInt32(), Is.EqualTo(3));
+        });
+    }
+
+    [Test]
     public async Task GetProdInvoiceById_ReturnsHeaderAndHistoricalSnapshotsWhenProviderIsDeletedAndProductChanges()
     {
         var tenantId = Guid.NewGuid();
