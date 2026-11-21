@@ -159,26 +159,34 @@ public sealed class ProdInvoiceEndpointIntegrationTests : ExampleDatabaseTestFix
             tenantId,
             new ProdInvoiceSeed(null, "PUR-EXACT-001", "Álvaro Núñez Suministros", DateTimeOffset.UtcNow),
             new ProdInvoiceSeed(null, "PUR-EXACT-001-EXTRA", "Álvaro Núñez Suministros", DateTimeOffset.UtcNow),
-            new ProdInvoiceSeed(null, "PUR-EXACT-001", "Beatriz García Proveedores", DateTimeOffset.UtcNow));
+            new ProdInvoiceSeed(null, "PUR-EXACT-002", "Beatriz García Proveedores", DateTimeOffset.UtcNow));
 
         await using var factory = new ProdInvoiceTestApplicationFactory(ConnectionString, ProviderName, tenantId);
         using var client = CreateAuthenticatedClient(factory, tenantId);
-        var query =
-            $"invoiceNumber={Uri.EscapeDataString("PUR-EXACT-001")}" +
-            $"&providerId={seeded.ProviderIds["Álvaro Núñez Suministros"]}";
-        using var response = await client.GetAsync($"/api/example/prod-invoices?{query}");
+        var matchingProviderId = seeded.ProviderIds["Álvaro Núñez Suministros"];
+        var differentProviderId = seeded.ProviderIds["Beatriz García Proveedores"];
+        var invoiceNumber = Uri.EscapeDataString("PUR-EXACT-001");
 
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var items = payload.GetProperty("items").EnumerateArray().ToArray();
+        using var matchingResponse = await client.GetAsync(
+            $"/api/example/prod-invoices?invoiceNumber={invoiceNumber}&providerId={matchingProviderId}");
+        using var nonMatchingResponse = await client.GetAsync(
+            $"/api/example/prod-invoices?invoiceNumber={invoiceNumber}&providerId={differentProviderId}");
+
+        Assert.That(matchingResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(nonMatchingResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var matchingPayload = await matchingResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var nonMatchingPayload = await nonMatchingResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var matchingItems = matchingPayload.GetProperty("items").EnumerateArray().ToArray();
+        var nonMatchingItems = nonMatchingPayload.GetProperty("items").EnumerateArray().ToArray();
 
         Assert.Multiple(() =>
         {
-            Assert.That(items, Has.Length.EqualTo(1));
-            Assert.That(items[0].GetProperty("invoiceNumber").GetString(), Is.EqualTo("PUR-EXACT-001"));
-            Assert.That(items[0].GetProperty("providerId").GetGuid(),
-                Is.EqualTo(seeded.ProviderIds["Álvaro Núñez Suministros"]));
-            Assert.That(payload.GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(matchingItems, Has.Length.EqualTo(1));
+            Assert.That(matchingItems[0].GetProperty("invoiceNumber").GetString(), Is.EqualTo("PUR-EXACT-001"));
+            Assert.That(matchingItems[0].GetProperty("providerId").GetGuid(), Is.EqualTo(matchingProviderId));
+            Assert.That(matchingPayload.GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(nonMatchingItems, Is.Empty);
+            Assert.That(nonMatchingPayload.GetProperty("totalCount").GetInt32(), Is.Zero);
         });
     }
 
