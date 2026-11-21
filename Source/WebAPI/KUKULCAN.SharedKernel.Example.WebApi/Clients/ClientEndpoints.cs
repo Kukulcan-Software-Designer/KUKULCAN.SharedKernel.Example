@@ -230,12 +230,10 @@ public static class ClientEndpoints
         };
 
         int totalCount = matchingClients.Count;
-        ClientListItemResponse[] items =
-        [
-            .. orderedClients
-                .Skip((requestedPage - 1) * requestedPageSize)
-                .Take(requestedPageSize)
-        ];
+        long offset = (long)(requestedPage - 1) * requestedPageSize;
+        ClientListItemResponse[] items = offset > int.MaxValue
+            ? []
+            : [.. orderedClients.Skip((int)offset).Take(requestedPageSize)];
 
         int totalPages = totalCount == 0
             ? 0
