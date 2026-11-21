@@ -181,7 +181,9 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
             code = "NEW-001",
             name = "New product",
             description = "Created through the Example API",
-            tenantId = forgedTenantId
+            tenantId = forgedTenantId,
+            isDeleted = true,
+            deletedOn = DateTimeOffset.UtcNow
         });
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.Created));
@@ -197,6 +199,8 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
             Assert.That(payload.GetProperty("description").GetString(),
                 Is.EqualTo("Created through the Example API"));
             Assert.That(payload.TryGetProperty("tenantId", out _), Is.False);
+            Assert.That(payload.TryGetProperty("isDeleted", out _), Is.False);
+            Assert.That(payload.TryGetProperty("deletedOn", out _), Is.False);
         });
 
         await using var context = CreateDbContext(tenantId);
