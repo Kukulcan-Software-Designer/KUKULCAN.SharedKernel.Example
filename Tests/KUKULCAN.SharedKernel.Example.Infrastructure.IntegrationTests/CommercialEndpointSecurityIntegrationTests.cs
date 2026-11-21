@@ -36,6 +36,7 @@ public sealed class CommercialEndpointSecurityIntegrationTests : ExampleDatabase
     [TestCase("GET", "/api/example/warehouse-stocks/00000000-0000-0000-0000-000000000001")]
     [TestCase("POST", "/api/example/warehouse-stocks")]
     [TestCase("GET", "/api/example/invoices/00000000-0000-0000-0000-000000000001")]
+    [TestCase("GET", "/api/example/invoices")]
     [TestCase("GET", "/api/example/prod-invoices")]
     [TestCase("GET", "/api/example/prod-invoices/00000000-0000-0000-0000-000000000001")]
     public async Task CommercialEndpoints_WithoutToken_ReturnsUnauthorized(
@@ -139,7 +140,9 @@ public sealed class CommercialEndpointSecurityIntegrationTests : ExampleDatabase
     [TestCase("GET", "/api/example/warehouse-stocks")]
     [TestCase("GET", "/api/example/warehouse-stocks/00000000-0000-0000-0000-000000000001")]
     [TestCase("POST", "/api/example/warehouse-stocks")]
+    [TestCase("GET", "/api/example/invoices")]
     [TestCase("GET", "/api/example/invoices/00000000-0000-0000-0000-000000000001")]
+    [TestCase("GET", "/api/example/prod-invoices")]
     [TestCase("GET", "/api/example/prod-invoices/00000000-0000-0000-0000-000000000001")]
     public async Task CommercialEndpoints_WithAuthenticatedUserAndNotReadyAccount_ReturnsForbidden(
         string method,
