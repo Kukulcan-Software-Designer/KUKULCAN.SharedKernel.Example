@@ -38,6 +38,8 @@ public sealed class WarehouseListingEndpointIntegrationTests : ExampleDatabaseTe
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
         var items = await ReadItemsAsync(response);
+        Assert.That(items[0].EnumerateObject().Select(property => property.Name),
+            Is.EquivalentTo(new[] { "id", "name", "city", "state", "postalCode" }));
         Assert.That(items.Select(item => item.GetProperty("name").GetString()),
             Is.EquivalentTo(new[] { "Álvaro Núñez", "Centro Norte", "Centro Sur" }));
     }
