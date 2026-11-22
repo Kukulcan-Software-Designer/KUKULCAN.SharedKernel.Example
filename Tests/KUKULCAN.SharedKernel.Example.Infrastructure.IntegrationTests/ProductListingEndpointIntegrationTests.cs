@@ -229,6 +229,12 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
         await using var factory = new ProductListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
         using var client = CreateAuthenticatedClient(factory, tenantId);
 
+        int productCountBefore;
+        await using (var countContext = CreateDbContext(tenantId))
+        {
+            productCountBefore = await countContext.Products.CountAsync(product => product.TenantId == tenantId);
+        }
+
         using var firstResponse = await client.PostAsJsonAsync("/api/example/products",
             new { code = "DUP-001", name = "First product" });
         Assert.That(firstResponse.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.Created));
@@ -237,6 +243,14 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
             new { code = "DUP-001", name = "Duplicate product" });
 
         Assert.That(duplicateResponse.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.Conflict));
+
+        await using var verificationContext = CreateDbContext(tenantId);
+        var productCountAfter = await verificationContext.Products
+            .CountAsync(product => product.TenantId == tenantId);
+        Assert.That(
+            productCountAfter,
+            Is.EqualTo(productCountBefore + 1),
+            "A duplicate Product request must not persist an additional product.");
     }
 
     [Test]
