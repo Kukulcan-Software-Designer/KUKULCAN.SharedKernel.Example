@@ -336,6 +336,7 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
 
         Guid warehouseId;
         Guid productId;
+        int stockCountBefore;
         await using (var context = CreateDbContext(tenantId))
         {
             var existingStock = await context.WarehouseStocks
@@ -344,6 +345,8 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
                 .FirstAsync();
             warehouseId = existingStock.WarehouseId;
             productId = existingStock.ProductId;
+            stockCountBefore = await context.WarehouseStocks
+                .CountAsync(stock => stock.TenantId == tenantId);
         }
 
         await using var factory = new WarehouseStockListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
@@ -356,6 +359,14 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
         });
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.Conflict));
+
+        await using var verificationContext = CreateDbContext(tenantId);
+        var stockCountAfter = await verificationContext.WarehouseStocks
+            .CountAsync(stock => stock.TenantId == tenantId);
+        Assert.That(
+            stockCountAfter,
+            Is.EqualTo(stockCountBefore),
+            "A duplicate WarehouseStock request must not persist an additional stock record.");
     }
 
     private async Task SeedWarehouseStocksAsync(Guid tenantId)
