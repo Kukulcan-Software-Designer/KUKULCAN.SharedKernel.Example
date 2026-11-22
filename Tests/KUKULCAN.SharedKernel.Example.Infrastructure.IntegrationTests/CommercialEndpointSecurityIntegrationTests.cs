@@ -5,6 +5,7 @@ using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.Example.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
@@ -169,6 +170,64 @@ public sealed class CommercialEndpointSecurityIntegrationTests : ExampleDatabase
             response.StatusCode,
             Is.EqualTo(HttpStatusCode.Forbidden),
             $"Expected an authenticated request with a not-ready account to be rejected for {method} {path}.");
+    }
+
+    [TestCase("/api/example/clients/not-a-guid")]
+    [TestCase("/api/example/providers/not-a-guid")]
+    [TestCase("/api/example/products/not-a-guid")]
+    [TestCase("/api/example/warehouses/not-a-guid")]
+    [TestCase("/api/example/warehouse-stocks/not-a-guid")]
+    [TestCase("/api/example/invoices/not-a-guid")]
+    [TestCase("/api/example/prod-invoices/not-a-guid")]
+    public async Task CommercialDetailEndpoints_WithMalformedGuid_ReturnsBadRequestProblemDetails(string path)
+    {
+        var tenantId = Guid.NewGuid();
+        await using var factory = new CommercialEndpointTestApplicationFactory(
+            ConnectionString,
+            ProviderName,
+            tenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", CreateReadyBearerToken(tenantId));
+
+        using var response = await client.GetAsync(path);
+        var body = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(body);
+        var root = document.RootElement;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+            Assert.That(
+                response.Content.Headers.ContentType?.MediaType,
+                Is.EqualTo("application/problem+json"));
+            Assert.That(root.TryGetProperty("status", out var status), Is.True);
+            Assert.That(status.GetInt32(), Is.EqualTo(StatusCodes.Status400BadRequest));
+            Assert.That(root.TryGetProperty("title", out var title), Is.True);
+            Assert.That(title.GetString(), Is.Not.Empty);
+            Assert.That(body, Does.Not.Contain("StackTrace").IgnoreCase);
+        });
+    }
+
+    private static string CreateReadyBearerToken(Guid tenantId)
+    {
+        var credentials = new SigningCredentials(
+            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)),
+            SecurityAlgorithms.HmacSha256);
+        var claims = new[]
+        {
+            new Claim("sub", Guid.NewGuid().ToString()),
+            new Claim("tenant_id", tenantId.ToString()),
+            new Claim("account_ready", "true")
+        };
+        var token = new JwtSecurityToken(
+            issuer: Issuer,
+            audience: Audience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(5),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     private static string CreateNotReadyBearerToken(Guid tenantId)
