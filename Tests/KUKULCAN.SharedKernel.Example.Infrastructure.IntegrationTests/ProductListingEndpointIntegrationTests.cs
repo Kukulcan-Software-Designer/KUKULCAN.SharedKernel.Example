@@ -5,16 +5,18 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using KUKULCAN.SharedKernel.Abstractions;
 using KUKULCAN.SharedKernel.Database.Configuration;
 using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using KUKULCAN.SharedKernel.Example.Infrastructure;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 
 namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
@@ -262,10 +264,9 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
     {
         const string productCode = "T66-FAIL";
         var tenantId = Guid.NewGuid();
-        var interceptor = new UnexpectedProductSaveChangesInterceptor();
-
         await using var factory = new ProductListingTestApplicationFactory(
-            ConnectionString, ProviderName, tenantId, interceptor, useProductionEnvironment: true);
+            ConnectionString, ProviderName, tenantId,
+            failProductPersistence: true, useProductionEnvironment: true);
         using var client = CreateAuthenticatedClient(factory, tenantId);
         using var response = await client.PostAsJsonAsync("/api/example/products", new
         {
@@ -403,7 +404,7 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
         string connectionString,
         string providerName,
         Guid tenantId,
-        IInterceptor? interceptor = null,
+        bool failProductPersistence = false,
         bool useProductionEnvironment = false)
         : WebApplicationFactory<Program>
     {
@@ -435,34 +436,23 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
             {
                 services.AddExampleDatabase(testConfiguration);
 
-                if (interceptor is not null)
-                {
-                    services.AddDbContext<ExampleDbContext>(options =>
-                        options.AddInterceptors(interceptor));
-                }
             });
+            
+            if (failProductPersistence)
+            {
+                builder.ConfigureTestServices(services =>
+                {
+                    services.RemoveAll<IClock>();
+                    services.AddSingleton<IClock, UnexpectedProductPersistenceClock>();
+                });
+            }
         }
     }
 
-    private sealed class UnexpectedProductSaveChangesInterceptor : SaveChangesInterceptor
+    private sealed class UnexpectedProductPersistenceClock : IClock
     {
-        private const string FailureDetails =
+        public DateTimeOffset UtcNow => throw new InvalidOperationException(
             "T66-SENSITIVE-DIAGNOSTIC-CANARY; Server=database.invalid; "
-            + "Password=T66-NOT-A-REAL-SECRET; SqlException: synthetic SQL statement SELECT * FROM Products.";
-
-        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
-            DbContextEventData eventData,
-            InterceptionResult<int> result,
-            CancellationToken cancellationToken = default)
-        {
-            if (eventData.Context is ExampleDbContext context
-                && context.ChangeTracker.Entries<Product>().Any(entry =>
-                    entry.State == EntityState.Added && entry.Entity.Code == "T66-FAIL"))
-            {
-                throw new InvalidOperationException(FailureDetails);
-            }
-
-            return ValueTask.FromResult(result);
-        }
+            + "Password=T66-NOT-A-REAL-SECRET; SqlException: synthetic SQL statement SELECT * FROM Products.");
     }
 }
