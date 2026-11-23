@@ -99,6 +99,38 @@ public sealed class InvoiceEndpointIntegrationTests : ExampleDatabaseTestFixture
     }
 
     [Test]
+    public async Task GetInvoices_WithClientAndIssuedFromOnly_IncludesInclusiveUtcLowerBoundary()
+    {
+        var tenantId = Guid.NewGuid();
+        var issuedFrom = new DateTimeOffset(2026, 7, 5, 10, 0, 0, TimeSpan.Zero);
+        var seeded = await SeedInvoicesAsync(
+            tenantId,
+            new InvoiceSeed(null, "SALE-T43-LOWER", "Álvaro Núñez", issuedFrom),
+            new InvoiceSeed(null, "SALE-T43-AFTER", "Álvaro Núñez", issuedFrom.AddHours(1)),
+            new InvoiceSeed(null, "SALE-T43-BEFORE", "Álvaro Núñez", issuedFrom.AddSeconds(-1)),
+            new InvoiceSeed(null, "SALE-T43-OTHER-CLIENT", "Beatriz García", issuedFrom.AddHours(1)));
+
+        await using var factory = new InvoiceTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var query =
+            $"clientId={seeded.ClientIds["Álvaro Núñez"]}" +
+            $"&issuedFrom={Uri.EscapeDataString("2026-07-05T12:00:00+02:00")}";
+        using var response = await client.GetAsync($"/api/example/invoices?{query}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = payload.GetProperty("items").EnumerateArray().ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items, Has.Length.EqualTo(2));
+            Assert.That(items.Select(item => item.GetProperty("invoiceNumber").GetString()),
+                Is.EquivalentTo(new[] { "SALE-T43-LOWER", "SALE-T43-AFTER" }));
+            Assert.That(payload.GetProperty("totalCount").GetInt32(), Is.EqualTo(2));
+        });
+    }
+
+    [Test]
     public async Task GetInvoices_WithInvoiceNumber_UsesExactCaseAndAccentInsensitiveMatching()
     {
         var tenantId = Guid.NewGuid();
