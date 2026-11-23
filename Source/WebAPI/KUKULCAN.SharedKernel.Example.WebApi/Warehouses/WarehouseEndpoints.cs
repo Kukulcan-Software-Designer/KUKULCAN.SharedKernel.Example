@@ -64,7 +64,7 @@ public static class WarehouseEndpoints
     {
         if (!Guid.TryParse(id, out Guid parsedId))
         {
-            return Results.Problem(
+            return HttpResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Invalid route parameter",
                 detail: "The identifier must be a valid GUID.");
