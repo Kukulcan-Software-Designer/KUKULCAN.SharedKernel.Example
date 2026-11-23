@@ -110,7 +110,7 @@ public static class ProductEndpoints
             .ToUpperInvariant();
     }
 
-    private static async Task<IResult> GetProductsAsync(HttpRequest request, 
+    private static async Task<IResult> GetProductsAsync(HttpRequest request,
         string? code, string? name, string? sortBy, string? sortDirection,
         [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
         CancellationToken cancellationToken)
