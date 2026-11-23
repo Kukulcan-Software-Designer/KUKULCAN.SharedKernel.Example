@@ -138,7 +138,8 @@ public static class WarehouseStockEndpoints
             });
         }
 
-        Dictionary<string, string[]> validationErrors = PaginationQueryValidator.Validate(request, out int requestedPage, out int requestedPageSize);
+        var validationErrors = PaginationQueryValidator.Validate(
+            request, out int requestedPage, out int requestedPageSize);
 
         if (minQuantity.HasValue && maxQuantity.HasValue && minQuantity.Value > maxQuantity.Value)
         {
