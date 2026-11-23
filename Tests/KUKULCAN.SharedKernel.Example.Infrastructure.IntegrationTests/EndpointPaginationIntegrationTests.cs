@@ -236,6 +236,8 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
     [TestCase("/api/example/products")]
     [TestCase("/api/example/warehouses")]
     [TestCase("/api/example/warehouse-stocks")]
+    [TestCase("/api/example/invoices")]
+    [TestCase("/api/example/prod-invoices")]
     public async Task Listing_WithPageBeyondLastPage_ReturnsEmptyItemsAndPreservesTotals(string route)
     {
         var tenantId = Guid.NewGuid();
@@ -247,13 +249,15 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        int expectedTotalCount = route is "/api/example/invoices" or "/api/example/prod-invoices" ? 1 : 3;
+        int expectedTotalPages = expectedTotalCount;
         Assert.Multiple(() =>
         {
             Assert.That(payload.GetProperty("items").GetArrayLength(), Is.Zero);
             Assert.That(payload.GetProperty("page").GetInt32(), Is.EqualTo(4));
             Assert.That(payload.GetProperty("pageSize").GetInt32(), Is.EqualTo(1));
-            Assert.That(payload.GetProperty("totalCount").GetInt32(), Is.EqualTo(3));
-            Assert.That(payload.GetProperty("totalPages").GetInt32(), Is.EqualTo(3));
+            Assert.That(payload.GetProperty("totalCount").GetInt32(), Is.EqualTo(expectedTotalCount));
+            Assert.That(payload.GetProperty("totalPages").GetInt32(), Is.EqualTo(expectedTotalPages));
         });
     }
 
