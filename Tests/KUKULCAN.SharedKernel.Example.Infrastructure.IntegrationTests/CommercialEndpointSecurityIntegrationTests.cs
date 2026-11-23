@@ -192,16 +192,24 @@ public sealed class CommercialEndpointSecurityIntegrationTests : ExampleDatabase
             new AuthenticationHeaderValue("Bearer", CreateReadyBearerToken(tenantId));
 
         using var response = await client.GetAsync(path);
+
+        Assert.That(
+            response.StatusCode,
+            Is.EqualTo(HttpStatusCode.BadRequest),
+            $"Expected malformed GUID at {path} to return HTTP 400.");
+
+        var mediaType = response.Content.Headers.ContentType?.MediaType;
+        Assert.That(
+            mediaType,
+            Is.EqualTo("application/problem+json"),
+            $"Expected malformed GUID at {path} to return ProblemDetails JSON, but received '{mediaType ?? "<missing>"}'.");
+
         var body = await response.Content.ReadAsStringAsync();
         using var document = JsonDocument.Parse(body);
         var root = document.RootElement;
 
         Assert.Multiple(() =>
         {
-            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
-            Assert.That(
-                response.Content.Headers.ContentType?.MediaType,
-                Is.EqualTo("application/problem+json"));
             Assert.That(root.TryGetProperty("status", out var status), Is.True);
             Assert.That(status.GetInt32(), Is.EqualTo(StatusCodes.Status400BadRequest));
             Assert.That(root.TryGetProperty("title", out var title), Is.True);
