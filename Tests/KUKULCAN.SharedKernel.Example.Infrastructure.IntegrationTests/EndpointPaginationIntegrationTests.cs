@@ -381,7 +381,7 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
             .ToArray();
 
         Product[] products = Enumerable.Range(0, 121)
-            .Select(_ => new Product
+            .Select(index => new Product
             {
                 Id = Guid.NewGuid(),
                 TenantId = tenantId,
