@@ -128,7 +128,8 @@ public static class ProductEndpoints
             });
         }
 
-        Dictionary<string, string[]> validationErrors = PaginationQueryValidator.Validate(request, out int requestedPage, out int requestedPageSize);
+        var validationErrors = PaginationQueryValidator.Validate(
+            request, out int requestedPage, out int requestedPageSize);
 
         string? normalizedSortBy = string.IsNullOrWhiteSpace(sortBy) ? null : sortBy.Trim();
         string? normalizedSortDirection = string.IsNullOrWhiteSpace(sortDirection)
