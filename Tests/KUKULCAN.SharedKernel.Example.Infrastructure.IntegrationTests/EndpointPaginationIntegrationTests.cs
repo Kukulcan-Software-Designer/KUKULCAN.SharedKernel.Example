@@ -138,6 +138,37 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
         using var response = await client.GetAsync($"{route}?{query}");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(
+            response.Content.Headers.ContentType?.MediaType,
+            Is.EqualTo("application/problem+json"));
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var payload = document.RootElement;
+
+        var hasStatus = payload.TryGetProperty("status", out var status);
+        Assert.That(hasStatus, Is.True, "The error response must include the status property.");
+        if (hasStatus)
+        {
+            Assert.That(status.ValueKind, Is.EqualTo(JsonValueKind.Number));
+            if (status.ValueKind == JsonValueKind.Number)
+                Assert.That(status.GetInt32(), Is.EqualTo((int)HttpStatusCode.BadRequest));
+        }
+
+        var expectedParameter = query[..query.IndexOf('=')];
+        var hasErrors = payload.TryGetProperty("errors", out var errors);
+        Assert.That(hasErrors, Is.True, "The error response must include the errors property.");
+        if (hasErrors)
+        {
+            Assert.That(errors.ValueKind, Is.EqualTo(JsonValueKind.Object));
+            if (errors.ValueKind == JsonValueKind.Object)
+            {
+                Assert.That(
+                    errors.EnumerateObject().Any(error =>
+                        string.Equals(error.Name, expectedParameter, StringComparison.OrdinalIgnoreCase)),
+                    Is.True,
+                    $"The errors property must identify the invalid '{expectedParameter}' parameter.");
+            }
+        }
     }
 
     [TestCase("/api/example/clients")]
@@ -296,6 +327,8 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            builder.UseEnvironment(Microsoft.Extensions.Hosting.Environments.Production);
+
             var settings = new Dictionary<string, string?>
             {
                 [$"{KukulcanDatabaseOptions.SectionKey}:Provider"] = providerName,
