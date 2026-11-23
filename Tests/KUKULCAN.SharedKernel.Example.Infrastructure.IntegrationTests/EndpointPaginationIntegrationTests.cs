@@ -193,8 +193,9 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
                 foreach (string expectedParameter in expectedParameters)
                 {
                     Assert.That(
-                        actualErrorKeys,
-                        Does.Contain(expectedParameter).IgnoreCase,
+                        actualErrorKeys.Any(key =>
+                            string.Equals(key, expectedParameter, StringComparison.OrdinalIgnoreCase)),
+                        Is.True,
                         $"The errors property must identify the invalid '{expectedParameter}' parameter.");
                 }
             }
