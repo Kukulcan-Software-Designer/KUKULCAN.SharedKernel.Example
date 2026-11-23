@@ -3,6 +3,7 @@ using System.Text;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
+using KUKULCAN.SharedKernel.Example.WebApi.Pagination;
 using Microsoft.EntityFrameworkCore;
 using HttpResults = Microsoft.AspNetCore.Http.Results;
 
@@ -137,19 +138,7 @@ public static class WarehouseStockEndpoints
             });
         }
 
-        int requestedPage = page ?? 1;
-        int requestedPageSize = pageSize ?? 25;
-
-        var validationErrors = new Dictionary<string, string[]>();
-        if (requestedPage < 1)
-        {
-            validationErrors[nameof(page)] = ["Page must be greater than or equal to 1."];
-        }
-
-        if (requestedPageSize is < 1 or > 100)
-        {
-            validationErrors[nameof(pageSize)] = ["PageSize must be between 1 and 100."];
-        }
+        Dictionary<string, string[]> validationErrors = PaginationQueryValidator.Validate(request, out int requestedPage, out int requestedPageSize);
 
         if (minQuantity.HasValue && maxQuantity.HasValue && minQuantity.Value > maxQuantity.Value)
         {
