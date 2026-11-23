@@ -79,6 +79,35 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
         });
     }
 
+    [TestCase("/api/example/clients")]
+    [TestCase("/api/example/providers")]
+    [TestCase("/api/example/products")]
+    [TestCase("/api/example/warehouses")]
+    [TestCase("/api/example/warehouse-stocks")]
+    [TestCase("/api/example/invoices")]
+    [TestCase("/api/example/prod-invoices")]
+    public async Task Listing_With124Records_ReturnsFivePages(string route)
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedPaginationDataAsync(tenantId);
+        await SeedPaginationDataFor124RecordsAsync(tenantId);
+        await using var factory = CreateFactory(tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+
+        using var response = await client.GetAsync($"{route}?page=1&pageSize=25");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(payload.GetProperty("items").GetArrayLength(), Is.EqualTo(25));
+            Assert.That(payload.GetProperty("page").GetInt32(), Is.EqualTo(1));
+            Assert.That(payload.GetProperty("pageSize").GetInt32(), Is.EqualTo(25));
+            Assert.That(payload.GetProperty("totalCount").GetInt32(), Is.EqualTo(124));
+            Assert.That(payload.GetProperty("totalPages").GetInt32(), Is.EqualTo(5));
+        });
+    }
+
     [TestCase("/api/example/clients", "page=0")]
     [TestCase("/api/example/providers", "page=0")]
     [TestCase("/api/example/products", "page=0")]
@@ -319,6 +348,116 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
             ProductId = product.Id,
             Quantity = 20m + index
         }));
+
+        await context.SaveChangesAsync();
+    }
+
+    private async Task SeedPaginationDataFor124RecordsAsync(Guid tenantId)
+    {
+        await using var context = CreateDbContext(tenantId);
+
+        Client[] clients = Enumerable.Range(0, 121)
+            .Select(index => new Client
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = $"T57 pagination client {index:D3}",
+                City = "Madrid",
+                State = "Madrid",
+                PostalCode = $"28{index:D3}"
+            })
+            .ToArray();
+
+        Provider[] providers = Enumerable.Range(0, 121)
+            .Select(index => new Provider
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = $"T57 pagination provider {index:D3}",
+                City = "Madrid",
+                State = "Madrid",
+                PostalCode = $"29{index:D3}"
+            })
+            .ToArray();
+
+        Product[] products = Enumerable.Range(0, 121)
+            .Select(_ => new Product
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Code = $"T57-{Guid.NewGuid():N}"[..13],
+                Name = "T57 pagination product",
+                Description = "T57 pagination integration test"
+            })
+            .ToArray();
+
+        Warehouse[] warehouses = Enumerable.Range(0, 121)
+            .Select(index => new Warehouse
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = $"T57 pagination warehouse {index:D3}",
+                City = "Madrid",
+                State = "Madrid",
+                PostalCode = $"30{index:D3}"
+            })
+            .ToArray();
+
+        Guid existingWarehouseId = await context.Warehouses
+            .Where(warehouse => warehouse.TenantId == tenantId)
+            .Select(warehouse => warehouse.Id)
+            .FirstAsync();
+
+        Guid[] clientIds = await context.Clients
+            .Where(client => client.TenantId == tenantId)
+            .Select(client => client.Id)
+            .ToArrayAsync();
+        clientIds = [.. clientIds, .. clients.Select(client => client.Id)];
+
+        Guid[] providerIds = await context.Providers
+            .Where(provider => provider.TenantId == tenantId)
+            .Select(provider => provider.Id)
+            .ToArrayAsync();
+        providerIds = [.. providerIds, .. providers.Select(provider => provider.Id)];
+
+        Invoice[] invoices = Enumerable.Range(0, 123)
+            .Select(index => new Invoice
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                ClientId = clientIds[index % clientIds.Length],
+                InvoiceNumber = $"T57-SALE-{Guid.NewGuid():N}"[..18],
+                IssuedAt = DateTimeOffset.UtcNow.AddMinutes(index),
+                ClientName = $"T57 pagination client {index % clientIds.Length:D3}"
+            })
+            .ToArray();
+
+        ProdInvoice[] prodInvoices = Enumerable.Range(0, 123)
+            .Select(index => new ProdInvoice
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                ProviderId = providerIds[index % providerIds.Length],
+                InvoiceNumber = $"T57-PUR-{Guid.NewGuid():N}"[..17],
+                IssuedAt = DateTimeOffset.UtcNow.AddMinutes(index),
+                ProviderName = $"T57 pagination provider {index % providerIds.Length:D3}"
+            })
+            .ToArray();
+
+        context.Clients.AddRange(clients);
+        context.Providers.AddRange(providers);
+        context.Products.AddRange(products);
+        context.Warehouses.AddRange(warehouses);
+        context.WarehouseStocks.AddRange(products.Select(product => new WarehouseStock
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            WarehouseId = existingWarehouseId,
+            ProductId = product.Id,
+            Quantity = 1m
+        }));
+        context.Invoices.AddRange(invoices);
+        context.ProdInvoices.AddRange(prodInvoices);
 
         await context.SaveChangesAsync();
     }
