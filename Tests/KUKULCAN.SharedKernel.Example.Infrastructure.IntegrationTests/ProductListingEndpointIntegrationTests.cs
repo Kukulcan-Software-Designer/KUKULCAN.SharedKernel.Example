@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 
 namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
@@ -243,6 +244,8 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
             new { code = "DUP-001", name = "Duplicate product" });
 
         Assert.That(duplicateResponse.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.Conflict));
+        Assert.That(await duplicateResponse.Content.ReadAsStringAsync(), Is.Empty,
+            "A duplicate Product conflict must not expose SQL or provider diagnostics.");
 
         await using var verificationContext = CreateDbContext(tenantId);
         var productCountAfter = await verificationContext.Products
@@ -251,6 +254,46 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
             productCountAfter,
             Is.EqualTo(productCountBefore + 1),
             "A duplicate Product request must not persist an additional product.");
+    }
+
+
+    [Test]
+    public async Task PostProducts_WhenUnexpectedPersistenceFailureOccurs_ReturnsSanitizedServerErrorWithoutPersistingProduct()
+    {
+        const string productCode = "T66-FAIL";
+        var tenantId = Guid.NewGuid();
+        var interceptor = new UnexpectedProductSaveChangesInterceptor();
+
+        await using var factory = new ProductListingTestApplicationFactory(
+            ConnectionString, ProviderName, tenantId, interceptor, useProductionEnvironment: true);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.PostAsJsonAsync("/api/example/products", new
+        {
+            code = productCode,
+            name = "Product used to test unexpected persistence failures"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.InternalServerError));
+
+        var errorBody = await response.Content.ReadAsStringAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(errorBody, Does.Not.Contain("T66-SENSITIVE-DIAGNOSTIC-CANARY"));
+            Assert.That(errorBody, Does.Not.Contain("database.invalid").IgnoreCase);
+            Assert.That(errorBody, Does.Not.Contain("T66-NOT-A-REAL-SECRET"));
+            Assert.That(errorBody, Does.Not.Contain("SqlException").IgnoreCase);
+            Assert.That(errorBody, Does.Not.Contain("PostgresException").IgnoreCase);
+            Assert.That(errorBody, Does.Not.Contain("MySqlException").IgnoreCase);
+            Assert.That(errorBody, Does.Not.Contain("InvalidOperationException").IgnoreCase);
+            Assert.That(errorBody, Does.Not.Contain("SELECT * FROM Products").IgnoreCase);
+            Assert.That(errorBody, Does.Not.Contain("   at "));
+        });
+
+        await using var verificationContext = CreateDbContext(tenantId);
+        var productWasPersisted = await verificationContext.Products
+            .AnyAsync(product => product.TenantId == tenantId && product.Code == productCode);
+        Assert.That(productWasPersisted, Is.False,
+            "A failed Product persistence operation must not leave the attempted record in the database.");
     }
 
     [Test]
@@ -357,11 +400,20 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
     }
 
     private sealed class ProductListingTestApplicationFactory(
-        string connectionString, string providerName, Guid tenantId)
+        string connectionString,
+        string providerName,
+        Guid tenantId,
+        IInterceptor? interceptor = null,
+        bool useProductionEnvironment = false)
         : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            if (useProductionEnvironment)
+            {
+                builder.UseEnvironment("Production");
+            }
+
             var settings = new Dictionary<string, string?>
             {
                 [$"{KukulcanDatabaseOptions.SectionKey}:Provider"] = providerName,
@@ -380,7 +432,37 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddConfiguration(testConfiguration));
             builder.ConfigureServices(services =>
-                services.AddExampleDatabase(testConfiguration));
+            {
+                services.AddExampleDatabase(testConfiguration);
+
+                if (interceptor is not null)
+                {
+                    services.AddDbContext<ExampleDbContext>(options =>
+                        options.AddInterceptors(interceptor));
+                }
+            });
+        }
+    }
+
+    private sealed class UnexpectedProductSaveChangesInterceptor : SaveChangesInterceptor
+    {
+        private const string FailureDetails =
+            "T66-SENSITIVE-DIAGNOSTIC-CANARY; Server=database.invalid; "
+            + "Password=T66-NOT-A-REAL-SECRET; SqlException: synthetic SQL statement SELECT * FROM Products.";
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (eventData.Context is ExampleDbContext context
+                && context.ChangeTracker.Entries<Product>().Any(entry =>
+                    entry.State == EntityState.Added && entry.Entity.Code == "T66-FAIL"))
+            {
+                throw new InvalidOperationException(FailureDetails);
+            }
+
+            return ValueTask.FromResult(result);
         }
     }
 }
