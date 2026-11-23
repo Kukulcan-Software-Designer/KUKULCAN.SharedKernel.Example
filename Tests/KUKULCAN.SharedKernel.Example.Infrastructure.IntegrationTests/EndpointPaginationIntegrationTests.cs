@@ -262,6 +262,8 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
     [TestCase("/api/example/products")]
     [TestCase("/api/example/warehouses")]
     [TestCase("/api/example/warehouse-stocks")]
+    [TestCase("/api/example/invoices")]
+    [TestCase("/api/example/prod-invoices")]
     public async Task Listing_WithMaximumPageNumber_ReturnsEmptyItemsWithoutOffsetOverflow(string route)
     {
         var tenantId = Guid.NewGuid();
