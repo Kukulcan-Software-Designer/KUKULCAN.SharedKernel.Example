@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using KUKULCAN.SharedKernel.Database.Abstractions;
 using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
+using KUKULCAN.SharedKernel.Example.WebApi.Pagination;
 using Microsoft.EntityFrameworkCore;
 using HttpResults = Microsoft.AspNetCore.Http.Results;
 
@@ -112,7 +113,7 @@ public static class ProdInvoiceEndpoints
     }
 
     private static async Task<IResult> GetProdInvoicesAsync(HttpRequest request, Guid? providerId, string? providerName,
-        string? invoiceNumber, string? issuedFrom, string? issuedTo, int? page, int? pageSize, string? sortBy,
+        string? invoiceNumber, string? issuedFrom, string? issuedTo, string? sortBy,
         string? sortDirection, [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
         ITenantContext tenantContext, CancellationToken cancellationToken)
     {
@@ -129,19 +130,7 @@ public static class ProdInvoiceEndpoints
             });
         }
 
-        int requestedPage = page ?? 1;
-        int requestedPageSize = pageSize ?? 25;
-        var validationErrors = new Dictionary<string, string[]>();
-
-        if (requestedPage < 1)
-        {
-            validationErrors[nameof(page)] = ["Page must be greater than or equal to 1."];
-        }
-
-        if (requestedPageSize is < 1 or > 100)
-        {
-            validationErrors[nameof(pageSize)] = ["PageSize must be between 1 and 100."];
-        }
+        Dictionary<string, string[]> validationErrors = PaginationQueryValidator.Validate(request, out int requestedPage, out int requestedPageSize);
 
         DateTimeOffset? issuedFromUtc = null;
         if (!string.IsNullOrWhiteSpace(issuedFrom))
