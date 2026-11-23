@@ -46,16 +46,25 @@ public static class ClientEndpoints
             .WithName("GetClientById")
             .WithTags("Clients")
             .Produces<ClientListItemResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
         return endpoints;
     }
 
-    private static async Task<IResult> GetClientByIdAsync(Guid id,
+    private static async Task<IResult> GetClientByIdAsync(string id,
         [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
         CancellationToken cancellationToken)
     {
+        if (!Guid.TryParse(id, out Guid parsedId))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid route parameter",
+                detail: "The identifier must be a valid GUID.");
+        }
+
         if (tenantContext.TenantId == Guid.Empty)
         {
             return HttpResults.Forbid();
@@ -64,7 +73,7 @@ public static class ClientEndpoints
         ClientListItemResponse? client = await context.Clients
             .AsNoTracking()
             .Where(entity =>
-                entity.Id == id
+                entity.Id == parsedId
                 && entity.TenantId == tenantContext.TenantId
                 && !entity.IsDeleted)
             .Select(entity => new ClientListItemResponse(

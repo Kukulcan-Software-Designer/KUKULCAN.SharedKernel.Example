@@ -44,6 +44,7 @@ public static class WarehouseEndpoints
             .WithName("GetWarehouseById")
             .WithTags("Warehouses")
             .Produces<WarehouseListItemResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
@@ -57,10 +58,18 @@ public static class WarehouseEndpoints
         return endpoints;
     }
 
-    private static async Task<IResult> GetWarehouseByIdAsync(Guid id,
+    private static async Task<IResult> GetWarehouseByIdAsync(string id,
         [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
         CancellationToken cancellationToken)
     {
+        if (!Guid.TryParse(id, out Guid parsedId))
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid route parameter",
+                detail: "The identifier must be a valid GUID.");
+        }
+
         if (tenantContext.TenantId == Guid.Empty)
         {
             return HttpResults.Forbid();
@@ -69,7 +78,7 @@ public static class WarehouseEndpoints
         WarehouseListItemResponse? warehouse = await context.Warehouses
             .AsNoTracking()
             .Where(entity =>
-                entity.Id == id
+                entity.Id == parsedId
                 && entity.TenantId == tenantContext.TenantId)
             .Select(entity => new WarehouseListItemResponse(
                 entity.Id,
