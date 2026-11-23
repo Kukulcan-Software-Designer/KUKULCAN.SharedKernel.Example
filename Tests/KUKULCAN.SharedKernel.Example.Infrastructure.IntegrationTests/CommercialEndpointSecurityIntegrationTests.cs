@@ -189,6 +189,12 @@ public sealed class CommercialEndpointSecurityIntegrationTests : ExampleDatabase
             ProviderName,
             tenantId,
             environmentName: Environments.Production);
+
+        Assert.That(
+            factory.Services.GetRequiredService<IHostEnvironment>().EnvironmentName,
+            Is.EqualTo(Environments.Production),
+            "T63 must execute with the application host running in Production.");
+
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", CreateReadyBearerToken(tenantId));
@@ -293,7 +299,7 @@ public sealed class CommercialEndpointSecurityIntegrationTests : ExampleDatabase
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
-            builder.UseEnvironment(environmentName);
+            builder.UseSetting(WebHostDefaults.EnvironmentKey, environmentName);
 
             var settings = new Dictionary<string, string?>
             {
