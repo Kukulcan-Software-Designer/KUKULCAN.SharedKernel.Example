@@ -186,7 +186,8 @@ public sealed class CommercialEndpointSecurityIntegrationTests : ExampleDatabase
         await using var factory = new CommercialEndpointTestApplicationFactory(
             ConnectionString,
             ProviderName,
-            tenantId);
+            tenantId,
+            environmentName: Environments.Production);
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", CreateReadyBearerToken(tenantId));
@@ -285,11 +286,14 @@ public sealed class CommercialEndpointSecurityIntegrationTests : ExampleDatabase
     private sealed class CommercialEndpointTestApplicationFactory(
         string connectionString,
         string providerName,
-        Guid tenantId)
+        Guid tenantId,
+        string environmentName = Environments.Development)
         : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            builder.UseEnvironment(environmentName);
+
             var settings = new Dictionary<string, string?>
             {
                 [$"{KukulcanDatabaseOptions.SectionKey}:Provider"] = providerName,
