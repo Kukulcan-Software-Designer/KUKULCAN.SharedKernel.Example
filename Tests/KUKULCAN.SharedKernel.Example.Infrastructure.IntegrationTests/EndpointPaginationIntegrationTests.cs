@@ -385,7 +385,7 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
             {
                 Id = Guid.NewGuid(),
                 TenantId = tenantId,
-                Code = $"T57-{Guid.NewGuid():N}"[..13],
+                Code = $"T57-{index:D3}",
                 Name = "T57 pagination product",
                 Description = "T57 pagination integration test"
             })
@@ -426,7 +426,7 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
                 Id = Guid.NewGuid(),
                 TenantId = tenantId,
                 ClientId = clientIds[index % clientIds.Length],
-                InvoiceNumber = $"T57-SALE-{Guid.NewGuid():N}"[..18],
+                InvoiceNumber = $"T57-SALE-{index:D3}",
                 IssuedAt = DateTimeOffset.UtcNow.AddMinutes(index),
                 ClientName = $"T57 pagination client {index % clientIds.Length:D3}"
             })
@@ -438,7 +438,7 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
                 Id = Guid.NewGuid(),
                 TenantId = tenantId,
                 ProviderId = providerIds[index % providerIds.Length],
-                InvoiceNumber = $"T57-PUR-{Guid.NewGuid():N}"[..17],
+                InvoiceNumber = $"T57-PUR-{index:D3}",
                 IssuedAt = DateTimeOffset.UtcNow.AddMinutes(index),
                 ProviderName = $"T57 pagination provider {index % providerIds.Length:D3}"
             })
