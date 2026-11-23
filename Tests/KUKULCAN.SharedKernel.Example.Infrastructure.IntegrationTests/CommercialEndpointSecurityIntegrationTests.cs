@@ -288,7 +288,7 @@ public sealed class CommercialEndpointSecurityIntegrationTests : ExampleDatabase
         string connectionString,
         string providerName,
         Guid tenantId,
-        string environmentName = Environments.Development)
+        string environmentName = "Development")
         : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
