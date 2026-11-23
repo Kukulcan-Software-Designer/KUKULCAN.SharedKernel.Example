@@ -111,7 +111,7 @@ public static class WarehouseEndpoints
             .ToUpperInvariant();
     }
 
-    private static async Task<IResult> GetWarehousesAsync(HttpRequest request, 
+    private static async Task<IResult> GetWarehousesAsync(HttpRequest request,
         string? name, string? city, string? state, string? postalCode, string? sortBy, string? sortDirection,
         [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
         CancellationToken cancellationToken)
