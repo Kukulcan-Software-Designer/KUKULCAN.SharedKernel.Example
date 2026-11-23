@@ -119,7 +119,7 @@ public static class WarehouseStockEndpoints
             .ToUpperInvariant();
     }
 
-    private static async Task<IResult> GetWarehouseStocksAsync(HttpRequest request, 
+    private static async Task<IResult> GetWarehouseStocksAsync(HttpRequest request,
         Guid? warehouseId, Guid? productId, decimal? minQuantity, decimal? maxQuantity,
         string? productCode, string? productName, string? sortBy, string? sortDirection,
         [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
