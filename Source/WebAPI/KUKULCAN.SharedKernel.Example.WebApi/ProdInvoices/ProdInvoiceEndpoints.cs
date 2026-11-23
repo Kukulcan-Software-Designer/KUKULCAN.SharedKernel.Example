@@ -130,7 +130,8 @@ public static class ProdInvoiceEndpoints
             });
         }
 
-        Dictionary<string, string[]> validationErrors = PaginationQueryValidator.Validate(request, out int requestedPage, out int requestedPageSize);
+        var validationErrors = PaginationQueryValidator.Validate(
+            request, out int requestedPage, out int requestedPageSize);
 
         DateTimeOffset? issuedFromUtc = null;
         if (!string.IsNullOrWhiteSpace(issuedFrom))
