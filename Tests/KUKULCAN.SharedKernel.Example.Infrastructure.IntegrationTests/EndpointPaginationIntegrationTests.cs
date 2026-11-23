@@ -128,6 +128,27 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
     [TestCase("/api/example/prod-invoices", "page=0")]
     [TestCase("/api/example/prod-invoices", "pageSize=0")]
     [TestCase("/api/example/prod-invoices", "pageSize=101")]
+    [TestCase("/api/example/clients", "page=")]
+    [TestCase("/api/example/providers", "page=")]
+    [TestCase("/api/example/products", "page=")]
+    [TestCase("/api/example/warehouses", "page=")]
+    [TestCase("/api/example/warehouse-stocks", "page=")]
+    [TestCase("/api/example/invoices", "page=")]
+    [TestCase("/api/example/prod-invoices", "page=")]
+    [TestCase("/api/example/clients", "pageSize=")]
+    [TestCase("/api/example/providers", "pageSize=")]
+    [TestCase("/api/example/products", "pageSize=")]
+    [TestCase("/api/example/warehouses", "pageSize=")]
+    [TestCase("/api/example/warehouse-stocks", "pageSize=")]
+    [TestCase("/api/example/invoices", "pageSize=")]
+    [TestCase("/api/example/prod-invoices", "pageSize=")]
+    [TestCase("/api/example/clients", "page=not-a-number&pageSize=not-a-number")]
+    [TestCase("/api/example/providers", "page=not-a-number&pageSize=not-a-number")]
+    [TestCase("/api/example/products", "page=not-a-number&pageSize=not-a-number")]
+    [TestCase("/api/example/warehouses", "page=not-a-number&pageSize=not-a-number")]
+    [TestCase("/api/example/warehouse-stocks", "page=not-a-number&pageSize=not-a-number")]
+    [TestCase("/api/example/invoices", "page=not-a-number&pageSize=not-a-number")]
+    [TestCase("/api/example/prod-invoices", "page=not-a-number&pageSize=not-a-number")]
     public async Task Listing_WithInvalidPaginationParameters_ReturnsBadRequest(string route, string query)
     {
         var tenantId = Guid.NewGuid();
@@ -154,7 +175,10 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
                 Assert.That(status.GetInt32(), Is.EqualTo((int)HttpStatusCode.BadRequest));
         }
 
-        var expectedParameter = query[..query.IndexOf('=')];
+        string[] expectedParameters = query.Split('&')
+            .Select(parameter => parameter[..parameter.IndexOf('=')])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         var hasErrors = payload.TryGetProperty("errors", out var errors);
         Assert.That(hasErrors, Is.True, "The error response must include the errors property.");
         if (hasErrors)
@@ -162,11 +186,17 @@ public sealed class EndpointPaginationIntegrationTests : ExampleDatabaseTestFixt
             Assert.That(errors.ValueKind, Is.EqualTo(JsonValueKind.Object));
             if (errors.ValueKind == JsonValueKind.Object)
             {
-                Assert.That(
-                    errors.EnumerateObject().Any(error =>
-                        string.Equals(error.Name, expectedParameter, StringComparison.OrdinalIgnoreCase)),
-                    Is.True,
-                    $"The errors property must identify the invalid '{expectedParameter}' parameter.");
+                string[] actualErrorKeys = errors.EnumerateObject()
+                    .Select(error => error.Name)
+                    .ToArray();
+
+                foreach (string expectedParameter in expectedParameters)
+                {
+                    Assert.That(
+                        actualErrorKeys,
+                        Does.Contain(expectedParameter).IgnoreCase,
+                        $"The errors property must identify the invalid '{expectedParameter}' parameter.");
+                }
             }
         }
     }
