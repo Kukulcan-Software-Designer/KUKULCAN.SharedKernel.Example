@@ -129,6 +129,23 @@ public sealed class WarehouseListingEndpointIntegrationTests : ExampleDatabaseTe
     }
 
     [Test]
+    public async Task GetWarehouses_WithNameCityStateAndPostalCodeFilters_CombinesPredicatesWithAnd()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehousesAsync(tenantId);
+
+        await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync(
+            "/api/example/warehouses?name=centro&city=malaga&state=cataluna&postalCode=08001");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var items = await ReadItemsAsync(response);
+        Assert.That(items.Select(item => item.GetProperty("name").GetString()),
+            Is.EquivalentTo(new[] { "Centro Sur" }));
+    }
+
+    [Test]
     public async Task GetWarehouses_WithNameFilter_UsesPartialCaseAndAccentInsensitiveMatching()
     {
         var tenantId = Guid.NewGuid();
