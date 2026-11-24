@@ -44,7 +44,6 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
         Assert.That(items.Select(item => item.GetProperty("name").GetString()),
             Is.EquivalentTo(new[] { "Álvaro Núñez", "Carla Soto", "Padded city match" }));
     }
-    }
 
     [Test]
     public async Task GetProviders_WithStateFilter_UsesExactCaseAndAccentInsensitiveMatching()
@@ -65,7 +64,6 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
         Assert.That(items.Select(item => item.GetProperty("name").GetString()),
             Is.EquivalentTo(new[] { "Álvaro Núñez", "Alvaro Rios", "Padded state match" }));
     }
-    }
 
     [Test]
     public async Task GetProviders_WithPostalCodeFilter_PreservesLeadingZeroesAndUsesExactMatching()
@@ -84,7 +82,6 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
         var items = await ReadItemsAsync(response);
         Assert.That(items.Select(item => item.GetProperty("name").GetString()),
             Is.EquivalentTo(new[] { "Álvaro Núñez" }));
-    }
     }
 
     [Test]
@@ -105,7 +102,6 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
         Assert.That(items.Select(item => item.GetProperty("name").GetString()),
             Is.EquivalentTo(new[] { "Álvaro Núñez", "María de Álvaro" }));
     }
-    }
 
     [Test]
     public async Task GetProviders_WithStateAndPostalCodeFilters_CombinesPredicatesWithAnd()
@@ -125,7 +121,6 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
         var items = await ReadItemsAsync(response);
         Assert.That(items.Select(item => item.GetProperty("name").GetString()),
             Is.EquivalentTo(new[] { "Carla Soto", "Geographic exact match" }));
-    }
     }
 
     [Test]
@@ -148,7 +143,6 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
         var items = await ReadItemsAsync(response);
         Assert.That(items.Select(item => item.GetProperty("name").GetString()),
             Is.EquivalentTo(new[] { "Carla Soto", "María de Carla" }));
-    }
     }
 
     [Test]
