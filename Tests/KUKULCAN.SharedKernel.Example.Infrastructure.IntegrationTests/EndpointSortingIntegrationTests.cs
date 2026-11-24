@@ -30,6 +30,8 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
     private ClientSeed[] _clientSeeds = [];
     private ProviderSeed[] _providerSeeds = [];
     private StockSeed[] _stockSeeds = [];
+    private ProductSeed[] _productSeeds = [];
+    private WarehouseSeed[] _warehouseSeeds = [];
 
     [SetUp]
     public void SetUp()
@@ -51,10 +53,24 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         ];
         _stockSeeds =
         [
-            new(Guid.NewGuid(), "P-400", "delta", 40m),
-            new(Guid.NewGuid(), "P-100", "alpha", 10m),
-            new(Guid.NewGuid(), "P-100", "alpha", 10m),
-            new(Guid.NewGuid(), "P-300", "charlie", 30m)
+            new(Guid.Parse("00000000-0000-0000-0000-000000000401"), "P-400", "delta", 40m),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000402"), "P-100", "alpha", 10m),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000403"), "P-100", "alpha", 10m),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000404"), "P-300", "charlie", 30m)
+        ];
+        _productSeeds =
+        [
+            new(Guid.Parse("00000000-0000-0000-0000-000000000301"), "P-300", "gamma"),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000302"), "P-100", "alpha"),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000303"), "P-100", "beta"),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000304"), "P-200", "delta")
+        ];
+        _warehouseSeeds =
+        [
+            new(Guid.Parse("00000000-0000-0000-0000-000000000501"), "delta", "sevilla", "andalucia", "41001"),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000502"), "alpha", "madrid", "madrid", "28001"),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000503"), "alpha", "barcelona", "cataluna", "08001"),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000504"), "charlie", "sevilla", "andalucia", "41001")
         ];
     }
 
@@ -131,6 +147,120 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         Assert.That(actualIds, Is.EqualTo(expectedIds));
     }
 
+
+    [TestCase("code", "asc")]
+    [TestCase("code", "desc")]
+    public async Task GetProducts_WithAllowedSortField_OrdersInRequestedDirectionWithStableIdTieBreaker(
+        string sortBy, string sortDirection)
+    {
+        await SeedProductsAsync();
+        await using var factory = CreateFactory();
+        using var client = CreateAuthenticatedClient(factory);
+
+        using var response = await client.GetAsync(
+            $"/api/example/products?sortBy={sortBy}&sortDirection={sortDirection}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var actualIds = await ReadIdsAsync(response);
+        var expectedIds = Sort(_productSeeds, seed => ProductSortValue(seed, sortBy), sortDirection)
+            .Select(seed => seed.Id);
+        Assert.That(actualIds, Is.EqualTo(expectedIds));
+    }
+
+    [TestCase("name", "asc")]
+    [TestCase("name", "desc")]
+    [TestCase("city", "asc")]
+    [TestCase("city", "desc")]
+    [TestCase("state", "asc")]
+    [TestCase("state", "desc")]
+    [TestCase("postalCode", "asc")]
+    [TestCase("postalCode", "desc")]
+    public async Task GetWarehouses_WithAllowedSortField_OrdersInRequestedDirectionWithStableIdTieBreaker(
+        string sortBy, string sortDirection)
+    {
+        await SeedWarehousesAsync();
+        await using var factory = CreateFactory();
+        using var client = CreateAuthenticatedClient(factory);
+
+        using var response = await client.GetAsync(
+            $"/api/example/warehouses?sortBy={sortBy}&sortDirection={sortDirection}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var actualIds = await ReadIdsAsync(response);
+        var expectedIds = Sort(_warehouseSeeds, seed => WarehouseSortValue(seed, sortBy), sortDirection)
+            .Select(seed => seed.Id);
+        Assert.That(actualIds, Is.EqualTo(expectedIds));
+    }
+
+    [Test]
+    public async Task GetClients_WithoutSortParameters_UsesNameAscendingAndIdAscending()
+    {
+        await SeedClientsAsync();
+        await using var factory = CreateFactory();
+        using var client = CreateAuthenticatedClient(factory);
+        using var response = await client.GetAsync("/api/example/clients");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var expectedIds = _clientSeeds.OrderBy(seed => seed.Name, StringComparer.Ordinal)
+            .ThenBy(seed => seed.Id).Select(seed => seed.Id);
+        Assert.That(await ReadIdsAsync(response), Is.EqualTo(expectedIds));
+    }
+
+    [Test]
+    public async Task GetProviders_WithoutSortParameters_UsesNameAscendingAndIdAscending()
+    {
+        await SeedProvidersAsync();
+        await using var factory = CreateFactory();
+        using var client = CreateAuthenticatedClient(factory);
+        using var response = await client.GetAsync("/api/example/providers");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var expectedIds = _providerSeeds.OrderBy(seed => seed.Name, StringComparer.Ordinal)
+            .ThenBy(seed => seed.Id).Select(seed => seed.Id);
+        Assert.That(await ReadIdsAsync(response), Is.EqualTo(expectedIds));
+    }
+
+    [Test]
+    public async Task GetProducts_WithoutSortParameters_UsesCodeAscendingAndIdAscending()
+    {
+        await SeedProductsAsync();
+        await using var factory = CreateFactory();
+        using var client = CreateAuthenticatedClient(factory);
+        using var response = await client.GetAsync("/api/example/products");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var expectedIds = _productSeeds.OrderBy(seed => seed.Code, StringComparer.Ordinal)
+            .ThenBy(seed => seed.Id).Select(seed => seed.Id);
+        Assert.That(await ReadIdsAsync(response), Is.EqualTo(expectedIds));
+    }
+
+    [Test]
+    public async Task GetWarehouses_WithoutSortParameters_UsesNameAscendingAndIdAscending()
+    {
+        await SeedWarehousesAsync();
+        await using var factory = CreateFactory();
+        using var client = CreateAuthenticatedClient(factory);
+        using var response = await client.GetAsync("/api/example/warehouses");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var expectedIds = _warehouseSeeds.OrderBy(seed => seed.Name, StringComparer.Ordinal)
+            .ThenBy(seed => seed.Id).Select(seed => seed.Id);
+        Assert.That(await ReadIdsAsync(response), Is.EqualTo(expectedIds));
+    }
+
+    [Test]
+    public async Task GetWarehouseStocks_WithoutSortParameters_UsesIdAscending()
+    {
+        await SeedWarehouseStocksAsync();
+        await using var factory = CreateFactory();
+        using var client = CreateAuthenticatedClient(factory);
+        using var response = await client.GetAsync("/api/example/warehouse-stocks");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var expectedIds = _stockSeeds.OrderBy(seed => seed.Id).Select(seed => seed.Id);
+        Assert.That(await ReadIdsAsync(response), Is.EqualTo(expectedIds));
+    }
+
     [TestCase("/api/example/clients")]
     [TestCase("/api/example/providers")]
     [TestCase("/api/example/warehouse-stocks")]
@@ -186,6 +316,35 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
     {
         await using var context = CreateDbContext(_tenantId);
         context.Providers.AddRange(_providerSeeds.Select(seed => new Provider
+        {
+            Id = seed.Id,
+            TenantId = _tenantId,
+            Name = seed.Name,
+            City = seed.City,
+            State = seed.State,
+            PostalCode = seed.PostalCode
+        }));
+        await context.SaveChangesAsync();
+    }
+
+    private async Task SeedProductsAsync()
+    {
+        await using var context = CreateDbContext(_tenantId);
+        context.Products.AddRange(_productSeeds.Select(seed => new Product
+        {
+            Id = seed.Id,
+            TenantId = _tenantId,
+            Code = seed.Code,
+            Name = seed.Name,
+            Description = "Issue #8 sorting integration-test product"
+        }));
+        await context.SaveChangesAsync();
+    }
+
+    private async Task SeedWarehousesAsync()
+    {
+        await using var context = CreateDbContext(_tenantId);
+        context.Warehouses.AddRange(_warehouseSeeds.Select(seed => new Warehouse
         {
             Id = seed.Id,
             TenantId = _tenantId,
@@ -275,6 +434,8 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         ClientSeed seed => seed.Id,
         ProviderSeed seed => seed.Id,
         StockSeed seed => seed.Id,
+        ProductSeed seed => seed.Id,
+        WarehouseSeed seed => seed.Id,
         _ => throw new ArgumentOutOfRangeException(nameof(item))
     };
 
@@ -301,6 +462,22 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         "quantity" => seed.Quantity,
         "productCode" => seed.ProductCode,
         "productName" => seed.ProductName,
+        _ => throw new ArgumentOutOfRangeException(nameof(sortBy))
+    };
+
+    private static string ProductSortValue(ProductSeed seed, string sortBy) => sortBy switch
+    {
+        "code" => seed.Code,
+        "name" => seed.Name,
+        _ => throw new ArgumentOutOfRangeException(nameof(sortBy))
+    };
+
+    private static string WarehouseSortValue(WarehouseSeed seed, string sortBy) => sortBy switch
+    {
+        "name" => seed.Name,
+        "city" => seed.City,
+        "state" => seed.State,
+        "postalCode" => seed.PostalCode,
         _ => throw new ArgumentOutOfRangeException(nameof(sortBy))
     };
 
@@ -353,4 +530,6 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
     private sealed record ClientSeed(Guid Id, string Name, string City, string State, string PostalCode);
     private sealed record ProviderSeed(Guid Id, string Name, string City, string State, string PostalCode);
     private sealed record StockSeed(Guid Id, string ProductCode, string ProductName, decimal Quantity);
+    private sealed record ProductSeed(Guid Id, string Code, string Name);
+    private sealed record WarehouseSeed(Guid Id, string Name, string City, string State, string PostalCode);
 }
