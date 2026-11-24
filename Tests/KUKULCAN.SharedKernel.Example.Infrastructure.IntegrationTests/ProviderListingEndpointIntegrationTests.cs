@@ -151,6 +151,46 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
     }
     }
 
+    [Test]
+    public async Task GetProviders_WithNameFilter_IsCaseAndAccentInsensitiveAndUsesContainsMatching()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedProvidersAsync(tenantId);
+        await SeedAdditionalProvidersAsync(tenantId,
+            new Provider { Id = Guid.NewGuid(), TenantId = tenantId, Name = "María de Álvaro", City = "Madrid", State = "Madrid", PostalCode = "28002" });
+
+        await using var factory = new ProviderListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync("/api/example/providers?name=ALVARO");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var items = await ReadItemsAsync(response);
+        Assert.That(items.Select(item => item.GetProperty("name").GetString()),
+            Is.EquivalentTo(new[] { "Álvaro Núñez", "Alvaro Rios", "María de Álvaro" }));
+    }
+
+    [Test]
+    public async Task GetProviders_WithCityStateAndPostalCodeFilters_CombinesPredicatesWithAnd()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedProvidersAsync(tenantId);
+        await SeedAdditionalProvidersAsync(tenantId,
+            new Provider { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Geographic exact match", City = "Málaga", State = "Cataluña", PostalCode = "08001" },
+            new Provider { Id = Guid.NewGuid(), TenantId = tenantId, Name = "City prefix near match", City = "Málaga Centro", State = "Cataluña", PostalCode = "08001" },
+            new Provider { Id = Guid.NewGuid(), TenantId = tenantId, Name = "State prefix near match", City = "Málaga", State = "Cataluña Oriental", PostalCode = "08001" },
+            new Provider { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Postal prefix near match", City = "Málaga", State = "Cataluña", PostalCode = "080010" });
+
+        await using var factory = new ProviderListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync(
+            "/api/example/providers?city=malaga&state=cataluna&postalCode=08001");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var items = await ReadItemsAsync(response);
+        Assert.That(items.Select(item => item.GetProperty("name").GetString()),
+            Is.EquivalentTo(new[] { "Carla Soto", "Geographic exact match" }));
+    }
+
     private async Task SeedAdditionalProvidersAsync(Guid tenantId, params Provider[] providers)
     {
         await using var context = CreateDbContext(tenantId);
