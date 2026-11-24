@@ -64,6 +64,57 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
     }
 
     [Test]
+    public async Task GetWarehouseStocks_WithProductNameInternalSubstring_UsesContainsCaseAndAccentInsensitiveMatching()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehouseStocksAsync(tenantId);
+
+        await using (var context = CreateDbContext(tenantId))
+        {
+            var warehouseId = await context.Warehouses
+                .Where(warehouse => warehouse.TenantId == tenantId)
+                .Select(warehouse => warehouse.Id)
+                .SingleAsync();
+
+            var internalMatchProduct = new Product
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Code = "PRD-INTERNAL",
+                Name = "Suministros y Distribuciones ÁLVARO Núñez del Sur"
+            };
+            var nonMatchProduct = new Product
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Code = "PRD-OTHER",
+                Name = "Beatriz García Proveedores"
+            };
+            context.Products.AddRange(internalMatchProduct, nonMatchProduct);
+            context.WarehouseStocks.AddRange(
+                new WarehouseStock
+                {
+                    Id = Guid.NewGuid(), TenantId = tenantId, WarehouseId = warehouseId,
+                    ProductId = internalMatchProduct.Id, Quantity = 10m
+                },
+                new WarehouseStock
+                {
+                    Id = Guid.NewGuid(), TenantId = tenantId, WarehouseId = warehouseId,
+                    ProductId = nonMatchProduct.Id, Quantity = 10m
+                });
+            await context.SaveChangesAsync();
+        }
+
+        await using var factory = new WarehouseStockListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync("/api/example/warehouse-stocks?productName=vArO nUnEz");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var items = await ReadItemsAsync(response);
+
+        Assert.That(items, Has.Length.EqualTo(1));
+        Assert.That(items[0].GetProperty("productCode").GetString(), Is.EqualTo("PRD-INTERNAL"));
+        Assert.That(items[0].GetProperty("productName").GetString(),
+            Is.EqualTo("Suministros y Distribuciones ÁLVARO Núñez del Sur"));
+    }
+
+    [Test]
     public async Task GetWarehouseStocks_WithUnknownQueryParameter_ReturnsBadRequest()
     {
         var tenantId = Guid.NewGuid();
