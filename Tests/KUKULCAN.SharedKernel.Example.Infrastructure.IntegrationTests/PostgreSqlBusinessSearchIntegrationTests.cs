@@ -23,9 +23,10 @@ public sealed class PostgreSqlBusinessSearchIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
 
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(postgres.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         await context.Database.MigrateAsync();
 
         var matchingClient = new Client

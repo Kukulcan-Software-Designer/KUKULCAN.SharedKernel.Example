@@ -4,8 +4,12 @@ using HttpResults = Microsoft.AspNetCore.Http.Results;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.I18N;
 
+/// <summary>Provides route mappings for the i18ntranslation API.</summary>
 public static class I18nTranslationEndpoints
 {
+    /// <summary>Maps the i18n translation endpoints HTTP endpoints.</summary>
+    /// <param name="endpoints">The route builder to extend.</param>
+    /// <returns>The route builder, allowing additional endpoint mappings to be chained.</returns>
     public static IEndpointRouteBuilder MapI18nTranslationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet(
@@ -66,6 +70,12 @@ public static class I18nTranslationEndpoints
     }
 }
 
+/// <summary>Represents i18n translation response data.</summary>
+/// <param name="Code">The code value.</param>
+/// <param name="LanguageCode">The language code value.</param>
+/// <param name="Text">The text value.</param>
+/// <param name="IsFallback">The is fallback value.</param>
+/// <param name="ActualLanguageCode">The actual language code value.</param>
 public sealed record I18nTranslationResponseDto(
     string Code,
     string LanguageCode,

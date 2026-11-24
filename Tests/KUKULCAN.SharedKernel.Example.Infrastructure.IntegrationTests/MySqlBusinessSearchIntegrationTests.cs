@@ -35,8 +35,9 @@ public sealed class MySqlBusinessSearchIntegrationTests
     public async Task MySqlBusinessSearches_FilterByCriteriaAndIsolateResultsByTenant(CancellationToken cancellationToken)
     {
         await using var database = await MySqlTestDiagnostics.StartDatabaseAsync("example_mysql_search");
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
 
-        var connectionString = database.GetConnectionString();
+        var connectionString = TestcontainersConnectionStringScope.Current;
         var tenantA = Guid.NewGuid();
         var tenantB = Guid.NewGuid();
         var rangeStart = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);

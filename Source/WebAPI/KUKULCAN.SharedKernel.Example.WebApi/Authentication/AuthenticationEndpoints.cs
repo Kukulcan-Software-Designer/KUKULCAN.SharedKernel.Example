@@ -8,8 +8,12 @@ using Microsoft.AspNetCore.Routing;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.Authentication;
 
+/// <summary>Maps authentication-related HTTP routes.</summary>
 public static class AuthenticationEndpoints
 {
+    /// <summary>Maps the authentication endpoints to the supplied route builder.</summary>
+    /// <param name="endpoints">The route builder to extend.</param>
+    /// <returns>The route builder, allowing additional endpoint mappings to be chained.</returns>
     public static IEndpointRouteBuilder MapAuthenticationEndpoints(
         this IEndpointRouteBuilder endpoints)
     {

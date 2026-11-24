@@ -38,8 +38,9 @@ public sealed class AdministratorBootstrapPersistenceIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
 
-        var connectionString = postgres.GetConnectionString();
+        var connectionString = TestcontainersConnectionStringScope.Current;
         var tenantId = Guid.NewGuid();
 
         await using (var migrationContext = CreateContext(connectionString, tenantId))

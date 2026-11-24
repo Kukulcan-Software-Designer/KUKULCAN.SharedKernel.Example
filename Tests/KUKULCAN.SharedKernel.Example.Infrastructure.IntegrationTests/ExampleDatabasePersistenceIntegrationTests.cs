@@ -25,11 +25,12 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
 
         var settings = new Dictionary<string, string?>
         {
             [$"{KukulcanDatabaseOptions.SectionKey}:Provider"] = nameof(DatabaseProvider.PostgresSql),
-            [$"{KukulcanDatabaseOptions.SectionKey}:ConnectionString"] = postgres.GetConnectionString(),
+            [$"{KukulcanDatabaseOptions.SectionKey}:ConnectionString"] = TestcontainersConnectionStringScope.Current,
             [$"{KukulcanDatabaseOptions.SectionKey}:Migration:AutoMigrateOnStartup"] = "false",
             [$"{KukulcanDatabaseOptions.SectionKey}:Migration:SeedDataOnStartup"] = "false"
         };
@@ -78,7 +79,7 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             Options.Create(new KukulcanDatabaseOptions
             {
                 Provider = DatabaseProvider.PostgresSql,
-                ConnectionString = postgres.GetConnectionString(),
+                ConnectionString = TestcontainersConnectionStringScope.Current,
                 Migration = new KukulcanDatabaseOptions.MigrationOptions
                 {
                     AutoMigrateOnStartup = false,
@@ -172,9 +173,10 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
 
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(postgres.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         await context.Database.MigrateAsync();
 
         var client = new KUKULCAN.SharedKernel.Example.Domain.Entities.Client
@@ -241,9 +243,10 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
 
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(postgres.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         await context.Database.MigrateAsync();
 
         var record = new KUKULCAN.SharedKernel.Example.Infrastructure.Persistence.DatabaseIntegrationRecord
@@ -281,10 +284,11 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
 
         var tenantId = Guid.NewGuid();
         var otherTenantId = Guid.NewGuid();
-        await using var context = CreateContext(postgres.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         await context.Database.MigrateAsync();
 
         var ownClient = new KUKULCAN.SharedKernel.Example.Domain.Entities.Client
@@ -323,9 +327,10 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
 
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(postgres.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         await context.Database.MigrateAsync();
 
         var actualDecimalColumns = await context.Database.SqlQueryRaw<string>(
@@ -402,9 +407,10 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
 
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(postgres.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         await context.Database.MigrateAsync();
 
         var clientId = Guid.NewGuid();
@@ -487,9 +493,10 @@ public sealed class ExampleDatabasePersistenceIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await postgres.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
 
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(postgres.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         await context.Database.MigrateAsync();
 
         var client = new KUKULCAN.SharedKernel.Example.Domain.Entities.Client

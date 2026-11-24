@@ -18,7 +18,8 @@ public sealed class SqlServerBusinessSearchIntegrationTests
     public async Task SqlServerBusinessSearches_FilterByCriteriaAndIsolateResultsByTenant()
     {
         await using var sqlServer = await CreateSqlServerAsync();
-        var connectionString = sqlServer.GetConnectionString();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(sqlServer.GetConnectionString());
+        var connectionString = TestcontainersConnectionStringScope.Current;
         var tenantA = Guid.NewGuid();
         var tenantB = Guid.NewGuid();
 

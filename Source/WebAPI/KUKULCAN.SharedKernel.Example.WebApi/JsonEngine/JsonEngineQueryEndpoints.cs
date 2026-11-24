@@ -3,8 +3,12 @@ using HttpResults = Microsoft.AspNetCore.Http.Results;
 
 namespace KUKULCAN.SharedKernel.Example.WebApi.JsonEngine;
 
+/// <summary>Provides route mappings for the jsonenginequery API.</summary>
 public static class JsonEngineQueryEndpoints
 {
+    /// <summary>Maps the json engine query endpoints HTTP endpoints.</summary>
+    /// <param name="endpoints">The route builder to extend.</param>
+    /// <returns>The route builder, allowing additional endpoint mappings to be chained.</returns>
     public static IEndpointRouteBuilder MapJsonEngineQueryEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost(
@@ -35,6 +39,9 @@ public static class JsonEngineQueryEndpoints
     }
 }
 
+/// <summary>Represents json engine query request data.</summary>
+/// <param name="Document">The document value.</param>
+/// <param name="Query">The query value.</param>
 public sealed record JsonEngineQueryRequest(
     System.Text.Json.JsonElement Document,
     string? Query);

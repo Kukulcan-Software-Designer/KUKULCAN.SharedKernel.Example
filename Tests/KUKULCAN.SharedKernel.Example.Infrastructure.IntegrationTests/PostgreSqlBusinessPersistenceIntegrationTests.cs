@@ -18,8 +18,9 @@ public sealed class PostgreSqlBusinessPersistenceIntegrationTests
     public async Task PostgreSqlBusinessPersistence_PersistsRelationshipsUpdatesMasterDataAndPreservesDocumentSnapshots()
     {
         await using var postgres = await CreatePostgreSqlAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(tenantId, postgres.GetConnectionString());
+        await using var context = CreateContext(tenantId, TestcontainersConnectionStringScope.Current);
         await context.Database.MigrateAsync();
 
         var client = new Client { TenantId = tenantId, Name = "Original Client" };
@@ -161,8 +162,9 @@ public sealed class PostgreSqlBusinessPersistenceIntegrationTests
     public async Task PostgreSqlBusinessConstraints_RejectMissingReferencesAndDuplicateCommercialKeys()
     {
         await using var postgres = await CreatePostgreSqlAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(postgres.GetConnectionString());
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(tenantId, postgres.GetConnectionString());
+        await using var context = CreateContext(tenantId, TestcontainersConnectionStringScope.Current);
         await context.Database.MigrateAsync();
 
         var client = new Client { TenantId = tenantId, Name = "Constraint Client" };
