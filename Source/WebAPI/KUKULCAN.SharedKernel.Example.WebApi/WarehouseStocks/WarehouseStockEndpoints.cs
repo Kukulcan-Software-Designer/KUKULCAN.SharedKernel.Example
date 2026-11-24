@@ -239,10 +239,7 @@ public static class WarehouseStockEndpoints
         IOrderedEnumerable<WarehouseStockListItemResponse> orderedStocks;
         if (normalizedSortBy is null)
         {
-            orderedStocks = matchingStocks
-                .OrderBy(stock => stock.WarehouseName, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(stock => stock.ProductCode, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(stock => stock.Id);
+            orderedStocks = matchingStocks.OrderBy(stock => stock.Id);
         }
         else
         {
