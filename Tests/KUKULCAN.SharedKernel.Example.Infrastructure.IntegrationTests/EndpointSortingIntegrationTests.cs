@@ -39,17 +39,17 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         _tenantId = Guid.NewGuid();
         _clientSeeds =
         [
-            new(Guid.NewGuid(), "delta", "sevilla", "andalucia", "41001"),
-            new(Guid.NewGuid(), "alpha", "madrid", "madrid", "28001"),
-            new(Guid.NewGuid(), "alpha", "barcelona", "cataluna", "08001"),
-            new(Guid.NewGuid(), "charlie", "sevilla", "andalucia", "41001")
+            new(Guid.Parse("00000000-0000-0000-0000-000000000101"), "delta", "sevilla", "andalucia", "41001"),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000102"), "alpha", "madrid", "madrid", "28001"),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000103"), "alpha", "barcelona", "cataluna", "08001"),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000104"), "charlie", "sevilla", "andalucia", "41001")
         ];
         _providerSeeds =
         [
-            new(Guid.NewGuid(), "delta", "sevilla", "andalucia", "41001"),
-            new(Guid.NewGuid(), "alpha", "madrid", "madrid", "28001"),
-            new(Guid.NewGuid(), "alpha", "barcelona", "cataluna", "08001"),
-            new(Guid.NewGuid(), "charlie", "sevilla", "andalucia", "41001")
+            new(Guid.Parse("00000000-0000-0000-0000-000000000201"), "delta", "sevilla", "andalucia", "41001"),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000202"), "alpha", "madrid", "madrid", "28001"),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000203"), "alpha", "barcelona", "cataluna", "08001"),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000204"), "charlie", "sevilla", "andalucia", "41001")
         ];
         _stockSeeds =
         [
