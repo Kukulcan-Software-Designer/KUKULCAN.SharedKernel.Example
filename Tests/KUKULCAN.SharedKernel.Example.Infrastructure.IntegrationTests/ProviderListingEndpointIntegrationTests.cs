@@ -27,7 +27,7 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
 
     [Test]
     public async Task GetProviders_WithCityFilter_UsesExactCaseAndAccentInsensitiveMatching()
-    {{
+    {
         var tenantId = Guid.NewGuid();
         await SeedProvidersAsync(tenantId);
         await SeedAdditionalProvidersAsync(tenantId,
@@ -48,7 +48,7 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
 
     [Test]
     public async Task GetProviders_WithStateFilter_UsesExactCaseAndAccentInsensitiveMatching()
-    {{
+    {
         var tenantId = Guid.NewGuid();
         await SeedProvidersAsync(tenantId);
         await SeedAdditionalProvidersAsync(tenantId,
@@ -69,7 +69,7 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
 
     [Test]
     public async Task GetProviders_WithPostalCodeFilter_PreservesLeadingZeroesAndUsesExactMatching()
-    {{
+    {
         var tenantId = Guid.NewGuid();
         await SeedProvidersAsync(tenantId);
         await SeedAdditionalProvidersAsync(tenantId,
@@ -89,7 +89,7 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
 
     [Test]
     public async Task GetProviders_WithNameAndCityFilters_CombinesPredicatesWithAnd()
-    {{
+    {
         var tenantId = Guid.NewGuid();
         await SeedProvidersAsync(tenantId);
         await SeedAdditionalProvidersAsync(tenantId,
@@ -109,7 +109,7 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
 
     [Test]
     public async Task GetProviders_WithStateAndPostalCodeFilters_CombinesPredicatesWithAnd()
-    {{
+    {
         var tenantId = Guid.NewGuid();
         await SeedProvidersAsync(tenantId);
         await SeedAdditionalProvidersAsync(tenantId,
@@ -130,7 +130,7 @@ public sealed class ProviderListingEndpointIntegrationTests : ExampleDatabaseTes
 
     [Test]
     public async Task GetProviders_WithAllFourFilters_CombinesPredicatesWithAnd()
-    {{
+    {
         var tenantId = Guid.NewGuid();
         await SeedProvidersAsync(tenantId);
         await SeedAdditionalProvidersAsync(tenantId,
