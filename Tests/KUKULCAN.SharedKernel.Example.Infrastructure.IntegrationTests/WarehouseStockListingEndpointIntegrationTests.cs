@@ -77,6 +77,55 @@ public sealed class WarehouseStockListingEndpointIntegrationTests : ExampleDatab
     }
 
     [Test]
+    public async Task GetWarehouseStocks_WithProductCodeAndProductNameFilters_CombinesPredicatesWithAnd()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedWarehouseStocksAsync(tenantId);
+
+        await using (var context = CreateDbContext(tenantId))
+        {
+            var warehouseId = await context.Warehouses
+                .Where(warehouse => warehouse.TenantId == tenantId)
+                .Select(warehouse => warehouse.Id)
+                .SingleAsync();
+
+            var codeOnlyProduct = new Product
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Code = "AB-300",
+                Name = "Té verde", Description = "Matches productCode only."
+            };
+            var nameOnlyProduct = new Product
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Code = "ZZ-500",
+                Name = "Café en grano", Description = "Matches productName only."
+            };
+            context.Products.AddRange(codeOnlyProduct, nameOnlyProduct);
+            context.WarehouseStocks.AddRange(
+                new WarehouseStock
+                {
+                    Id = Guid.NewGuid(), TenantId = tenantId, WarehouseId = warehouseId,
+                    ProductId = codeOnlyProduct.Id, Quantity = 10m
+                },
+                new WarehouseStock
+                {
+                    Id = Guid.NewGuid(), TenantId = tenantId, WarehouseId = warehouseId,
+                    ProductId = nameOnlyProduct.Id, Quantity = 10m
+                });
+            await context.SaveChangesAsync();
+        }
+
+        await using var factory = new WarehouseStockListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync(
+            "/api/example/warehouse-stocks?productCode=ab&productName=cafe");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var items = await ReadItemsAsync(response);
+        Assert.That(items.Select(item => item.GetProperty("productCode").GetString()),
+            Is.EquivalentTo(new[] { "ÁB-100", "AB-200" }));
+    }
+
+    [Test]
     public async Task GetWarehouseStocks_WithWarehouseAndProductFilters_CombinesPredicatesWithAnd()
     {
         var tenantId = Guid.NewGuid();
