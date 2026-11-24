@@ -183,6 +183,34 @@ public sealed class InvoiceEndpointIntegrationTests : ExampleDatabaseTestFixture
     }
 
     [Test]
+    public async Task GetInvoices_WithClientNameInternalSubstring_UsesContainsMatchingInsensitiveToCaseAndAccents()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedInvoicesAsync(
+            tenantId,
+            new InvoiceSeed(null, "SALE-CLIENT-INTERNAL", "Distribuciones ÁLVARO Núñez del Sur", DateTimeOffset.UtcNow),
+            new InvoiceSeed(null, "SALE-CLIENT-OTHER", "Beatriz García", DateTimeOffset.UtcNow));
+
+        await using var factory = new InvoiceTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync(
+            $"/api/example/invoices?clientName={Uri.EscapeDataString("vArO nUnEz")}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = payload.GetProperty("items").EnumerateArray().ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items, Has.Length.EqualTo(1));
+            Assert.That(items[0].GetProperty("invoiceNumber").GetString(), Is.EqualTo("SALE-CLIENT-INTERNAL"));
+            Assert.That(items[0].GetProperty("clientName").GetString(),
+                Is.EqualTo("Distribuciones ÁLVARO Núñez del Sur"));
+            Assert.That(payload.GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+        });
+    }
+
+    [Test]
     public async Task GetInvoices_WithEquivalentUtcAndOffsetDateRanges_ReturnsSameResults()
     {
         var tenantId = Guid.NewGuid();
