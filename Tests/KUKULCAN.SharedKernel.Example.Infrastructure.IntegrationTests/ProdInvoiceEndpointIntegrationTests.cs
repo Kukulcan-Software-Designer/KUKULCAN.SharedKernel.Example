@@ -84,7 +84,7 @@ public sealed class ProdInvoiceEndpointIntegrationTests : ExampleDatabaseTestFix
             tenantId,
             new ProdInvoiceSeed(firstId, "SORT-PUR-B", "Bravo Provider", issuedAt.AddDays(-1)),
             new ProdInvoiceSeed(secondId, "SORT-PUR-A", "Alpha Provider", issuedAt),
-            new ProdInvoiceSeed(thirdId, "SORT-PUR-A", "Alpha Provider", issuedAt));
+            new ProdInvoiceSeed(thirdId, "SORT-PUR-C", "Alpha Provider", issuedAt));
 
         await using var factory = new ProdInvoiceTestApplicationFactory(ConnectionString, ProviderName, tenantId);
         using var client = CreateAuthenticatedClient(factory, tenantId);
