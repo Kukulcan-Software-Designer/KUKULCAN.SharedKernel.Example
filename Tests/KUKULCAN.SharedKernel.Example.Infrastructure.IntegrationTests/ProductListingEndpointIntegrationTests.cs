@@ -267,6 +267,7 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
         await using var factory = new ProductListingTestApplicationFactory(
             ConnectionString, ProviderName, tenantId,
             failProductPersistence: true, useProductionEnvironment: true);
+        factory.UseKestrel(0);
         using var client = CreateAuthenticatedClient(factory, tenantId);
         using var response = await client.PostAsJsonAsync("/api/example/products", new
         {
