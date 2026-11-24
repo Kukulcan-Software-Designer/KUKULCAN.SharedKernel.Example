@@ -65,6 +65,49 @@ public sealed class ProdInvoiceEndpointIntegrationTests : ExampleDatabaseTestFix
         });
     }
 
+
+    [TestCase("invoiceNumber", "asc")]
+    [TestCase("invoiceNumber", "desc")]
+    [TestCase("issuedAt", "asc")]
+    [TestCase("issuedAt", "desc")]
+    [TestCase("providerName", "asc")]
+    [TestCase("providerName", "desc")]
+    public async Task GetProdInvoices_WithAllowedSortField_OrdersInRequestedDirectionWithStableIdTieBreaker(
+        string sortBy, string sortDirection)
+    {
+        var tenantId = Guid.NewGuid();
+        var firstId = Guid.Parse("00000000-0000-0000-0000-000000000601");
+        var secondId = Guid.Parse("00000000-0000-0000-0000-000000000602");
+        var thirdId = Guid.Parse("00000000-0000-0000-0000-000000000603");
+        var issuedAt = new DateTimeOffset(2026, 7, 5, 10, 0, 0, TimeSpan.Zero);
+        var seeded = await SeedProdInvoicesAsync(
+            tenantId,
+            new ProdInvoiceSeed(firstId, "SORT-PUR-B", "Bravo Provider", issuedAt.AddDays(-1)),
+            new ProdInvoiceSeed(secondId, "SORT-PUR-A", "Alpha Provider", issuedAt),
+            new ProdInvoiceSeed(thirdId, "SORT-PUR-A", "Alpha Provider", issuedAt));
+
+        await using var factory = new ProdInvoiceTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync(
+            $"/api/example/prod-invoices?sortBy={sortBy}&sortDirection={sortDirection}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var actualIds = payload.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid()).ToArray();
+        var comparer = Comparer<IComparable>.Default;
+        IOrderedEnumerable<ProdInvoice> ordered = string.Equals(
+            sortDirection, "desc", StringComparison.OrdinalIgnoreCase)
+            ? seeded.Invoices.OrderByDescending(invoice => SortValue(invoice, sortBy), comparer)
+            : seeded.Invoices.OrderBy(invoice => SortValue(invoice, sortBy), comparer);
+        var expected = (string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase)
+                ? ordered.ThenByDescending(invoice => invoice.Id)
+                : ordered.ThenBy(invoice => invoice.Id))
+            .Select(invoice => invoice.Id);
+
+        Assert.That(actualIds, Is.EqualTo(expected));
+    }
+
     [Test]
     public async Task GetProdInvoices_WithProviderAndUtcDateRange_IncludesBothInclusiveBoundaries()
     {
@@ -539,6 +582,15 @@ public sealed class ProdInvoiceEndpointIntegrationTests : ExampleDatabaseTestFix
             products.Select(product => product.Id).ToArray(),
             invoices);
     }
+
+
+    private static IComparable SortValue(ProdInvoice invoice, string sortBy) => sortBy switch
+    {
+        "invoiceNumber" => invoice.InvoiceNumber,
+        "issuedAt" => invoice.IssuedAt,
+        "providerName" => invoice.ProviderName,
+        _ => throw new ArgumentOutOfRangeException(nameof(sortBy))
+    };
 
     private static HttpClient CreateAuthenticatedClient(
         WebApplicationFactory<Program> factory,
