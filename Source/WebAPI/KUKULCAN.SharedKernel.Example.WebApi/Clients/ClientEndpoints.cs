@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using KUKULCAN.SharedKernel.Database.Abstractions;
+using KUKULCAN.SharedKernel.Example.Domain.Entities;
 using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
 using KUKULCAN.SharedKernel.Example.WebApi.Pagination;
 using Microsoft.EntityFrameworkCore;
@@ -51,7 +52,62 @@ public static class ClientEndpoints
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound);
 
+        endpoints.MapPost("/api/example/clients", CreateClientAsync)
+            .WithName("CreateClient")
+            .WithTags("Clients")
+            .Produces<ClientListItemResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden);
+
         return endpoints;
+    }
+
+    private static async Task<IResult> CreateClientAsync(
+        ClientCreateRequest request,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        ITenantContext tenantContext,
+        CancellationToken cancellationToken)
+    {
+        string name = request.Name?.Trim() ?? string.Empty;
+        string? city = string.IsNullOrWhiteSpace(request.City) ? null : request.City.Trim();
+        string? state = string.IsNullOrWhiteSpace(request.State) ? null : request.State.Trim();
+        string? postalCode = string.IsNullOrWhiteSpace(request.PostalCode) ? null : request.PostalCode.Trim();
+
+        var validationErrors = new Dictionary<string, string[]>();
+        if (name.Length == 0)
+            validationErrors[nameof(request.Name)] = ["Name is required."];
+        else if (name.Length > 200)
+            validationErrors[nameof(request.Name)] = ["Name must not exceed 200 characters."];
+        if (city?.Length > 120)
+            validationErrors[nameof(request.City)] = ["City must not exceed 120 characters."];
+        if (state?.Length > 120)
+            validationErrors[nameof(request.State)] = ["State must not exceed 120 characters."];
+        if (postalCode?.Length > 32)
+            validationErrors[nameof(request.PostalCode)] = ["PostalCode must not exceed 32 characters."];
+
+        if (validationErrors.Count > 0)
+            return HttpResults.ValidationProblem(validationErrors);
+        if (tenantContext.TenantId == Guid.Empty)
+            return HttpResults.Forbid();
+
+        var entity = new Client
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantContext.TenantId,
+            Name = name,
+            City = city,
+            State = state,
+            PostalCode = postalCode,
+            IsDeleted = false,
+            DeletedOn = null
+        };
+
+        context.Clients.Add(entity);
+        await context.SaveChangesAsync(cancellationToken);
+
+        var response = new ClientListItemResponse(
+            entity.Id, entity.Name, entity.City, entity.State, entity.PostalCode, entity.IsDeleted);
+        return HttpResults.Created($"/api/example/clients/{entity.Id}", response);
     }
 
     private static async Task<IResult> GetClientByIdAsync(string id,
@@ -242,6 +298,9 @@ public static class ClientEndpoints
             totalCount, totalPages));
     }
 }
+
+/// <summary>Represents client creation request data.</summary>
+public sealed record ClientCreateRequest(string? Name, string? City, string? State, string? PostalCode);
 
 /// <summary>Represents client list item response data.</summary>
 /// <param name="Id">The id value.</param>
