@@ -75,9 +75,9 @@ public sealed class InvoiceEndpointIntegrationTests : ExampleDatabaseTestFixture
         string sortBy, string sortDirection)
     {
         var tenantId = Guid.NewGuid();
-        var firstId = Guid.Parse("00000000-0000-0000-0000-000000000601");
-        var secondId = Guid.Parse("00000000-0000-0000-0000-000000000602");
-        var thirdId = Guid.Parse("00000000-0000-0000-0000-000000000603");
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        var thirdId = Guid.NewGuid();
         var issuedAt = new DateTimeOffset(2026, 7, 5, 10, 0, 0, TimeSpan.Zero);
         var seeded = await SeedInvoicesAsync(
             tenantId,
