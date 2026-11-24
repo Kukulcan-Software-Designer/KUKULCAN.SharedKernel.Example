@@ -83,7 +83,7 @@ public sealed class InvoiceEndpointIntegrationTests : ExampleDatabaseTestFixture
             tenantId,
             new InvoiceSeed(firstId, "SORT-SALE-B", "Bravo Client", issuedAt.AddDays(-1)),
             new InvoiceSeed(secondId, "SORT-SALE-A", "Alpha Client", issuedAt),
-            new InvoiceSeed(thirdId, "SORT-SALE-A", "Alpha Client", issuedAt));
+            new InvoiceSeed(thirdId, "SORT-SALE-C", "Alpha Client", issuedAt));
 
         await using var factory = new InvoiceTestApplicationFactory(ConnectionString, ProviderName, tenantId);
         using var client = CreateAuthenticatedClient(factory, tenantId);
