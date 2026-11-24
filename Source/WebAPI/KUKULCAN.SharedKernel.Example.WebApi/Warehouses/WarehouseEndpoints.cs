@@ -26,7 +26,10 @@ public static class WarehouseEndpoints
 
     private static readonly HashSet<string> AllowedSortFields = new(StringComparer.OrdinalIgnoreCase)
     {
-        "name"
+        "name",
+        "city",
+        "state",
+        "postalCode"
     };
 
     /// <summary>Maps the warehouse endpoints HTTP endpoints.</summary>
@@ -139,7 +142,7 @@ public static class WarehouseEndpoints
 
         if (normalizedSortBy is not null && !AllowedSortFields.Contains(normalizedSortBy))
         {
-            validationErrors[nameof(sortBy)] = ["SortBy must be: name."];
+            validationErrors[nameof(sortBy)] = ["SortBy must be one of: name, city, state, postalCode."];
         }
 
         if (normalizedSortDirection is not null && normalizedSortDirection is not ("asc" or "desc"))
@@ -216,13 +219,22 @@ public static class WarehouseEndpoints
             ];
         }
 
+        string sortField = normalizedSortBy?.ToLowerInvariant() ?? "name";
         bool descending = normalizedSortDirection == "desc";
+        Func<WarehouseListItemResponse, string> sortKey = sortField switch
+        {
+            "city" => warehouse => NormalizeSearchText(warehouse.City ?? string.Empty),
+            "state" => warehouse => NormalizeSearchText(warehouse.State ?? string.Empty),
+            "postalcode" => warehouse => NormalizeSearchText(warehouse.PostalCode ?? string.Empty),
+            _ => warehouse => NormalizeSearchText(warehouse.Name)
+        };
+
         IOrderedEnumerable<WarehouseListItemResponse> orderedWarehouses = descending
             ? matchingWarehouses
-                .OrderByDescending(warehouse => NormalizeSearchText(warehouse.Name), StringComparer.Ordinal)
+                .OrderByDescending(sortKey, StringComparer.Ordinal)
                 .ThenByDescending(warehouse => warehouse.Id)
             : matchingWarehouses
-                .OrderBy(warehouse => NormalizeSearchText(warehouse.Name), StringComparer.Ordinal)
+                .OrderBy(sortKey, StringComparer.Ordinal)
                 .ThenBy(warehouse => warehouse.Id);
 
         int totalCount = matchingWarehouses.Count;
