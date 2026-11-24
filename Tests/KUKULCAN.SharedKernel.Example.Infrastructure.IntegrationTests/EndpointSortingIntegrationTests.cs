@@ -39,38 +39,38 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         _tenantId = Guid.NewGuid();
         _clientSeeds =
         [
-            new(Guid.Parse("00000000-0000-0000-0000-000000000101"), "delta", "sevilla", "andalucia", "41001"),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000102"), "alpha", "madrid", "madrid", "28001"),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000103"), "alpha", "barcelona", "cataluna", "08001"),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000104"), "charlie", "sevilla", "andalucia", "41001")
+            new(Guid.NewGuid(), "delta", "sevilla", "andalucia", "41001"),
+            new(Guid.NewGuid(), "alpha", "madrid", "madrid", "28001"),
+            new(Guid.NewGuid(), "alpha", "barcelona", "cataluna", "08001"),
+            new(Guid.NewGuid(), "charlie", "sevilla", "andalucia", "41001")
         ];
         _providerSeeds =
         [
-            new(Guid.Parse("00000000-0000-0000-0000-000000000201"), "delta", "sevilla", "andalucia", "41001"),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000202"), "alpha", "madrid", "madrid", "28001"),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000203"), "alpha", "barcelona", "cataluna", "08001"),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000204"), "charlie", "sevilla", "andalucia", "41001")
+            new(Guid.NewGuid(), "delta", "sevilla", "andalucia", "41001"),
+            new(Guid.NewGuid(), "alpha", "madrid", "madrid", "28001"),
+            new(Guid.NewGuid(), "alpha", "barcelona", "cataluna", "08001"),
+            new(Guid.NewGuid(), "charlie", "sevilla", "andalucia", "41001")
         ];
         _stockSeeds =
         [
-            new(Guid.Parse("00000000-0000-0000-0000-000000000401"), "P-400", "delta", 40m),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000402"), "P-100", "alpha", 10m),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000403"), "P-100", "alpha", 10m),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000404"), "P-300", "charlie", 30m)
+            new(Guid.NewGuid(), "P-400", "delta", 40m),
+            new(Guid.NewGuid(), "P-100", "alpha", 10m),
+            new(Guid.NewGuid(), "P-100", "alpha", 10m),
+            new(Guid.NewGuid(), "P-300", "charlie", 30m)
         ];
         _productSeeds =
         [
-            new(Guid.Parse("00000000-0000-0000-0000-000000000301"), "P-300", "gamma"),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000302"), "P-100", "alpha"),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000303"), "P-150", "beta"),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000304"), "P-200", "delta")
+            new(Guid.NewGuid(), "P-300", "gamma"),
+            new(Guid.NewGuid(), "P-100", "alpha"),
+            new(Guid.NewGuid(), "P-150", "beta"),
+            new(Guid.NewGuid(), "P-200", "delta")
         ];
         _warehouseSeeds =
         [
-            new(Guid.Parse("00000000-0000-0000-0000-000000000501"), "delta", "sevilla", "andalucia", "41001"),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000502"), "alpha", "madrid", "madrid", "28001"),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000503"), "alpha", "barcelona", "cataluna", "08001"),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000504"), "charlie", "sevilla", "andalucia", "41001")
+            new(Guid.NewGuid(), "delta", "sevilla", "andalucia", "41001"),
+            new(Guid.NewGuid(), "alpha", "madrid", "madrid", "28001"),
+            new(Guid.NewGuid(), "alpha", "barcelona", "cataluna", "08001"),
+            new(Guid.NewGuid(), "charlie", "sevilla", "andalucia", "41001")
         ];
     }
 
