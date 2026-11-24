@@ -25,10 +25,11 @@ public sealed class BusinessDecimalAndTransactionIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await database.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
 
         await VerifyDecimalAndTransactionBehaviorAsync(
             DatabaseProvider.PostgresSql,
-            database.GetConnectionString());
+            TestcontainersConnectionStringScope.Current);
     }
 
     [Test]
@@ -38,10 +39,11 @@ public sealed class BusinessDecimalAndTransactionIntegrationTests
             .WithPassword(TestDatabaseCredentials.GeneratePassword())
             .Build();
         await database.StartAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
 
         await VerifyDecimalAndTransactionBehaviorAsync(
             DatabaseProvider.SqlServer,
-            database.GetConnectionString());
+            TestcontainersConnectionStringScope.Current);
     }
 
     private static async Task VerifyDecimalAndTransactionBehaviorAsync(

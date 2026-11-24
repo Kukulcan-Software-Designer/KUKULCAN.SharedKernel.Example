@@ -1,0 +1,456 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using KUKULCAN.SharedKernel.Database.Configuration;
+using KUKULCAN.SharedKernel.Example.Domain.Entities;
+using KUKULCAN.SharedKernel.Example.Infrastructure;
+using KUKULCAN.SharedKernel.Example.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
+
+namespace KUKULCAN.SharedKernel.Example.Infrastructure.IntegrationTests;
+
+[TestFixture]
+[NonParallelizable]
+public sealed class ClientListingEndpointIntegrationTests : ExampleDatabaseTestFixture
+{
+    private static readonly string SigningKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+    private const string Issuer = "issue-8-client-listing-tests";
+    private const string Audience = "issue-8-client-listing-api";
+
+    [Test]
+    public void ExampleDatabaseFixture_ExposesTestcontainersConnectionThroughCanonicalEnvironmentVariable()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                Environment.GetEnvironmentVariable("KUKULCAN__DATABASE__PROVIDER"),
+                Is.EqualTo(ProviderName));
+            Assert.That(
+                Environment.GetEnvironmentVariable("KUKULCAN__DATABASE__CONNECTIONSTRING"),
+                Is.EqualTo(ConnectionString).And.Not.Empty);
+        });
+    }
+
+    [Test]
+    public async Task GetClients_WithNameFilter_IsCaseAndAccentInsensitiveAndUsesContainsMatching()
+    {
+        var tenantId = Guid.NewGuid();
+        var clients = new[]
+        {
+            new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Álvaro Núñez", City = "Málaga", State = "Andalucía", PostalCode = "00123" },
+            new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Alvaro Rios", City = "Sevilla", State = "Andalucía", PostalCode = "41001" },
+            new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "María de Álvaro", City = "Madrid", State = "Madrid", PostalCode = "28002" },
+            new Client { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Beatriz García", City = "Madrid", State = "Madrid", PostalCode = "28001" }
+        };
+        await SeedTenantAsync(tenantId, clients);
+
+        await using var factory = new ClientListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateAccessToken(tenantId));
+        using var response = await client.GetAsync("/api/example/clients?name=alvaro");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = payload.GetProperty("items").EnumerateArray().ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(items, Has.Length.EqualTo(3));
+            Assert.That(items[0].EnumerateObject().Select(property => property.Name),
+                Is.EquivalentTo(new[] { "id", "name", "city", "state", "postalCode", "isDeleted" }));
+            Assert.That(items.Select(item => item.GetProperty("name").GetString()),
+                Is.EquivalentTo(new[] { "Álvaro Núñez", "Alvaro Rios", "María de Álvaro" }));
+        });
+    }
+
+    [Test]
+    public async Task GetClients_WithCityFilter_UsesExactCaseAndAccentInsensitiveMatching()
+    {
+        var tenantId = Guid.NewGuid();
+        var clients = CreateGeographicClients(tenantId);
+        clients[0].City = " Málaga ";
+        clients =
+        [
+            .. clients,
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "City prefix near match",
+                City = "Málaga Centro", State = "Andalucía", PostalCode = "00124"
+            },
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "City substring near match",
+                City = "Gran Málaga", State = "Andalucía", PostalCode = "00125"
+            }
+        ];
+        await SeedTenantAsync(tenantId, clients);
+
+        await using var factory = new ClientListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateAccessToken(tenantId));
+        using var response = await client.GetAsync("/api/example/clients?city=%20MALAGA%20");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = payload.GetProperty("items").EnumerateArray().ToArray();
+        Assert.That(items.Select(item => item.GetProperty("name").GetString()),
+            Is.EquivalentTo(new[] { "Álvaro Núñez", "Carla Soto" }));
+    }
+
+    [Test]
+    public async Task GetClients_WithStateFilter_UsesExactCaseAndAccentInsensitiveMatching()
+    {
+        var tenantId = Guid.NewGuid();
+        var clients = CreateGeographicClients(tenantId);
+        clients[0].State = " Andalucía ";
+        clients =
+        [
+            .. clients,
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "State prefix near match",
+                City = "Madrid", State = "Andalucía Oriental", PostalCode = "28002"
+            },
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "State substring near match",
+                City = "Madrid", State = "Gran Andalucía", PostalCode = "28003"
+            }
+        ];
+        await SeedTenantAsync(tenantId, clients);
+
+        await using var factory = new ClientListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateAccessToken(tenantId));
+        using var response = await client.GetAsync("/api/example/clients?state=%20ANDALUCIA%20");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = payload.GetProperty("items").EnumerateArray().ToArray();
+        Assert.That(items.Select(item => item.GetProperty("name").GetString()),
+            Is.EquivalentTo(new[] { "Álvaro Núñez", "Alvaro Rios" }));
+    }
+
+    [Test]
+    public async Task GetClients_WithPostalCodeFilter_PreservesLeadingZeroesAndUsesExactMatching()
+    {
+        var tenantId = Guid.NewGuid();
+        var clients = CreateGeographicClients(tenantId);
+        clients =
+        [
+            .. clients,
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "Postal prefix near match",
+                City = "Málaga", State = "Andalucía", PostalCode = "001234"
+            },
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "Postal numeric near match",
+                City = "Málaga", State = "Andalucía", PostalCode = "123"
+            }
+        ];
+        await SeedTenantAsync(tenantId, clients);
+
+        await using var factory = new ClientListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateAccessToken(tenantId));
+        using var response = await client.GetAsync("/api/example/clients?postalCode=00123");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = payload.GetProperty("items").EnumerateArray().ToArray();
+        Assert.That(items.Select(item => item.GetProperty("name").GetString()),
+            Is.EquivalentTo(new[] { "Álvaro Núñez" }));
+    }
+
+
+    [Test]
+    public async Task GetClients_WithCityStateAndPostalCodeFilters_CombinesPredicatesWithAnd()
+    {
+        var tenantId = Guid.NewGuid();
+        Client[] clients =
+        [
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "Geographic match",
+                City = "Málaga", State = "Andalucía", PostalCode = "00123"
+            },
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "City prefix near match",
+                City = "Málaga Centro", State = "Andalucía", PostalCode = "00123"
+            },
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "State prefix near match",
+                City = "Málaga", State = "Andalucía Oriental", PostalCode = "00123"
+            },
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "Postal prefix near match",
+                City = "Málaga", State = "Andalucía", PostalCode = "001234"
+            }
+        ];
+        await SeedTenantAsync(tenantId, clients);
+
+        await using var factory = new ClientListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateAccessToken(tenantId));
+        using var response = await client.GetAsync(
+            "/api/example/clients?city=malaga&state=andalucia&postalCode=00123");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = payload.GetProperty("items").EnumerateArray().ToArray();
+        Assert.That(items.Select(item => item.GetProperty("name").GetString()),
+            Is.EquivalentTo(new[] { "Geographic match" }));
+    }
+
+    [Test]
+    public async Task GetClients_WithNameAndCityFilters_CombinesPredicatesWithAnd()
+    {
+        var tenantId = Guid.NewGuid();
+        var clients = CreateGeographicClients(tenantId);
+        clients =
+        [
+            .. clients,
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "María de Álvaro",
+                City = " Málaga ", State = "Andalucía", PostalCode = "00123"
+            },
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "Álvaro near city",
+                City = "Málaga Centro", State = "Andalucía", PostalCode = "00124"
+            }
+        ];
+        await SeedTenantAsync(tenantId, clients);
+
+        await using var factory = new ClientListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateAccessToken(tenantId));
+        using var response = await client.GetAsync("/api/example/clients?name=alvaro&city=malaga");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = payload.GetProperty("items").EnumerateArray().ToArray();
+        Assert.That(items.Select(item => item.GetProperty("name").GetString()),
+            Is.EquivalentTo(new[] { "Álvaro Núñez", "María de Álvaro" }));
+    }
+
+    [Test]
+    public async Task GetClients_WithNameStateAndPostalCodeFilters_CombinesAllPredicatesWithAnd()
+    {
+        var tenantId = Guid.NewGuid();
+        var clients = CreateGeographicClients(tenantId);
+        clients =
+        [
+            .. clients,
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "Ana Carla Pérez",
+                City = "Barcelona", State = "Cataluña", PostalCode = "08001"
+            },
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "Carla state near match",
+                City = "Barcelona", State = "Cataluña Oriental", PostalCode = "08001"
+            },
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "Carla postal near match",
+                City = "Barcelona", State = "Cataluña", PostalCode = "080010"
+            }
+        ];
+        await SeedTenantAsync(tenantId, clients);
+
+        await using var factory = new ClientListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateAccessToken(tenantId));
+        using var response = await client.GetAsync("/api/example/clients?name=carla&state=cataluna&postalCode=08001");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = payload.GetProperty("items").EnumerateArray().ToArray();
+        Assert.That(items.Select(item => item.GetProperty("name").GetString()),
+            Is.EquivalentTo(new[] { "Carla Soto", "Ana Carla Pérez" }));
+    }
+
+    [Test]
+    public async Task GetClients_WithAllFourFilters_CombinesPredicatesWithAnd()
+    {
+        var tenantId = Guid.NewGuid();
+        var clients = CreateGeographicClients(tenantId);
+        clients =
+        [
+            .. clients,
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "María de Álvaro",
+                City = "Málaga", State = "Andalucía", PostalCode = "00123"
+            },
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "Álvaro city near match",
+                City = "Málaga Centro", State = "Andalucía", PostalCode = "00123"
+            },
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "Álvaro state near match",
+                City = "Málaga", State = "Andalucía Oriental", PostalCode = "00123"
+            },
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "Álvaro postal near match",
+                City = "Málaga", State = "Andalucía", PostalCode = "001234"
+            },
+            new Client
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Name = "Name near match",
+                City = "Málaga", State = "Andalucía", PostalCode = "00123"
+            }
+        ];
+        await SeedTenantAsync(tenantId, clients);
+
+        await using var factory = new ClientListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateAccessToken(tenantId));
+        using var response = await client.GetAsync(
+            "/api/example/clients?name=alvaro&city=malaga&state=andalucia&postalCode=00123");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = payload.GetProperty("items").EnumerateArray().ToArray();
+        Assert.That(items.Select(item => item.GetProperty("name").GetString()),
+            Is.EquivalentTo(new[] { "Álvaro Núñez", "María de Álvaro" }));
+    }
+
+    private static Client[] CreateGeographicClients(Guid tenantId) =>
+    [
+        new Client
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, Name = "Álvaro Núñez",
+            City = "Málaga", State = "Andalucía", PostalCode = "00123"
+        },
+        new Client
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, Name = "Alvaro Rios",
+            City = "Sevilla", State = "Andalucía", PostalCode = "41001"
+        },
+        new Client
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, Name = "Beatriz García",
+            City = "Madrid", State = "Madrid", PostalCode = "28001"
+        },
+        new Client
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, Name = "Carla Soto",
+            City = "Málaga", State = "Cataluña", PostalCode = "08001"
+        },
+        new Client
+        {
+            Id = Guid.NewGuid(), TenantId = tenantId, Name = "Carla Soto",
+            City = "Zaragoza", State = "Aragón", PostalCode = "50001"
+        }
+    ];
+
+    [Test]
+    public async Task ExampleDatabaseFixture_SeedsRelatedEntitiesAndIsolatesTenants()
+    {
+        var tenantId = Guid.NewGuid();
+        var client = new Client
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Fixture isolation client"
+        };
+
+        await SeedTenantAsync(tenantId, [client]);
+
+        await using var ownTenantContext = CreateDbContext(tenantId);
+        await using var otherTenantContext = CreateDbContext(Guid.NewGuid());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ownTenantContext.Clients.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.Providers.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.Products.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.Warehouses.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.WarehouseStocks.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.Invoices.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.InvoiceLines.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.ProdInvoices.Count(), Is.EqualTo(1));
+            Assert.That(ownTenantContext.ProdInvoiceLines.Count(), Is.EqualTo(1));
+            Assert.That(otherTenantContext.Clients.Count(), Is.Zero);
+            Assert.That(otherTenantContext.Providers.Count(), Is.Zero);
+            Assert.That(otherTenantContext.Products.Count(), Is.Zero);
+            Assert.That(otherTenantContext.Warehouses.Count(), Is.Zero);
+            Assert.That(otherTenantContext.WarehouseStocks.Count(), Is.Zero);
+            Assert.That(otherTenantContext.Invoices.Count(), Is.Zero);
+            Assert.That(otherTenantContext.InvoiceLines.Count(), Is.Zero);
+            Assert.That(otherTenantContext.ProdInvoices.Count(), Is.Zero);
+            Assert.That(otherTenantContext.ProdInvoiceLines.Count(), Is.Zero);
+        });
+    }
+
+    private static string CreateAccessToken(Guid tenantId)
+    {
+        var credentials = new SigningCredentials(
+            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)),
+            SecurityAlgorithms.HmacSha256);
+        var token = new JwtSecurityToken(
+            Issuer,
+            Audience,
+            [
+                new Claim(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString()),
+                new Claim("tenant_id", tenantId.ToString()),
+                new Claim("account_ready", "true")
+            ],
+            expires: DateTime.UtcNow.AddMinutes(5),
+            signingCredentials: credentials);
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private sealed class ClientListingTestApplicationFactory(
+        string connectionString, string providerName, Guid tenantId)
+        : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            var settings = new Dictionary<string, string?>
+            {
+                [$"{KukulcanDatabaseOptions.SectionKey}:Provider"] = providerName,
+                [$"{KukulcanDatabaseOptions.SectionKey}:ConnectionString"] = connectionString,
+                [$"{KukulcanDatabaseOptions.SectionKey}:Migration:AutoMigrateOnStartup"] = "false",
+                [$"{KukulcanDatabaseOptions.SectionKey}:Migration:SeedDataOnStartup"] = "false",
+                ["Kukulcan:Auth:DefaultTenantId"] = tenantId.ToString(),
+                ["Kukulcan:Auth:Jwt:SigningKey"] = SigningKey,
+                ["Kukulcan:Auth:Jwt:Issuer"] = Issuer,
+                ["Kukulcan:Auth:Jwt:Audience"] = Audience
+            };
+            IConfiguration testConfiguration = new ConfigurationBuilder()
+                .AddInMemoryCollection(settings)
+                .Build();
+
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddConfiguration(testConfiguration));
+
+            // Register the Example context explicitly in the test host. This keeps
+            // database setup independent from WebApplicationFactory configuration
+            // timing while using the same provider and connection string as the API.
+            builder.ConfigureServices(services =>
+                services.AddExampleDatabase(testConfiguration));
+        }
+    }
+}

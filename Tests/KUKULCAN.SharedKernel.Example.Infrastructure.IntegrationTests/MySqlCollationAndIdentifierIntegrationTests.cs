@@ -21,8 +21,9 @@ public sealed class MySqlCollationAndIdentifierIntegrationTests
         CancellationToken cancellationToken)
     {
         await using var database = await MySqlTestDiagnostics.StartDatabaseAsync("example_mysql_collation");
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(database.GetConnectionString(), tenantId);
+        await using var context = CreateContext(TestcontainersConnectionStringScope.Current, tenantId);
         await MySqlTestDiagnostics.MigrateAsync(context, TestContext.CurrentContext.Test.Name);
 
         var client = new Client
@@ -86,13 +87,14 @@ public sealed class MySqlCollationAndIdentifierIntegrationTests
         CancellationToken cancellationToken)
     {
         await using var database = await MySqlTestDiagnostics.StartDatabaseAsync("example_mysql_identifiers");
-        await using var modelContext = CreateContext(database.GetConnectionString(), Guid.NewGuid());
+        using var connectionStringScope = new TestcontainersConnectionStringScope(database.GetConnectionString());
+        await using var modelContext = CreateContext(TestcontainersConnectionStringScope.Current, Guid.NewGuid());
         Assert.That(
             modelContext.Model.FindAnnotation("Relational:MaxIdentifierLength")?.Value,
             Is.EqualTo(64),
             "The EF Core MySQL model must configure the provider identifier limit as 64 characters.");
 
-        await using var connection = new MySqlConnection(database.GetConnectionString());
+        await using var connection = new MySqlConnection(TestcontainersConnectionStringScope.Current);
         await connection.OpenAsync(cancellationToken);
 
         const string identifierAtLimit = "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii";

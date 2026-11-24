@@ -9,6 +9,8 @@
   <Folder Name="/Documentation/Functional/">
     <File Path="Documentation\Functional\Diseno_Funcional_WebAPI_Example.docx" />
     <File Path="Documentation\Functional\Example_Web_API_Functional_Design.docx" />
+    <File Path="Documentation\Functional\Issue_8_T01-T90_Traceability.xlsx" />
+    <File Path="Documentation\Functional\Issue_8_Test_Matrix_Addendum.md" />
   </Folder>
   <Folder Name="/Documentation/Scripts/">
     <File Path="Documentation\Scripts\setup-example-milestones.sh" />

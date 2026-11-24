@@ -19,8 +19,9 @@ public sealed class SqlServerBusinessSoftDeleteIntegrationTests
     public async Task SqlServerSoftDelete_HidesMasterDataAndPreservesHistoricalDocumentsAndRelationships()
     {
         await using var sqlServer = await CreateSqlServerAsync();
+        using var connectionStringScope = new TestcontainersConnectionStringScope(sqlServer.GetConnectionString());
         var tenantId = Guid.NewGuid();
-        await using var context = CreateContext(tenantId, sqlServer.GetConnectionString());
+        await using var context = CreateContext(tenantId, TestcontainersConnectionStringScope.Current);
         await context.Database.MigrateAsync();
 
         var client = new Client
@@ -145,7 +146,7 @@ public sealed class SqlServerBusinessSoftDeleteIntegrationTests
 
         // ExecuteDelete bypasses EF's soft-delete SaveChanges behavior and exercises
         // the real SQL Server foreign-key restrictions protecting historical records.
-        await using var physicalDeleteContext = CreateContext(tenantId, sqlServer.GetConnectionString());
+        await using var physicalDeleteContext = CreateContext(tenantId, TestcontainersConnectionStringScope.Current);
         await Assert.ThrowsAsync<SqlException>(() => physicalDeleteContext.Clients
                 .IgnoreQueryFilters()
                 .Where(entity => entity.Id == client.Id)

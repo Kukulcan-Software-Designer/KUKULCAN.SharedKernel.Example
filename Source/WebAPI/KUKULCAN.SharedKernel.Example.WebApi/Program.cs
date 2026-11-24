@@ -14,6 +14,13 @@ using KUKULCAN.SharedKernel.Example.WebApi.JsonEngine;
 using KUKULCAN.SharedKernel.JsonEngine.SQL;
 using KUKULCAN.SharedKernel.JsonEngine.SQL.Interfaces;
 using KUKULCAN.SharedKernel.Example.WebApi.Authentication;
+using KUKULCAN.SharedKernel.Example.WebApi.Clients;
+using KUKULCAN.SharedKernel.Example.WebApi.Providers;
+using KUKULCAN.SharedKernel.Example.WebApi.Products;
+using KUKULCAN.SharedKernel.Example.WebApi.Warehouses;
+using KUKULCAN.SharedKernel.Example.WebApi.WarehouseStocks;
+using KUKULCAN.SharedKernel.Example.WebApi.Invoices;
+using KUKULCAN.SharedKernel.Example.WebApi.ProdInvoices;
 using KUKULCAN.SharedKernel.Results;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -48,6 +55,7 @@ if (!string.IsNullOrWhiteSpace(bootstrapPassword)
         "Administrator bootstrap requires database configuration, a non-empty default tenant, and Kukulcan:Auth:Administrator:Email. Supply the bootstrap password through a secure secret source.");
 }
 
+builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient<I18nServiceTokenHandler>();
 builder.Services.AddHttpClient("KukulcanI18N", client =>
@@ -157,6 +165,13 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi().AllowAnonymous();
+    app.UseSwaggerUI(options =>
+        options.SwaggerEndpoint("/openapi/v1.json", "KUKULCAN.SharedKernel.Example.WebApi"));
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -209,6 +224,14 @@ app.MapJsonEngineQueryEndpoints();
 app.MapI18nTranslationEndpoints();
 
 app.MapAuthenticationEndpoints();
+
+app.MapClientEndpoints();
+app.MapProviderEndpoints();
+app.MapProductEndpoints();
+app.MapWarehouseEndpoints();
+app.MapWarehouseStockEndpoints();
+app.MapInvoiceEndpoints();
+app.MapProdInvoiceEndpoints();
 
 if (exampleDatabaseConfigured)
 {
