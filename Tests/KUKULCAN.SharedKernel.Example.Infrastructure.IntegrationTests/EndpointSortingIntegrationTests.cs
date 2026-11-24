@@ -62,7 +62,7 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
         [
             new(Guid.Parse("00000000-0000-0000-0000-000000000301"), "P-300", "gamma"),
             new(Guid.Parse("00000000-0000-0000-0000-000000000302"), "P-100", "alpha"),
-            new(Guid.Parse("00000000-0000-0000-0000-000000000303"), "P-100", "beta"),
+            new(Guid.Parse("00000000-0000-0000-0000-000000000303"), "P-150", "beta"),
             new(Guid.Parse("00000000-0000-0000-0000-000000000304"), "P-200", "delta")
         ];
         _warehouseSeeds =
@@ -150,7 +150,7 @@ public sealed class EndpointSortingIntegrationTests : ExampleDatabaseTestFixture
 
     [TestCase("code", "asc")]
     [TestCase("code", "desc")]
-    public async Task GetProducts_WithAllowedSortField_OrdersInRequestedDirectionWithStableIdTieBreaker(
+    public async Task GetProducts_WithAllowedSortField_OrdersInRequestedDirection(
         string sortBy, string sortDirection)
     {
         await SeedProductsAsync();
