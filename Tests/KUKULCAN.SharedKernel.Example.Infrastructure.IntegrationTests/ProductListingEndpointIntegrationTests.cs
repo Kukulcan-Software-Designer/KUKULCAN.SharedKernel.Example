@@ -65,6 +65,38 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
 
 
     [Test]
+    public async Task GetProducts_WithCodeAndNameFilters_CombinesPredicatesWithAnd()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedProductsAsync(tenantId);
+
+        await using (var context = CreateDbContext(tenantId))
+        {
+            context.Products.AddRange(
+                new Product
+                {
+                    Id = Guid.NewGuid(), TenantId = tenantId, Code = "AB-300",
+                    Name = "Té verde", Description = "Matches code only."
+                },
+                new Product
+                {
+                    Id = Guid.NewGuid(), TenantId = tenantId, Code = "ZZ-500",
+                    Name = "Café en grano", Description = "Matches name only."
+                });
+            await context.SaveChangesAsync();
+        }
+
+        await using var factory = new ProductListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync("/api/example/products?code=ab&name=cafe");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var items = await ReadItemsAsync(response);
+        Assert.That(items.Select(item => item.GetProperty("code").GetString()),
+            Is.EquivalentTo(new[] { "ÁB-100", "AB-200" }));
+    }
+
+    [Test]
     public async Task GetProducts_WithSortByNameAscending_UsesIdAsStableTieBreaker()
     {
         var tenantId = Guid.NewGuid();
