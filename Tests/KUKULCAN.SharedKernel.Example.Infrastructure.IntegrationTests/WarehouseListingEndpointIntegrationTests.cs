@@ -31,17 +31,21 @@ public sealed class WarehouseListingEndpointIntegrationTests : ExampleDatabaseTe
     {
         var tenantId = Guid.NewGuid();
         await SeedWarehousesAsync(tenantId);
+        await SeedAdditionalWarehousesAsync(tenantId,
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Padded city match", City = " Málaga ", State = "Andalucía", PostalCode = "00124" },
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "City prefix near match", City = "Málaga Centro", State = "Andalucía", PostalCode = "00125" },
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "City substring near match", City = "Gran Málaga", State = "Andalucía", PostalCode = "00126" });
 
         await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
         using var client = CreateAuthenticatedClient(factory, tenantId);
-        using var response = await client.GetAsync("/api/example/warehouses?city=malaga");
+        using var response = await client.GetAsync("/api/example/warehouses?city=%20MALAGA%20");
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
         var items = await ReadItemsAsync(response);
         Assert.That(items[0].EnumerateObject().Select(property => property.Name),
             Is.EquivalentTo(new[] { "id", "name", "city", "state", "postalCode" }));
         Assert.That(items.Select(item => item.GetProperty("name").GetString()),
-            Is.EquivalentTo(new[] { "Álvaro Núñez", "Centro Norte", "Centro Sur" }));
+            Is.EquivalentTo(new[] { "Álvaro Núñez", "Centro Norte", "Centro Sur", "Padded city match" }));
     }
 
     [Test]
@@ -49,15 +53,19 @@ public sealed class WarehouseListingEndpointIntegrationTests : ExampleDatabaseTe
     {
         var tenantId = Guid.NewGuid();
         await SeedWarehousesAsync(tenantId);
+        await SeedAdditionalWarehousesAsync(tenantId,
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Padded state match", City = "Madrid", State = " Andalucía ", PostalCode = "28002" },
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "State prefix near match", City = "Madrid", State = "Andalucía Oriental", PostalCode = "28003" },
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "State substring near match", City = "Madrid", State = "Gran Andalucía", PostalCode = "28004" });
 
         await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
         using var client = CreateAuthenticatedClient(factory, tenantId);
-        using var response = await client.GetAsync("/api/example/warehouses?state=andalucia");
+        using var response = await client.GetAsync("/api/example/warehouses?state=%20ANDALUCIA%20");
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
         var items = await ReadItemsAsync(response);
         Assert.That(items.Select(item => item.GetProperty("name").GetString()),
-            Is.EquivalentTo(new[] { "Álvaro Núñez", "Alvaro Rios" }));
+            Is.EquivalentTo(new[] { "Álvaro Núñez", "Alvaro Rios", "Padded state match" }));
     }
 
     [Test]
@@ -65,6 +73,9 @@ public sealed class WarehouseListingEndpointIntegrationTests : ExampleDatabaseTe
     {
         var tenantId = Guid.NewGuid();
         await SeedWarehousesAsync(tenantId);
+        await SeedAdditionalWarehousesAsync(tenantId,
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Postal prefix near match", City = "Málaga", State = "Andalucía", PostalCode = "001234" },
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Postal numeric near match", City = "Málaga", State = "Andalucía", PostalCode = "123" });
 
         await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
         using var client = CreateAuthenticatedClient(factory, tenantId);
@@ -81,15 +92,18 @@ public sealed class WarehouseListingEndpointIntegrationTests : ExampleDatabaseTe
     {
         var tenantId = Guid.NewGuid();
         await SeedWarehousesAsync(tenantId);
+        await SeedAdditionalWarehousesAsync(tenantId,
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Regional Norte distribution", City = "Málaga", State = "Andalucía", PostalCode = "00127" },
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Norte city prefix near match", City = "Málaga Centro", State = "Andalucía", PostalCode = "00128" });
 
         await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
         using var client = CreateAuthenticatedClient(factory, tenantId);
-        using var response = await client.GetAsync("/api/example/warehouses?name=norte&city=malaga");
+        using var response = await client.GetAsync("/api/example/warehouses?name=NORTE&city=malaga");
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
         var items = await ReadItemsAsync(response);
         Assert.That(items.Select(item => item.GetProperty("name").GetString()),
-            Is.EquivalentTo(new[] { "Centro Norte" }));
+            Is.EquivalentTo(new[] { "Centro Norte", "Regional Norte distribution" }));
     }
 
     [Test]
@@ -97,6 +111,11 @@ public sealed class WarehouseListingEndpointIntegrationTests : ExampleDatabaseTe
     {
         var tenantId = Guid.NewGuid();
         await SeedWarehousesAsync(tenantId);
+        await SeedAdditionalWarehousesAsync(tenantId,
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Geographic exact match", City = "Málaga", State = "Cataluña", PostalCode = "08001" },
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "City prefix near match", City = "Málaga Centro", State = "Cataluña", PostalCode = "08001" },
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "State prefix near match", City = "Málaga", State = "Cataluña Oriental", PostalCode = "08001" },
+            new Warehouse { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Postal prefix near match", City = "Málaga", State = "Cataluña", PostalCode = "080010" });
 
         await using var factory = new WarehouseListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
         using var client = CreateAuthenticatedClient(factory, tenantId);
@@ -106,7 +125,7 @@ public sealed class WarehouseListingEndpointIntegrationTests : ExampleDatabaseTe
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
         var items = await ReadItemsAsync(response);
         Assert.That(items.Select(item => item.GetProperty("name").GetString()),
-            Is.EquivalentTo(new[] { "Centro Sur" }));
+            Is.EquivalentTo(new[] { "Centro Sur", "Geographic exact match" }));
     }
 
     [Test]
@@ -287,6 +306,13 @@ public sealed class WarehouseListingEndpointIntegrationTests : ExampleDatabaseTe
         using var response = await client.PostAsJsonAsync("/api/example/warehouses", payload);
 
         Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.BadRequest));
+    }
+
+    private async Task SeedAdditionalWarehousesAsync(Guid tenantId, params Warehouse[] warehouses)
+    {
+        await using var context = CreateDbContext(tenantId);
+        context.Warehouses.AddRange(warehouses);
+        await context.SaveChangesAsync();
     }
 
     private async Task SeedWarehousesAsync(Guid tenantId)
