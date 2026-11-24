@@ -65,6 +65,37 @@ public sealed class ProductListingEndpointIntegrationTests : ExampleDatabaseTest
 
 
     [Test]
+    public async Task GetProducts_WithNameInternalSubstring_UsesContainsCaseAndAccentInsensitiveMatching()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedProductsForOrderingAsync(tenantId,
+        [
+            new Product
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Code = "PRD-INTERNAL",
+                Name = "Suministros y Distribuciones ÁLVARO Núñez del Sur"
+            },
+            new Product
+            {
+                Id = Guid.NewGuid(), TenantId = tenantId, Code = "PRD-OTHER",
+                Name = "Beatriz García Proveedores"
+            }
+        ]);
+
+        await using var factory = new ProductListingTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync("/api/example/products?name=vArO nUnEz");
+
+        Assert.That(response.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.OK));
+        var items = await ReadItemsAsync(response);
+
+        Assert.That(items, Has.Length.EqualTo(1));
+        Assert.That(items[0].GetProperty("code").GetString(), Is.EqualTo("PRD-INTERNAL"));
+        Assert.That(items[0].GetProperty("name").GetString(),
+            Is.EqualTo("Suministros y Distribuciones ÁLVARO Núñez del Sur"));
+    }
+
+    [Test]
     public async Task GetProducts_WithCodeAndNameFilters_CombinesPredicatesWithAnd()
     {
         var tenantId = Guid.NewGuid();
