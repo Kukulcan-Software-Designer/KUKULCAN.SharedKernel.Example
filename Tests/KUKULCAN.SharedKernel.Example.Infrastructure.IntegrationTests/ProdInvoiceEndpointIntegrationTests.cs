@@ -127,6 +127,43 @@ public sealed class ProdInvoiceEndpointIntegrationTests : ExampleDatabaseTestFix
     }
 
     [Test]
+    public async Task GetProdInvoices_WithProviderNameInternalSubstring_UsesContainsMatchingInsensitiveToCaseAndAccents()
+    {
+        var tenantId = Guid.NewGuid();
+        await SeedProdInvoicesAsync(
+            tenantId,
+            new ProdInvoiceSeed(
+                null,
+                "PUR-PROVIDER-INTERNAL",
+                "Suministros y Distribuciones ÁLVARO Núñez del Sur",
+                DateTimeOffset.UtcNow),
+            new ProdInvoiceSeed(
+                null,
+                "PUR-PROVIDER-OTHER",
+                "Beatriz García Proveedores",
+                DateTimeOffset.UtcNow));
+
+        await using var factory = new ProdInvoiceTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        using var response = await client.GetAsync(
+            $"/api/example/prod-invoices?providerName={Uri.EscapeDataString("vArO nUnEz")}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var items = payload.GetProperty("items").EnumerateArray().ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items, Has.Length.EqualTo(1));
+            Assert.That(items[0].GetProperty("invoiceNumber").GetString(),
+                Is.EqualTo("PUR-PROVIDER-INTERNAL"));
+            Assert.That(items[0].GetProperty("providerName").GetString(),
+                Is.EqualTo("Suministros y Distribuciones ÁLVARO Núñez del Sur"));
+            Assert.That(payload.GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+        });
+    }
+
+    [Test]
     public async Task GetProdInvoices_WithInvoiceNumber_UsesExactCaseAndAccentInsensitiveMatching()
     {
         var tenantId = Guid.NewGuid();
