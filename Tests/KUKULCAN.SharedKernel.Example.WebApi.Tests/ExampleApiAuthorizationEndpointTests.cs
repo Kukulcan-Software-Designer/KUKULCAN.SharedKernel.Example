@@ -31,7 +31,9 @@ public sealed class ExampleApiAuthorizationEndpointTests
         {
             ("api/example/clients", "GET"),
             ("api/example/clients/{id}", "GET"),
+            ("api/example/clients", "POST"),
             ("api/example/providers", "GET"),
+            ("api/example/providers", "POST"),
             ("api/example/providers/{id}", "GET"),
             ("api/example/products", "GET"),
             ("api/example/products/{id}", "GET"),
