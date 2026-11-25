@@ -38,8 +38,7 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
             "A valid update with the current entity version must succeed.");
-        Assert.That(response.Headers.ETag?.Tag, Is.EqualTo("\"2\""),
-            "The successful update must return the incremented strong ETag.");
+        AssertStrongEtag(response, "\"2\"");
 
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Multiple(() =>
@@ -50,7 +49,7 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
             Assert.That(payload.GetProperty("quantity").GetDecimal(), Is.EqualTo(12.345m));
         });
 
-        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, 12.345m);
+        await AssertPersistedStockAsync(fixture.TenantId, fixture.StockId, 12.345m, 2, fixture.WarehouseId, fixture.ProductId);
     }
 
     [Test]
@@ -63,8 +62,8 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
         using var response = await SendPutAsync(client, fixture.StockId, 0m);
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-        Assert.That(response.Headers.ETag?.Tag, Is.EqualTo("\"2\""));
-        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, 0m);
+        AssertStrongEtag(response, "\"2\"");
+        await AssertPersistedStockAsync(fixture.TenantId, fixture.StockId, 0m, 2, fixture.WarehouseId, fixture.ProductId);
     }
 
     [Test]
@@ -77,7 +76,8 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
         using var response = await SendPutAsync(client, fixture.StockId, -0.001m);
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
-        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity);
+        await AssertProblemDetailsAsync(response);
+        await AssertPersistedStockAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity, 1, fixture.WarehouseId, fixture.ProductId);
     }
 
     [Test]
@@ -90,7 +90,8 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
         using var response = await SendPutAsync(client, fixture.StockId, 12.3456m);
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
-        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity);
+        await AssertProblemDetailsAsync(response);
+        await AssertPersistedStockAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity, 1, fixture.WarehouseId, fixture.ProductId);
     }
 
     [Test]
@@ -104,7 +105,7 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
             client, fixture.StockId, 12.345m, includeIfMatch: false);
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.PreconditionRequired));
-        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity);
+        await AssertPersistedStockAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity, 1, fixture.WarehouseId, fixture.ProductId);
     }
 
     [Test]
@@ -118,7 +119,8 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
             client, fixture.StockId, 12.345m, ifMatch: "not-an-etag");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
-        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity);
+        await AssertProblemDetailsAsync(response);
+        await AssertPersistedStockAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity, 1, fixture.WarehouseId, fixture.ProductId);
     }
 
     [Test]
@@ -132,7 +134,7 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
             client, fixture.StockId, 12.345m, ifMatch: "\"0\"");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
-        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity);
+        await AssertPersistedStockAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity, 1, fixture.WarehouseId, fixture.ProductId);
     }
 
     [Test]
@@ -148,7 +150,7 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
         await using var context = CreateDbContext(fixture.TenantId);
         Assert.That(await context.WarehouseStocks.CountAsync(), Is.EqualTo(1));
-        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity);
+        await AssertPersistedStockAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity, 1, fixture.WarehouseId, fixture.ProductId);
     }
 
     [Test]
@@ -165,12 +167,16 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
         await SeedTenantAsync(foreignTenantId, [foreignClient]);
 
         Guid foreignStockId;
+        Guid foreignWarehouseId;
+        Guid foreignProductId;
         decimal foreignOriginalQuantity;
         await using (var foreignContext = CreateDbContext(foreignTenantId))
         {
             var foreignStock = await foreignContext.WarehouseStocks
                 .SingleAsync(stock => stock.TenantId == foreignTenantId);
             foreignStockId = foreignStock.Id;
+            foreignWarehouseId = foreignStock.WarehouseId;
+            foreignProductId = foreignStock.ProductId;
             foreignOriginalQuantity = foreignStock.Quantity;
         }
 
@@ -180,8 +186,8 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
         using var response = await SendPutAsync(client, foreignStockId, 12.345m);
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
-        await AssertPersistedQuantityAsync(
-            foreignTenantId, foreignStockId, foreignOriginalQuantity);
+        await AssertPersistedStockAsync(
+            foreignTenantId, foreignStockId, foreignOriginalQuantity, 1, foreignWarehouseId, foreignProductId);
     }
 
     [Test]
@@ -197,10 +203,10 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
         Assert.Multiple(() =>
         {
             Assert.That(firstResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(firstResponse.Headers.ETag?.Tag, Is.EqualTo("\"2\""));
+            AssertStrongEtag(firstResponse, "\"2\"");
             Assert.That(secondResponse.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
         });
-        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, 12.345m);
+        await AssertPersistedStockAsync(fixture.TenantId, fixture.StockId, 12.345m, 2, fixture.WarehouseId, fixture.ProductId);
     }
 
     [Test]
@@ -214,7 +220,7 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
             $"/api/example/warehouse-stocks/{fixture.StockId}");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-        Assert.That(response.Headers.ETag?.Tag, Is.EqualTo("\"1\""));
+        AssertStrongEtag(response, "\"1\"");
 
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Multiple(() =>
@@ -245,14 +251,64 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
             tenantId, stock.Id, stock.WarehouseId, stock.ProductId, stock.Quantity);
     }
 
-    private async Task AssertPersistedQuantityAsync(
-        Guid tenantId, Guid stockId, decimal expectedQuantity)
+    private async Task AssertPersistedStockAsync(
+        Guid tenantId,
+        Guid stockId,
+        decimal expectedQuantity,
+        int expectedVersion,
+        Guid? expectedWarehouseId = null,
+        Guid? expectedProductId = null)
     {
         await using var context = CreateDbContext(tenantId);
         var stock = await context.WarehouseStocks
             .SingleAsync(entity => entity.Id == stockId && entity.TenantId == tenantId);
-        Assert.That(stock.Quantity, Is.EqualTo(expectedQuantity),
-            "A rejected update must not change the persisted stock quantity.");
+
+        var versionProperty = typeof(WarehouseStock).GetProperty("Version");
+        Assert.That(versionProperty, Is.Not.Null,
+            "WarehouseStock must expose the application-managed Version property.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(stock.Id, Is.EqualTo(stockId), "Stock identity must remain unchanged.");
+            Assert.That(stock.TenantId, Is.EqualTo(tenantId), "Stock tenant ownership must remain unchanged.");
+            Assert.That(stock.Quantity, Is.EqualTo(expectedQuantity),
+                "The persisted absolute quantity must match the expected value.");
+            if (expectedWarehouseId.HasValue)
+                Assert.That(stock.WarehouseId, Is.EqualTo(expectedWarehouseId.Value));
+            if (expectedProductId.HasValue)
+                Assert.That(stock.ProductId, Is.EqualTo(expectedProductId.Value));
+            if (versionProperty is not null)
+                Assert.That(Convert.ToInt32(versionProperty.GetValue(stock)), Is.EqualTo(expectedVersion),
+                    "The persisted application-managed version must match the expected value.");
+        });
+    }
+
+    private static void AssertStrongEtag(HttpResponseMessage response, string expectedTag)
+    {
+        var etag = response.Headers.ETag;
+        Assert.That(etag, Is.Not.Null, "The response must include an ETag.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(etag!.IsWeak, Is.False, "The ETag must be strong, not weak.");
+            Assert.That(etag.Tag, Is.EqualTo(expectedTag));
+        });
+    }
+
+    private static async Task AssertProblemDetailsAsync(HttpResponseMessage response)
+    {
+        Assert.That(response.Content.Headers.ContentType?.MediaType,
+            Is.EqualTo("application/problem+json"),
+            "HTTP 400 validation errors must use the ProblemDetails media type.");
+
+        using var document = await JsonDocument.ParseAsync(
+            await response.Content.ReadAsStreamAsync());
+        var root = document.RootElement;
+        Assert.Multiple(() =>
+        {
+            Assert.That(root.ValueKind, Is.EqualTo(JsonValueKind.Object));
+            Assert.That(root.GetProperty("status").GetInt32(), Is.EqualTo((int)HttpStatusCode.BadRequest));
+            Assert.That(root.GetProperty("type").GetString(), Is.Not.Null.And.Not.Empty);
+            Assert.That(root.GetProperty("title").GetString(), Is.Not.Null.And.Not.Empty);
+        });
     }
 
     private static HttpRequestMessage CreatePutRequest(
