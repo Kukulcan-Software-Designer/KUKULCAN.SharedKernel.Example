@@ -73,6 +73,26 @@ The following maximum lengths are the acceptance limits for the editable fields.
 | I18-036 | Header and line snapshots | Create a document with valid header and line data | The approved header and line snapshot fields are persisted with the values present at creation time |
 | I18-037 | Complete transaction rollback | Cause a failure after document creation has begun but before all lines complete | The transaction leaves no document header and no lines persisted |
 
+## I18-012 — warehouse-stock quantity update HTTP matrix
+
+I18-012 is verified as a provider-independent HTTP contract through the Example Web API and a real provider-backed database. The update uses an absolute destination quantity, not a delta. A successful update requires the current strong ETag in `If-Match`, returns HTTP 200 with the next strong ETag, and changes only the stock quantity. The initial entity version is 1. Rejected requests must leave the persisted quantity and version unchanged.
+
+| Test method | HTTP stimulus | Expected HTTP result | Required persisted-state assertion |
+|---|---|---|---|
+| `PutWarehouseStock_WithValidAbsoluteQuantityAndCurrentVersion_UpdatesOnlyQuantity` | PUT a positive quantity with `If-Match: "1"` | 200; strong ETag `"2"`; response identifies the stock, warehouse, product, and absolute quantity | Quantity is replaced by the submitted value; stock identity and warehouse/product relationships remain unchanged |
+| `PutWarehouseStock_WithZeroQuantityAndCurrentVersion_AcceptsZero` | PUT quantity zero with the current ETag | 200; ETag increments to `"2"` | Quantity is persisted as zero |
+| `PutWarehouseStock_WithNegativeQuantity_ReturnsBadRequestAndPreservesQuantity` | PUT a negative quantity | 400 | Original quantity remains unchanged |
+| `PutWarehouseStock_WithMoreThanThreeFractionalDigits_ReturnsBadRequestAndPreservesQuantity` | PUT a quantity with more than three fractional digits | 400; no silent rounding | Original quantity remains unchanged |
+| `PutWarehouseStock_WithoutIfMatch_ReturnsPreconditionRequiredAndPreservesQuantity` | PUT without `If-Match` | 428 | Original quantity remains unchanged |
+| `PutWarehouseStock_WithMalformedIfMatch_ReturnsBadRequestAndPreservesQuantity` | PUT with a malformed `If-Match` value | 400 | Original quantity remains unchanged |
+| `PutWarehouseStock_WithStaleVersion_ReturnsConflictAndPreservesCurrentQuantity` | PUT with a syntactically valid but stale version | 409 | Original/current quantity remains unchanged |
+| `PutWarehouseStock_WithUnknownId_ReturnsNotFoundWithoutCreatingStock` | PUT an unknown stock identifier | 404 | No stock is created; existing stock remains unchanged |
+| `PutWarehouseStock_BelongingToAnotherTenant_ReturnsNotFoundAndPreservesForeignStock` | Authenticated Tenant A attempts to PUT Tenant B's stock | 404 tenant-hiding response | Foreign stock quantity and ownership remain unchanged |
+| `PutWarehouseStock_TwiceWithSameVersion_RejectsSecondUpdateAsConflict` | Submit two sequential PUT requests using the same original ETag | First request 200 with incremented ETag; second request 409 | The first quantity remains persisted; the stale second request does not overwrite it |
+| `GetWarehouseStockById_ReturnsCurrentRepresentationAndStrongVersionEtag` | GET the stock detail by identifier | 200 with current strong ETag | Response contains the stock identifier, warehouse/product identifiers, and current quantity |
+
+All rows above are required on PostgreSQL, Microsoft SQL Server, and MySQL. The test fixture must use an isolated tenant and provider-backed database. For every rejected PUT, the persisted quantity must be queried after the HTTP response; where the version is exposed through the detail GET, its ETag must also remain at the pre-request value. These tests do not authorize any production implementation by themselves: keep the production code unchanged until the test suite demonstrates RED against the current behavior.
+
 ## Common execution and evidence rules
 
 1. **Test-first sequence:** add or extend the HTTP integration test, demonstrate a genuine RED against the current implementation, and only then make the minimum production change required by that failing test. Do not modify production code before the RED evidence exists.
