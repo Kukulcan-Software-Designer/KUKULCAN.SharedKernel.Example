@@ -200,12 +200,9 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
         using var firstResponse = await SendPutAsync(client, fixture.StockId, 12.345m);
         using var secondResponse = await SendPutAsync(client, fixture.StockId, 20m);
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(firstResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-            AssertStrongEtag(firstResponse, "\"2\"");
-            Assert.That(secondResponse.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
-        });
+        Assert.That(firstResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        AssertStrongEtag(firstResponse, "\"2\"");
+        Assert.That(secondResponse.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
         await AssertPersistedStockAsync(fixture.TenantId, fixture.StockId, 12.345m, 2, fixture.WarehouseId, fixture.ProductId);
     }
 
@@ -221,6 +218,9 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         AssertStrongEtag(response, "\"1\"");
+        await AssertPersistedStockAsync(
+            fixture.TenantId, fixture.StockId, fixture.OriginalQuantity, 1,
+            fixture.WarehouseId, fixture.ProductId);
 
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Multiple(() =>
