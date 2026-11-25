@@ -56,6 +56,15 @@ public static class ProductEndpoints
             .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status409Conflict);
 
+        endpoints.MapPut("/api/example/products/{id}", UpdateProductAsync)
+            .WithName("UpdateProduct")
+            .WithTags("Products")
+            .Produces<ProductListItemResponse>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
         return endpoints;
     }
 
@@ -294,6 +303,57 @@ public static class ProductEndpoints
 
         return HttpResults.Created($"/api/example/products/{product.Id}", response);
     }
+    private static async Task<IResult> UpdateProductAsync(
+        string id,
+        ProductCreateRequest request,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        ITenantContext tenantContext,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(id, out Guid parsedId))
+            return HttpResults.Problem(statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid route parameter", detail: "The identifier must be a valid GUID.");
+
+        string code = request.Code?.Trim() ?? string.Empty;
+        string name = request.Name?.Trim() ?? string.Empty;
+        string? description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
+
+        var validationErrors = new Dictionary<string, string[]>();
+        if (code.Length == 0)
+            validationErrors[nameof(request.Code)] = ["Code is required."];
+        else if (code.Length > 64)
+            validationErrors[nameof(request.Code)] = ["Code must not exceed 64 characters."];
+        if (name.Length == 0)
+            validationErrors[nameof(request.Name)] = ["Name is required."];
+        else if (name.Length > 200)
+            validationErrors[nameof(request.Name)] = ["Name must not exceed 200 characters."];
+        if (description?.Length > 1000)
+            validationErrors[nameof(request.Description)] = ["Description must not exceed 1000 characters."];
+        if (validationErrors.Count > 0)
+            return HttpResults.ValidationProblem(validationErrors);
+        if (tenantContext.TenantId == Guid.Empty)
+            return HttpResults.Forbid();
+
+        Product? entity = await context.Products.SingleOrDefaultAsync(product =>
+            product.Id == parsedId && product.TenantId == tenantContext.TenantId, cancellationToken);
+        if (entity is null)
+            return HttpResults.NotFound();
+
+        bool codeAlreadyExists = await context.Products.AnyAsync(product =>
+            product.TenantId == tenantContext.TenantId && product.Id != parsedId && product.Code == code,
+            cancellationToken);
+        if (codeAlreadyExists)
+            return HttpResults.Conflict();
+
+        entity.Code = code;
+        entity.Name = name;
+        entity.Description = description;
+        await context.SaveChangesAsync(cancellationToken);
+
+        return HttpResults.Ok(new ProductListItemResponse(
+            entity.Id, entity.Code, entity.Name, entity.Description));
+    }
+
 }
 
 /// <summary>Represents product create request data.</summary>
