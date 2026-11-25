@@ -264,10 +264,10 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
             .SingleAsync(entity => entity.Id == stockId && entity.TenantId == tenantId);
 
         var versionProperty = typeof(WarehouseStock).GetProperty("Version");
-        Assert.That(versionProperty, Is.Not.Null,
-            "WarehouseStock must expose the application-managed Version property.");
         Assert.Multiple(() =>
         {
+            Assert.That(versionProperty, Is.Not.Null,
+                "WarehouseStock must expose the application-managed Version property.");
             Assert.That(stock.Id, Is.EqualTo(stockId), "Stock identity must remain unchanged.");
             Assert.That(stock.TenantId, Is.EqualTo(tenantId), "Stock tenant ownership must remain unchanged.");
             Assert.That(stock.Quantity, Is.EqualTo(expectedQuantity),
