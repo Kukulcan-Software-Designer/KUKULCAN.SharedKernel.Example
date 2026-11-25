@@ -102,6 +102,8 @@ public sealed class ExampleApiAuthorizationEndpointTests
         };
         var allowedOperations = new HashSet<(string Route, string Method)>
         {
+            ("api/example/clients", "POST"),
+            ("api/example/providers", "POST"),
             ("api/example/clients", "GET"),
             ("api/example/clients/{id}", "GET"),
             ("api/example/providers", "GET"),
