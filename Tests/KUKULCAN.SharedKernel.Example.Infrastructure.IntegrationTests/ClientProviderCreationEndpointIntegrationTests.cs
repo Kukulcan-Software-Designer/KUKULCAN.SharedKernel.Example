@@ -124,6 +124,116 @@ public sealed class ClientProviderCreationEndpointIntegrationTests : ExampleData
         });
     }
 
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task I18_001_PostClient_WithMissingOrBlankName_ReturnsBadRequestWithoutPersistence(bool blankName)
+    {
+        var tenantId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var payload = new Dictionary<string, object?> { ["city"] = "Barcelona" };
+        if (blankName) payload["name"] = "   ";
+        using var response = await client.PostAsJsonAsync("/api/example/clients", payload);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(response.Content.Headers.ContentType?.MediaType, Is.EqualTo("application/problem+json"));
+        await using var db = CreateDbContext(tenantId);
+        Assert.That(await db.Clients.CountAsync(), Is.Zero);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task I18_002_PostProvider_WithMissingOrBlankName_ReturnsBadRequestWithoutPersistence(bool blankName)
+    {
+        var tenantId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var payload = new Dictionary<string, object?> { ["city"] = "Valencia" };
+        if (blankName) payload["name"] = "   ";
+        using var response = await client.PostAsJsonAsync("/api/example/providers", payload);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(response.Content.Headers.ContentType?.MediaType, Is.EqualTo("application/problem+json"));
+        await using var db = CreateDbContext(tenantId);
+        Assert.That(await db.Providers.CountAsync(), Is.Zero);
+    }
+
+    [TestCase("/api/example/clients", "name", 201)]
+    [TestCase("/api/example/clients", "city", 121)]
+    [TestCase("/api/example/clients", "state", 121)]
+    [TestCase("/api/example/clients", "postalCode", 33)]
+    [TestCase("/api/example/providers", "name", 201)]
+    [TestCase("/api/example/providers", "city", 121)]
+    [TestCase("/api/example/providers", "state", 121)]
+    [TestCase("/api/example/providers", "postalCode", 33)]
+    public async Task I18_003_PostEntity_WithFieldExceedingLengthLimit_ReturnsBadRequestWithoutPersistence(string endpoint, string field, int length)
+    {
+        var tenantId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var payload = new Dictionary<string, object?>
+        {
+            ["name"] = "Valid entity name", ["city"] = "Madrid", ["state"] = "Madrid", ["postalCode"] = "28001"
+        };
+        payload[field] = new string('X', length);
+        using var response = await client.PostAsJsonAsync(endpoint, payload);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(response.Content.Headers.ContentType?.MediaType, Is.EqualTo("application/problem+json"));
+        await using var db = CreateDbContext(tenantId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(db.Clients.Count(), Is.Zero);
+            Assert.That(db.Providers.Count(), Is.Zero);
+        });
+    }
+
+    [Test]
+    public async Task I18_004_PostClientAndProvider_WithTenantAContext_CreatesOnlyTenantARecords()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantA);
+        using var clientA = CreateAuthenticatedClient(factory, tenantA);
+        using var clientResponse = await clientA.PostAsJsonAsync("/api/example/clients", new
+        {
+            name = "I18-004 Tenant A Client", city = "Barcelona", state = "Cataluña", postalCode = "08001"
+        });
+        using var providerResponse = await clientA.PostAsJsonAsync("/api/example/providers", new
+        {
+            name = "I18-004 Tenant A Provider", city = "Valencia", state = "Comunidad Valenciana", postalCode = "46001"
+        });
+        Assert.Multiple(() =>
+        {
+            Assert.That(clientResponse.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+            Assert.That(providerResponse.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+        });
+        var clientPayload = await clientResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var providerPayload = await providerResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var clientId = clientPayload.GetProperty("id").GetGuid();
+        var providerId = providerPayload.GetProperty("id").GetGuid();
+        await using (var dbA = CreateDbContext(tenantA))
+        {
+            Assert.That(await dbA.Clients.CountAsync(x => x.Id == clientId), Is.EqualTo(1));
+            Assert.That(await dbA.Providers.CountAsync(x => x.Id == providerId), Is.EqualTo(1));
+        }
+        using var clientB = CreateAuthenticatedClient(factory, tenantB);
+        using var clientsB = await clientB.GetAsync("/api/example/clients?page=1&pageSize=100");
+        using var providersB = await clientB.GetAsync("/api/example/providers?page=1&pageSize=100");
+        Assert.Multiple(() =>
+        {
+            Assert.That(clientsB.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(providersB.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        });
+        var clientsPayloadB = await clientsB.Content.ReadFromJsonAsync<JsonElement>();
+        var providersPayloadB = await providersB.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(clientsPayloadB.GetProperty("items").GetArrayLength(), Is.Zero);
+            Assert.That(providersPayloadB.GetProperty("items").GetArrayLength(), Is.Zero);
+            Assert.That(clientsPayloadB.GetProperty("totalCount").GetInt32(), Is.Zero);
+            Assert.That(providersPayloadB.GetProperty("totalCount").GetInt32(), Is.Zero);
+        });
+    }
+
     private static HttpClient CreateAuthenticatedClient(
         WebApplicationFactory<Program> factory, Guid tenantId)
     {
