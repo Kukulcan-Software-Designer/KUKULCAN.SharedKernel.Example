@@ -14,6 +14,7 @@
   </Folder>
   <Folder Name="/Documentation/Functional/Issue #18/">
     <File Path="Documentation\Functional\Issue_18_T16-T17_I18-001-I18-037_Traceability.xlsx" />
+    <File Path="Documentation\Functional\Issue_18_Test_Matrix_Addendum.md" />
   </Folder>
   <Folder Name="/Documentation/Functional/Issue #8/">
     <File Path="Documentation\Functional\Issue_8_T01-T90_Traceability.xlsx" />
