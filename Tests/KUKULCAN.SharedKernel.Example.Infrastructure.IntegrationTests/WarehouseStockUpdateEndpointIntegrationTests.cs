@@ -30,44 +30,11 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
     [Test]
     public async Task PutWarehouseStock_WithValidAbsoluteQuantityAndCurrentVersion_UpdatesOnlyQuantity()
     {
-        var tenantId = Guid.NewGuid();
-        var seedClient = new Client
-        {
-            Id = Guid.NewGuid(),
-            TenantId = tenantId,
-            Name = "Warehouse stock update fixture client"
-        };
-        await SeedTenantAsync(tenantId, [seedClient]);
+        var fixture = await SeedWarehouseStockAsync();
+        await using var factory = CreateFactory(fixture.TenantId);
+        using var client = CreateAuthenticatedClient(factory, fixture.TenantId);
 
-        Guid stockId;
-        Guid warehouseId;
-        Guid productId;
-        decimal originalQuantity;
-
-        await using (var context = CreateDbContext(tenantId))
-        {
-            var stock = await context.WarehouseStocks
-                .SingleAsync(entity => entity.TenantId == tenantId);
-
-            stockId = stock.Id;
-            warehouseId = stock.WarehouseId;
-            productId = stock.ProductId;
-            originalQuantity = stock.Quantity;
-        }
-
-        await using var factory = new WarehouseStockUpdateTestApplicationFactory(
-            ConnectionString, ProviderName, tenantId);
-        using var client = CreateAuthenticatedClient(factory, tenantId);
-
-        using var request = new HttpRequestMessage(
-            HttpMethod.Put,
-            $"/api/example/warehouse-stocks/{stockId}")
-        {
-            Content = JsonContent.Create(new { quantity = 12.345m })
-        };
-        request.Headers.TryAddWithoutValidation("If-Match", "\"1\"");
-
-        using var response = await client.SendAsync(request);
+        using var response = await SendPutAsync(client, fixture.StockId, 12.345m);
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
             "A valid update with the current entity version must succeed.");
@@ -77,24 +44,248 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
         var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Multiple(() =>
         {
-            Assert.That(payload.GetProperty("id").GetGuid(), Is.EqualTo(stockId));
-            Assert.That(payload.GetProperty("warehouseId").GetGuid(), Is.EqualTo(warehouseId));
-            Assert.That(payload.GetProperty("productId").GetGuid(), Is.EqualTo(productId));
+            Assert.That(payload.GetProperty("id").GetGuid(), Is.EqualTo(fixture.StockId));
+            Assert.That(payload.GetProperty("warehouseId").GetGuid(), Is.EqualTo(fixture.WarehouseId));
+            Assert.That(payload.GetProperty("productId").GetGuid(), Is.EqualTo(fixture.ProductId));
             Assert.That(payload.GetProperty("quantity").GetDecimal(), Is.EqualTo(12.345m));
         });
 
-        await using var verificationContext = CreateDbContext(tenantId);
-        var persistedStock = await verificationContext.WarehouseStocks
-            .SingleAsync(entity => entity.Id == stockId && entity.TenantId == tenantId);
+        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, 12.345m);
+    }
+
+    [Test]
+    public async Task PutWarehouseStock_WithZeroQuantityAndCurrentVersion_AcceptsZero()
+    {
+        var fixture = await SeedWarehouseStockAsync();
+        await using var factory = CreateFactory(fixture.TenantId);
+        using var client = CreateAuthenticatedClient(factory, fixture.TenantId);
+
+        using var response = await SendPutAsync(client, fixture.StockId, 0m);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.Headers.ETag?.Tag, Is.EqualTo("\"2\""));
+        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, 0m);
+    }
+
+    [Test]
+    public async Task PutWarehouseStock_WithNegativeQuantity_ReturnsBadRequestAndPreservesQuantity()
+    {
+        var fixture = await SeedWarehouseStockAsync();
+        await using var factory = CreateFactory(fixture.TenantId);
+        using var client = CreateAuthenticatedClient(factory, fixture.TenantId);
+
+        using var response = await SendPutAsync(client, fixture.StockId, -0.001m);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity);
+    }
+
+    [Test]
+    public async Task PutWarehouseStock_WithMoreThanThreeFractionalDigits_ReturnsBadRequestAndPreservesQuantity()
+    {
+        var fixture = await SeedWarehouseStockAsync();
+        await using var factory = CreateFactory(fixture.TenantId);
+        using var client = CreateAuthenticatedClient(factory, fixture.TenantId);
+
+        using var response = await SendPutAsync(client, fixture.StockId, 12.3456m);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity);
+    }
+
+    [Test]
+    public async Task PutWarehouseStock_WithoutIfMatch_ReturnsPreconditionRequiredAndPreservesQuantity()
+    {
+        var fixture = await SeedWarehouseStockAsync();
+        await using var factory = CreateFactory(fixture.TenantId);
+        using var client = CreateAuthenticatedClient(factory, fixture.TenantId);
+
+        using var response = await SendPutAsync(
+            client, fixture.StockId, 12.345m, includeIfMatch: false);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.PreconditionRequired));
+        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity);
+    }
+
+    [Test]
+    public async Task PutWarehouseStock_WithMalformedIfMatch_ReturnsBadRequestAndPreservesQuantity()
+    {
+        var fixture = await SeedWarehouseStockAsync();
+        await using var factory = CreateFactory(fixture.TenantId);
+        using var client = CreateAuthenticatedClient(factory, fixture.TenantId);
+
+        using var response = await SendPutAsync(
+            client, fixture.StockId, 12.345m, ifMatch: "not-an-etag");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity);
+    }
+
+    [Test]
+    public async Task PutWarehouseStock_WithStaleVersion_ReturnsConflictAndPreservesCurrentQuantity()
+    {
+        var fixture = await SeedWarehouseStockAsync();
+        await using var factory = CreateFactory(fixture.TenantId);
+        using var client = CreateAuthenticatedClient(factory, fixture.TenantId);
+
+        using var response = await SendPutAsync(
+            client, fixture.StockId, 12.345m, ifMatch: "\"0\"");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
+        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity);
+    }
+
+    [Test]
+    public async Task PutWarehouseStock_WithUnknownId_ReturnsNotFoundWithoutCreatingStock()
+    {
+        var fixture = await SeedWarehouseStockAsync();
+        var unknownStockId = Guid.NewGuid();
+        await using var factory = CreateFactory(fixture.TenantId);
+        using var client = CreateAuthenticatedClient(factory, fixture.TenantId);
+
+        using var response = await SendPutAsync(client, unknownStockId, 12.345m);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        await using var context = CreateDbContext(fixture.TenantId);
+        Assert.That(await context.WarehouseStocks.CountAsync(), Is.EqualTo(1));
+        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity);
+    }
+
+    [Test]
+    public async Task PutWarehouseStock_BelongingToAnotherTenant_ReturnsNotFoundAndPreservesForeignStock()
+    {
+        var authenticatedFixture = await SeedWarehouseStockAsync();
+        var foreignTenantId = Guid.NewGuid();
+        var foreignClient = new Client
+        {
+            Id = Guid.NewGuid(),
+            TenantId = foreignTenantId,
+            Name = "Foreign warehouse stock fixture client"
+        };
+        await SeedTenantAsync(foreignTenantId, [foreignClient]);
+
+        Guid foreignStockId;
+        decimal foreignOriginalQuantity;
+        await using (var foreignContext = CreateDbContext(foreignTenantId))
+        {
+            var foreignStock = await foreignContext.WarehouseStocks
+                .SingleAsync(stock => stock.TenantId == foreignTenantId);
+            foreignStockId = foreignStock.Id;
+            foreignOriginalQuantity = foreignStock.Quantity;
+        }
+
+        await using var factory = CreateFactory(authenticatedFixture.TenantId);
+        using var client = CreateAuthenticatedClient(factory, authenticatedFixture.TenantId);
+
+        using var response = await SendPutAsync(client, foreignStockId, 12.345m);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        await AssertPersistedQuantityAsync(
+            foreignTenantId, foreignStockId, foreignOriginalQuantity);
+    }
+
+    [Test]
+    public async Task PutWarehouseStock_TwiceWithSameVersion_RejectsSecondUpdateAsConflict()
+    {
+        var fixture = await SeedWarehouseStockAsync();
+        await using var factory = CreateFactory(fixture.TenantId);
+        using var client = CreateAuthenticatedClient(factory, fixture.TenantId);
+
+        using var firstResponse = await SendPutAsync(client, fixture.StockId, 12.345m);
+        using var secondResponse = await SendPutAsync(client, fixture.StockId, 20m);
 
         Assert.Multiple(() =>
         {
-            Assert.That(persistedStock.Quantity, Is.EqualTo(12.345m));
-            Assert.That(persistedStock.WarehouseId, Is.EqualTo(warehouseId));
-            Assert.That(persistedStock.ProductId, Is.EqualTo(productId));
-            Assert.That(persistedStock.Quantity, Is.Not.EqualTo(originalQuantity));
+            Assert.That(firstResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(firstResponse.Headers.ETag?.Tag, Is.EqualTo("\"2\""));
+            Assert.That(secondResponse.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
+        });
+        await AssertPersistedQuantityAsync(fixture.TenantId, fixture.StockId, 12.345m);
+    }
+
+    [Test]
+    public async Task GetWarehouseStockById_ReturnsCurrentRepresentationAndStrongVersionEtag()
+    {
+        var fixture = await SeedWarehouseStockAsync();
+        await using var factory = CreateFactory(fixture.TenantId);
+        using var client = CreateAuthenticatedClient(factory, fixture.TenantId);
+
+        using var response = await client.GetAsync(
+            $"/api/example/warehouse-stocks/{fixture.StockId}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(response.Headers.ETag?.Tag, Is.EqualTo("\"1\""));
+
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(payload.GetProperty("id").GetGuid(), Is.EqualTo(fixture.StockId));
+            Assert.That(payload.GetProperty("warehouseId").GetGuid(), Is.EqualTo(fixture.WarehouseId));
+            Assert.That(payload.GetProperty("productId").GetGuid(), Is.EqualTo(fixture.ProductId));
+            Assert.That(payload.GetProperty("quantity").GetDecimal(), Is.EqualTo(fixture.OriginalQuantity));
         });
     }
+
+    private async Task<WarehouseStockFixture> SeedWarehouseStockAsync()
+    {
+        var tenantId = Guid.NewGuid();
+        var seedClient = new Client
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = "Warehouse stock update fixture client"
+        };
+        await SeedTenantAsync(tenantId, [seedClient]);
+
+        await using var context = CreateDbContext(tenantId);
+        var stock = await context.WarehouseStocks
+            .SingleAsync(entity => entity.TenantId == tenantId);
+
+        return new WarehouseStockFixture(
+            tenantId, stock.Id, stock.WarehouseId, stock.ProductId, stock.Quantity);
+    }
+
+    private async Task AssertPersistedQuantityAsync(
+        Guid tenantId, Guid stockId, decimal expectedQuantity)
+    {
+        await using var context = CreateDbContext(tenantId);
+        var stock = await context.WarehouseStocks
+            .SingleAsync(entity => entity.Id == stockId && entity.TenantId == tenantId);
+        Assert.That(stock.Quantity, Is.EqualTo(expectedQuantity),
+            "A rejected update must not change the persisted stock quantity.");
+    }
+
+    private static HttpRequestMessage CreatePutRequest(
+        Guid stockId, decimal quantity, string? ifMatch, bool includeIfMatch)
+    {
+        var request = new HttpRequestMessage(
+            HttpMethod.Put,
+            $"/api/example/warehouse-stocks/{stockId}")
+        {
+            Content = JsonContent.Create(new { quantity })
+        };
+
+        if (includeIfMatch)
+        {
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
+        return request;
+    }
+
+    private static async Task<HttpResponseMessage> SendPutAsync(
+        HttpClient client,
+        Guid stockId,
+        decimal quantity,
+        string? ifMatch = "\"1\"",
+        bool includeIfMatch = true)
+    {
+        using var request = CreatePutRequest(stockId, quantity, ifMatch, includeIfMatch);
+        return await client.SendAsync(request);
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(Guid tenantId) =>
+        new WarehouseStockUpdateTestApplicationFactory(ConnectionString, ProviderName, tenantId);
 
     private static HttpClient CreateAuthenticatedClient(
         WebApplicationFactory<Program> factory, Guid tenantId)
@@ -122,6 +313,13 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
             signingCredentials: credentials);
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    private sealed record WarehouseStockFixture(
+        Guid TenantId,
+        Guid StockId,
+        Guid WarehouseId,
+        Guid ProductId,
+        decimal OriginalQuantity);
 
     private sealed class WarehouseStockUpdateTestApplicationFactory(
         string connectionString, string providerName, Guid tenantId)
