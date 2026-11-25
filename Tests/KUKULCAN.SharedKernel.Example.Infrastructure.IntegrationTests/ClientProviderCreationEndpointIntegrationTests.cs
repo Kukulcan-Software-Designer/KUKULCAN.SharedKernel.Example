@@ -691,6 +691,258 @@ public sealed class ClientProviderCreationEndpointIntegrationTests : ExampleData
         });
     }
 
+
+    [TestCase("clients", "name", "missing", 0)]
+    [TestCase("clients", "name", "null", 0)]
+    [TestCase("clients", "name", "empty", 0)]
+    [TestCase("clients", "name", "whitespace", 0)]
+    [TestCase("clients", "name", "too-long", 201)]
+    [TestCase("clients", "city", "too-long", 121)]
+    [TestCase("clients", "state", "too-long", 121)]
+    [TestCase("clients", "postalCode", "too-long", 33)]
+    [TestCase("providers", "name", "missing", 0)]
+    [TestCase("providers", "name", "null", 0)]
+    [TestCase("providers", "name", "empty", 0)]
+    [TestCase("providers", "name", "whitespace", 0)]
+    [TestCase("providers", "name", "too-long", 201)]
+    [TestCase("providers", "city", "too-long", 121)]
+    [TestCase("providers", "state", "too-long", 121)]
+    [TestCase("providers", "postalCode", "too-long", 33)]
+    public async Task I18_011_PutClientOrProvider_WithInvalidField_ReturnsBadRequestWithoutChangingPersistedRecord(
+        string entityType, string field, string invalidKind, int invalidLength)
+    {
+        var tenantId = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["name"] = "Original entity", ["city"] = "Madrid",
+            ["state"] = "Madrid", ["postalCode"] = "28001"
+        };
+        ApplyInvalidField(payload, field, invalidKind, invalidLength);
+
+        await using (var db = CreateDbContext(tenantId))
+        {
+            if (entityType == "clients")
+            {
+                db.Clients.Add(new Client
+                {
+                    Id = entityId, TenantId = tenantId, Name = "Original entity",
+                    City = "Madrid", State = "Madrid", PostalCode = "28001", IsDeleted = false
+                });
+            }
+            else
+            {
+                db.Providers.Add(new Provider
+                {
+                    Id = entityId, TenantId = tenantId, Name = "Original entity",
+                    City = "Madrid", State = "Madrid", PostalCode = "28001", IsDeleted = false
+                });
+            }
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PutAsJsonAsync($"/api/example/{entityType}/{entityId}", payload);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest),
+            $"I18-011 requires invalid {entityType} field '{field}' ({invalidKind}) to return HTTP 400.");
+
+        await using var verification = CreateDbContext(tenantId);
+        if (entityType == "clients")
+        {
+            var persisted = await verification.Clients.SingleAsync(x => x.Id == entityId);
+            Assert.Multiple(() =>
+            {
+                Assert.That(persisted.Id, Is.EqualTo(entityId));
+                Assert.That(persisted.TenantId, Is.EqualTo(tenantId));
+                Assert.That(persisted.Name, Is.EqualTo("Original entity"));
+                Assert.That(persisted.City, Is.EqualTo("Madrid"));
+                Assert.That(persisted.State, Is.EqualTo("Madrid"));
+                Assert.That(persisted.PostalCode, Is.EqualTo("28001"));
+                Assert.That(persisted.IsDeleted, Is.False);
+            });
+        }
+        else
+        {
+            var persisted = await verification.Providers.SingleAsync(x => x.Id == entityId);
+            Assert.Multiple(() =>
+            {
+                Assert.That(persisted.Id, Is.EqualTo(entityId));
+                Assert.That(persisted.TenantId, Is.EqualTo(tenantId));
+                Assert.That(persisted.Name, Is.EqualTo("Original entity"));
+                Assert.That(persisted.City, Is.EqualTo("Madrid"));
+                Assert.That(persisted.State, Is.EqualTo("Madrid"));
+                Assert.That(persisted.PostalCode, Is.EqualTo("28001"));
+                Assert.That(persisted.IsDeleted, Is.False);
+            });
+        }
+    }
+
+    [TestCase("code", "missing", 0)]
+    [TestCase("code", "null", 0)]
+    [TestCase("code", "empty", 0)]
+    [TestCase("code", "whitespace", 0)]
+    [TestCase("code", "too-long", 65)]
+    [TestCase("name", "missing", 0)]
+    [TestCase("name", "null", 0)]
+    [TestCase("name", "empty", 0)]
+    [TestCase("name", "whitespace", 0)]
+    [TestCase("name", "too-long", 201)]
+    [TestCase("description", "too-long", 1001)]
+    public async Task I18_011_PutProduct_WithInvalidField_ReturnsBadRequestWithoutChangingPersistedRecord(
+        string field, string invalidKind, int invalidLength)
+    {
+        var tenantId = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var payload = new Dictionary<string, object?>
+        {
+            ["code"] = "ORIGINAL-CODE", ["name"] = "Original product",
+            ["description"] = "Original description"
+        };
+        ApplyInvalidField(payload, field, invalidKind, invalidLength);
+
+        await using (var db = CreateDbContext(tenantId))
+        {
+            db.Products.Add(new Product
+            {
+                Id = entityId, TenantId = tenantId, Code = "ORIGINAL-CODE",
+                Name = "Original product", Description = "Original description"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PutAsJsonAsync($"/api/example/products/{entityId}", payload);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest),
+            $"I18-011 requires invalid Product field '{field}' ({invalidKind}) to return HTTP 400.");
+
+        await using var verification = CreateDbContext(tenantId);
+        var persisted = await verification.Products.SingleAsync(x => x.Id == entityId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.Id, Is.EqualTo(entityId));
+            Assert.That(persisted.TenantId, Is.EqualTo(tenantId));
+            Assert.That(persisted.Code, Is.EqualTo("ORIGINAL-CODE"));
+            Assert.That(persisted.Name, Is.EqualTo("Original product"));
+            Assert.That(persisted.Description, Is.EqualTo("Original description"));
+        });
+    }
+
+    [TestCase("name", "missing", 0)]
+    [TestCase("name", "null", 0)]
+    [TestCase("name", "empty", 0)]
+    [TestCase("name", "whitespace", 0)]
+    [TestCase("name", "too-long", 201)]
+    [TestCase("city", "too-long", 121)]
+    [TestCase("state", "too-long", 121)]
+    [TestCase("postalCode", "too-long", 33)]
+    public async Task I18_011_PutWarehouse_WithInvalidField_ReturnsBadRequestWithoutChangingPersistedRecord(
+        string field, string invalidKind, int invalidLength)
+    {
+        var tenantId = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var payload = new Dictionary<string, object?>
+        {
+            ["name"] = "Original warehouse", ["city"] = "Madrid",
+            ["state"] = "Madrid", ["postalCode"] = "28001"
+        };
+        ApplyInvalidField(payload, field, invalidKind, invalidLength);
+
+        await using (var db = CreateDbContext(tenantId))
+        {
+            db.Warehouses.Add(new Warehouse
+            {
+                Id = entityId, TenantId = tenantId, Name = "Original warehouse",
+                City = "Madrid", State = "Madrid", PostalCode = "28001"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PutAsJsonAsync($"/api/example/warehouses/{entityId}", payload);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest),
+            $"I18-011 requires invalid Warehouse field '{field}' ({invalidKind}) to return HTTP 400.");
+
+        await using var verification = CreateDbContext(tenantId);
+        var persisted = await verification.Warehouses.SingleAsync(x => x.Id == entityId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.Id, Is.EqualTo(entityId));
+            Assert.That(persisted.TenantId, Is.EqualTo(tenantId));
+            Assert.That(persisted.Name, Is.EqualTo("Original warehouse"));
+            Assert.That(persisted.City, Is.EqualTo("Madrid"));
+            Assert.That(persisted.State, Is.EqualTo("Madrid"));
+            Assert.That(persisted.PostalCode, Is.EqualTo("28001"));
+        });
+    }
+
+    [Test]
+    public async Task I18_011_PutWarehouse_WithNameAtApprovedMaximumLength_UpdatesSuccessfully()
+    {
+        var tenantId = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        var expectedName = new string('W', 200);
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+
+        await using (var db = CreateDbContext(tenantId))
+        {
+            db.Warehouses.Add(new Warehouse
+            {
+                Id = entityId, TenantId = tenantId, Name = "Original warehouse",
+                City = "Madrid", State = "Madrid", PostalCode = "28001"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PutAsJsonAsync($"/api/example/warehouses/{entityId}", new
+        {
+            name = expectedName, city = "Barcelona", state = "Cataluña", postalCode = "08001"
+        });
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            "The approved Warehouse.Name limit is 200 characters; a value at that boundary must be accepted.");
+
+        await using var verification = CreateDbContext(tenantId);
+        var persisted = await verification.Warehouses.SingleAsync(x => x.Id == entityId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.Id, Is.EqualTo(entityId));
+            Assert.That(persisted.TenantId, Is.EqualTo(tenantId));
+            Assert.That(persisted.Name, Is.EqualTo(expectedName));
+            Assert.That(persisted.City, Is.EqualTo("Barcelona"));
+            Assert.That(persisted.State, Is.EqualTo("Cataluña"));
+            Assert.That(persisted.PostalCode, Is.EqualTo("08001"));
+        });
+    }
+
+    private static void ApplyInvalidField(
+        IDictionary<string, object?> payload, string field, string invalidKind, int invalidLength)
+    {
+        switch (invalidKind)
+        {
+            case "missing":
+                payload.Remove(field);
+                break;
+            case "null":
+                payload[field] = null;
+                break;
+            case "empty":
+                payload[field] = string.Empty;
+                break;
+            case "whitespace":
+                payload[field] = "   ";
+                break;
+            case "too-long":
+                payload[field] = new string('X', invalidLength);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(invalidKind), invalidKind, "Unknown invalid-field test case.");
+        }
+    }
+
     private static HttpClient CreateAuthenticatedClient(
         WebApplicationFactory<Program> factory, Guid tenantId)
     {
