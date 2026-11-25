@@ -788,7 +788,7 @@ public sealed class ClientProviderCreationEndpointIntegrationTests : ExampleData
     [TestCase("name", "null", 0)]
     [TestCase("name", "empty", 0)]
     [TestCase("name", "whitespace", 0)]
-    [TestCase("name", "too-long", 201)]
+    [TestCase("name", "too-long", 161)]
     [TestCase("description", "too-long", 1001)]
     public async Task I18_011_PutProduct_WithInvalidField_ReturnsBadRequestWithoutChangingPersistedRecord(
         string field, string invalidKind, int invalidLength)
@@ -884,7 +884,7 @@ public sealed class ClientProviderCreationEndpointIntegrationTests : ExampleData
     {
         var tenantId = Guid.NewGuid();
         var entityId = Guid.NewGuid();
-        var expectedName = new string('W', 200);
+        var expectedName = new string('W', 160);
         await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
         using var client = CreateAuthenticatedClient(factory, tenantId);
 
@@ -903,7 +903,7 @@ public sealed class ClientProviderCreationEndpointIntegrationTests : ExampleData
             name = expectedName, city = "Barcelona", state = "Cataluña", postalCode = "08001"
         });
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
-            "The approved Warehouse.Name limit is 200 characters; a value at that boundary must be accepted.");
+            "The approved Warehouse.Name limit is 160 characters, matching the shared persistence mapping; a value at that boundary must be accepted.");
 
         await using var verification = CreateDbContext(tenantId);
         var persisted = await verification.Warehouses.SingleAsync(x => x.Id == entityId);
