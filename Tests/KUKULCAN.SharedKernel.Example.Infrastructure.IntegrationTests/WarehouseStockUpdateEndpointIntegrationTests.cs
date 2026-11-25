@@ -284,7 +284,7 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
         return await client.SendAsync(request);
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(Guid tenantId) =>
+    private WebApplicationFactory<Program> CreateFactory(Guid tenantId) =>
         new WarehouseStockUpdateTestApplicationFactory(ConnectionString, ProviderName, tenantId);
 
     private static HttpClient CreateAuthenticatedClient(
