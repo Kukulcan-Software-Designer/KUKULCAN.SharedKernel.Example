@@ -388,6 +388,159 @@ public sealed class ClientProviderCreationEndpointIntegrationTests : ExampleData
         });
     }
 
+    [Test]
+    public async Task I18_009_PutClient_WithNonexistentId_ReturnsNotFoundWithoutChangingPersistedRecords()
+    {
+        var tenantId = Guid.NewGuid();
+        var existingId = Guid.NewGuid();
+        var nonexistentId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        await using (var db = CreateDbContext(tenantId))
+        {
+            db.Clients.Add(new Client
+            {
+                Id = existingId, TenantId = tenantId, Name = "Existing Client",
+                City = "Madrid", State = "Madrid", PostalCode = "28001", IsDeleted = false
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PutAsJsonAsync($"/api/example/clients/{nonexistentId}", new
+        {
+            name = "New Client", city = "Barcelona", state = "Cataluña", postalCode = "08001"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        await using var verification = CreateDbContext(tenantId);
+        var persisted = await verification.Clients.ToListAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted, Has.Count.EqualTo(1));
+            Assert.That(persisted[0].Id, Is.EqualTo(existingId));
+            Assert.That(persisted[0].TenantId, Is.EqualTo(tenantId));
+            Assert.That(persisted[0].Name, Is.EqualTo("Existing Client"));
+            Assert.That(persisted[0].City, Is.EqualTo("Madrid"));
+            Assert.That(persisted[0].State, Is.EqualTo("Madrid"));
+            Assert.That(persisted[0].PostalCode, Is.EqualTo("28001"));
+            Assert.That(persisted[0].IsDeleted, Is.False);
+        });
+    }
+
+    [Test]
+    public async Task I18_009_PutProvider_WithNonexistentId_ReturnsNotFoundWithoutChangingPersistedRecords()
+    {
+        var tenantId = Guid.NewGuid();
+        var existingId = Guid.NewGuid();
+        var nonexistentId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        await using (var db = CreateDbContext(tenantId))
+        {
+            db.Providers.Add(new Provider
+            {
+                Id = existingId, TenantId = tenantId, Name = "Existing Provider",
+                City = "Madrid", State = "Madrid", PostalCode = "28001", IsDeleted = false
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PutAsJsonAsync($"/api/example/providers/{nonexistentId}", new
+        {
+            name = "New Provider", city = "Valencia", state = "Comunidad Valenciana", postalCode = "46001"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        await using var verification = CreateDbContext(tenantId);
+        var persisted = await verification.Providers.ToListAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted, Has.Count.EqualTo(1));
+            Assert.That(persisted[0].Id, Is.EqualTo(existingId));
+            Assert.That(persisted[0].TenantId, Is.EqualTo(tenantId));
+            Assert.That(persisted[0].Name, Is.EqualTo("Existing Provider"));
+            Assert.That(persisted[0].City, Is.EqualTo("Madrid"));
+            Assert.That(persisted[0].State, Is.EqualTo("Madrid"));
+            Assert.That(persisted[0].PostalCode, Is.EqualTo("28001"));
+            Assert.That(persisted[0].IsDeleted, Is.False);
+        });
+    }
+
+    [Test]
+    public async Task I18_009_PutProduct_WithNonexistentId_ReturnsNotFoundWithoutChangingPersistedRecords()
+    {
+        var tenantId = Guid.NewGuid();
+        var existingId = Guid.NewGuid();
+        var nonexistentId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        await using (var db = CreateDbContext(tenantId))
+        {
+            db.Products.Add(new Product
+            {
+                Id = existingId, TenantId = tenantId, Code = "EXISTING-CODE",
+                Name = "Existing Product", Description = "Existing description"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PutAsJsonAsync($"/api/example/products/{nonexistentId}", new
+        {
+            code = "NEW-CODE", name = "New Product", description = "New description"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        await using var verification = CreateDbContext(tenantId);
+        var persisted = await verification.Products.ToListAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted, Has.Count.EqualTo(1));
+            Assert.That(persisted[0].Id, Is.EqualTo(existingId));
+            Assert.That(persisted[0].TenantId, Is.EqualTo(tenantId));
+            Assert.That(persisted[0].Code, Is.EqualTo("EXISTING-CODE"));
+            Assert.That(persisted[0].Name, Is.EqualTo("Existing Product"));
+            Assert.That(persisted[0].Description, Is.EqualTo("Existing description"));
+        });
+    }
+
+    [Test]
+    public async Task I18_009_PutWarehouse_WithNonexistentId_ReturnsNotFoundWithoutChangingPersistedRecords()
+    {
+        var tenantId = Guid.NewGuid();
+        var existingId = Guid.NewGuid();
+        var nonexistentId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        await using (var db = CreateDbContext(tenantId))
+        {
+            db.Warehouses.Add(new Warehouse
+            {
+                Id = existingId, TenantId = tenantId, Name = "Existing Warehouse",
+                City = "Madrid", State = "Madrid", PostalCode = "28001"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PutAsJsonAsync($"/api/example/warehouses/{nonexistentId}", new
+        {
+            name = "New Warehouse", city = "Sevilla", state = "Andalucía", postalCode = "41001"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        await using var verification = CreateDbContext(tenantId);
+        var persisted = await verification.Warehouses.ToListAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted, Has.Count.EqualTo(1));
+            Assert.That(persisted[0].Id, Is.EqualTo(existingId));
+            Assert.That(persisted[0].TenantId, Is.EqualTo(tenantId));
+            Assert.That(persisted[0].Name, Is.EqualTo("Existing Warehouse"));
+            Assert.That(persisted[0].City, Is.EqualTo("Madrid"));
+            Assert.That(persisted[0].State, Is.EqualTo("Madrid"));
+            Assert.That(persisted[0].PostalCode, Is.EqualTo("28001"));
+        });
+    }
+
     private static HttpClient CreateAuthenticatedClient(
         WebApplicationFactory<Program> factory, Guid tenantId)
     {
