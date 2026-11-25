@@ -541,6 +541,156 @@ public sealed class ClientProviderCreationEndpointIntegrationTests : ExampleData
         });
     }
 
+
+    [Test]
+    public async Task I18_010_PutClient_WithForeignTenantId_ReturnsNotFoundWithoutChangingPersistedRecords()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantA);
+        using var clientA = CreateAuthenticatedClient(factory, tenantA);
+        await using (var dbB = CreateDbContext(tenantB))
+        {
+            dbB.Clients.Add(new Client
+            {
+                Id = entityId, TenantId = tenantB, Name = "Tenant B Client",
+                City = "Madrid", State = "Madrid", PostalCode = "28001", IsDeleted = false
+            });
+            await dbB.SaveChangesAsync();
+        }
+
+        using var response = await clientA.PutAsJsonAsync($"/api/example/clients/{entityId}", new
+        {
+            name = "Tenant A Attempt", city = "Barcelona", state = "Cataluña", postalCode = "08001"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        await using var verification = CreateDbContext(tenantB);
+        var persisted = await verification.Clients.SingleAsync(x => x.Id == entityId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.Id, Is.EqualTo(entityId));
+            Assert.That(persisted.TenantId, Is.EqualTo(tenantB));
+            Assert.That(persisted.Name, Is.EqualTo("Tenant B Client"));
+            Assert.That(persisted.City, Is.EqualTo("Madrid"));
+            Assert.That(persisted.State, Is.EqualTo("Madrid"));
+            Assert.That(persisted.PostalCode, Is.EqualTo("28001"));
+            Assert.That(persisted.IsDeleted, Is.False);
+        });
+    }
+
+    [Test]
+    public async Task I18_010_PutProvider_WithForeignTenantId_ReturnsNotFoundWithoutChangingPersistedRecords()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantA);
+        using var clientA = CreateAuthenticatedClient(factory, tenantA);
+        await using (var dbB = CreateDbContext(tenantB))
+        {
+            dbB.Providers.Add(new Provider
+            {
+                Id = entityId, TenantId = tenantB, Name = "Tenant B Provider",
+                City = "Madrid", State = "Madrid", PostalCode = "28001", IsDeleted = false
+            });
+            await dbB.SaveChangesAsync();
+        }
+
+        using var response = await clientA.PutAsJsonAsync($"/api/example/providers/{entityId}", new
+        {
+            name = "Tenant A Attempt", city = "Valencia", state = "Comunidad Valenciana", postalCode = "46001"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        await using var verification = CreateDbContext(tenantB);
+        var persisted = await verification.Providers.SingleAsync(x => x.Id == entityId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.Id, Is.EqualTo(entityId));
+            Assert.That(persisted.TenantId, Is.EqualTo(tenantB));
+            Assert.That(persisted.Name, Is.EqualTo("Tenant B Provider"));
+            Assert.That(persisted.City, Is.EqualTo("Madrid"));
+            Assert.That(persisted.State, Is.EqualTo("Madrid"));
+            Assert.That(persisted.PostalCode, Is.EqualTo("28001"));
+            Assert.That(persisted.IsDeleted, Is.False);
+        });
+    }
+
+    [Test]
+    public async Task I18_010_PutProduct_WithForeignTenantId_ReturnsNotFoundWithoutChangingPersistedRecords()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantA);
+        using var clientA = CreateAuthenticatedClient(factory, tenantA);
+        await using (var dbB = CreateDbContext(tenantB))
+        {
+            dbB.Products.Add(new Product
+            {
+                Id = entityId, TenantId = tenantB, Code = "TENANT-B-CODE",
+                Name = "Tenant B Product", Description = "Tenant B description"
+            });
+            await dbB.SaveChangesAsync();
+        }
+
+        using var response = await clientA.PutAsJsonAsync($"/api/example/products/{entityId}", new
+        {
+            code = "TENANT-A-CODE", name = "Tenant A Attempt", description = "Tenant A description"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        await using var verification = CreateDbContext(tenantB);
+        var persisted = await verification.Products.SingleAsync(x => x.Id == entityId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.Id, Is.EqualTo(entityId));
+            Assert.That(persisted.TenantId, Is.EqualTo(tenantB));
+            Assert.That(persisted.Code, Is.EqualTo("TENANT-B-CODE"));
+            Assert.That(persisted.Name, Is.EqualTo("Tenant B Product"));
+            Assert.That(persisted.Description, Is.EqualTo("Tenant B description"));
+        });
+    }
+
+    [Test]
+    public async Task I18_010_PutWarehouse_WithForeignTenantId_ReturnsNotFoundWithoutChangingPersistedRecords()
+    {
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantA);
+        using var clientA = CreateAuthenticatedClient(factory, tenantA);
+        await using (var dbB = CreateDbContext(tenantB))
+        {
+            dbB.Warehouses.Add(new Warehouse
+            {
+                Id = entityId, TenantId = tenantB, Name = "Tenant B Warehouse",
+                City = "Madrid", State = "Madrid", PostalCode = "28001"
+            });
+            await dbB.SaveChangesAsync();
+        }
+
+        using var response = await clientA.PutAsJsonAsync($"/api/example/warehouses/{entityId}", new
+        {
+            name = "Tenant A Attempt", city = "Sevilla", state = "Andalucía", postalCode = "41001"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        await using var verification = CreateDbContext(tenantB);
+        var persisted = await verification.Warehouses.SingleAsync(x => x.Id == entityId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.Id, Is.EqualTo(entityId));
+            Assert.That(persisted.TenantId, Is.EqualTo(tenantB));
+            Assert.That(persisted.Name, Is.EqualTo("Tenant B Warehouse"));
+            Assert.That(persisted.City, Is.EqualTo("Madrid"));
+            Assert.That(persisted.State, Is.EqualTo("Madrid"));
+            Assert.That(persisted.PostalCode, Is.EqualTo("28001"));
+        });
+    }
+
     private static HttpClient CreateAuthenticatedClient(
         WebApplicationFactory<Program> factory, Guid tenantId)
     {
