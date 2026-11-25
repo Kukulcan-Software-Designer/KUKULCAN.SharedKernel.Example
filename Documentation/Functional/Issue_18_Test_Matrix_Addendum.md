@@ -1,6 +1,6 @@
 # Issue #18 — HTTP Test Matrix Addendum
 
-**Base document:** `Diseno_Funcional_WebAPI_Example.docx`, consolidated functional design v1.0, including the approved decisions D-01–D-14 and the approved Issue #18 scope.  
+**Base document:** `Diseno_Funcional_WebAPI_Example.docx`, consolidated functional design v1.2, including the approved decisions D-01–D-14 and the approved Issue #18 scope.  
 **Branch:** `FEATURES/M4-Issue-18-WebAPI-Business`  
 **Traceability workbook:** `Issue_18_T16-T17_I18-001-I18-037_Traceability.xlsx`  
 **Purpose:** Define the HTTP acceptance cases owned by Issue #18 and make their expected observable behavior explicit before implementation.
@@ -26,6 +26,26 @@ All applicable cases must be exercised through the Web API using `WebApplication
 | I18-009 | Update not found | PUT an update for a resource identifier that does not exist | HTTP 404; no resource is created and no existing resource changes |
 | I18-010 | Tenant isolation on update | PUT a resource that exists but belongs to another tenant | HTTP 404 Not Found (tenant-hiding response); no data or ownership changes |
 | I18-011 | Update validation | PUT a payload that violates an approved required-field, length, or domain constraint | HTTP 400; the previously persisted state remains unchanged |
+
+### I18-011 — approved update-field constraints
+
+The following maximum lengths are the acceptance limits for the editable fields. Required fields must not be null, empty, or whitespace-only after trimming; optional fields may be null or empty. Any invalid PUT returns HTTP 400 and leaves the complete persisted record unchanged.
+
+| Entity | Field | Requirement | Maximum length |
+|---|---|---|---:|
+| Client / Provider | Name | Required | 200 |
+| Client / Provider | City | Optional | 120 |
+| Client / Provider | State | Optional | 120 |
+| Client / Provider | PostalCode | Optional | 32 |
+| Product | Code | Required | 64 |
+| Product | Name | Required | 200 |
+| Product | Description | Optional | 1000 |
+| Warehouse | Name | Required | 160 |
+| Warehouse | City | Optional | 120 |
+| Warehouse | State | Optional | 120 |
+| Warehouse | PostalCode | Optional | 32 |
+
+`Warehouse.Name` is limited to 160 characters to match the shared persistence mapping (`ExampleDbContextModelConfiguration`). The boundary acceptance test must accept exactly 160 characters; 161 characters must be rejected. `Product.Code` uniqueness remains a separate HTTP 409 conflict rule, not an I18-011 HTTP 400 length/required-field failure.
 | I18-012 | Stock quantity | Submit a valid controlled stock-quantity change for a WarehouseStock owned by the authenticated tenant | HTTP 200; the requested quantity is persisted for the intended stock record only |
 | I18-013 | Stock quantity validation | Submit an invalid stock quantity, including a value outside the approved domain constraints | HTTP 400; the original quantity remains unchanged |
 | I18-014 | Stock tenant isolation | Attempt to change stock belonging to another tenant | HTTP 404 Not Found (tenant-hiding response); no stock quantity or ownership changes |
