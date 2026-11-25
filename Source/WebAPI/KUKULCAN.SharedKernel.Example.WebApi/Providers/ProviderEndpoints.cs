@@ -59,6 +59,14 @@ public static class ProviderEndpoints
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status403Forbidden);
 
+        endpoints.MapPut("/api/example/providers/{id}", UpdateProviderAsync)
+            .WithName("UpdateProvider")
+            .WithTags("Providers")
+            .Produces<ProviderListItemResponse>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
+
         return endpoints;
     }
 
@@ -297,6 +305,54 @@ public static class ProviderEndpoints
         return HttpResults.Ok(new ProviderPagedResponse<ProviderListItemResponse>(items, requestedPage,
             requestedPageSize, totalCount, totalPages));
     }
+    private static async Task<IResult> UpdateProviderAsync(
+        string id,
+        ProviderCreateRequest request,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        ITenantContext tenantContext,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(id, out Guid parsedId))
+            return HttpResults.Problem(statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid route parameter", detail: "The identifier must be a valid GUID.");
+
+        string name = request.Name?.Trim() ?? string.Empty;
+        string? city = string.IsNullOrWhiteSpace(request.City) ? null : request.City.Trim();
+        string? state = string.IsNullOrWhiteSpace(request.State) ? null : request.State.Trim();
+        string? postalCode = string.IsNullOrWhiteSpace(request.PostalCode) ? null : request.PostalCode.Trim();
+
+        var validationErrors = new Dictionary<string, string[]>();
+        if (name.Length == 0)
+            validationErrors[nameof(request.Name)] = ["Name is required."];
+        else if (name.Length > 200)
+            validationErrors[nameof(request.Name)] = ["Name must not exceed 200 characters."];
+        if (city?.Length > 120)
+            validationErrors[nameof(request.City)] = ["City must not exceed 120 characters."];
+        if (state?.Length > 120)
+            validationErrors[nameof(request.State)] = ["State must not exceed 120 characters."];
+        if (postalCode?.Length > 32)
+            validationErrors[nameof(request.PostalCode)] = ["PostalCode must not exceed 32 characters."];
+        if (validationErrors.Count > 0)
+            return HttpResults.ValidationProblem(validationErrors);
+        if (tenantContext.TenantId == Guid.Empty)
+            return HttpResults.Forbid();
+
+        Provider? entity = await context.Providers.SingleOrDefaultAsync(provider =>
+            provider.Id == parsedId && provider.TenantId == tenantContext.TenantId && !provider.IsDeleted,
+            cancellationToken);
+        if (entity is null)
+            return HttpResults.NotFound();
+
+        entity.Name = name;
+        entity.City = city;
+        entity.State = state;
+        entity.PostalCode = postalCode;
+        await context.SaveChangesAsync(cancellationToken);
+
+        return HttpResults.Ok(new ProviderListItemResponse(
+            entity.Id, entity.Name, entity.City, entity.State, entity.PostalCode, entity.IsDeleted));
+    }
+
 }
 
 /// <summary>Represents provider creation request data.</summary>
