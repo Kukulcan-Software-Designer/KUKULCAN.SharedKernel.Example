@@ -234,6 +234,160 @@ public sealed class ClientProviderCreationEndpointIntegrationTests : ExampleData
         });
     }
 
+
+    [Test]
+    public async Task I18_005_PutClient_WithValidPayload_UpdatesEditableFields()
+    {
+        var tenantId = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var original = new Client
+        {
+            Id = entityId, TenantId = tenantId, Name = "Original Client",
+            City = "Madrid", State = "Madrid", PostalCode = "28001", IsDeleted = false
+        };
+        await using (var db = CreateDbContext(tenantId))
+        {
+            db.Clients.Add(original);
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PutAsJsonAsync($"/api/example/clients/{entityId}", new
+        {
+            name = "Updated Client", city = "Barcelona", state = "Cataluña", postalCode = "08001"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            "I18-005 requires a valid Client update to return HTTP 200.");
+        await using var verification = CreateDbContext(tenantId);
+        var persisted = await verification.Clients.SingleAsync(x => x.Id == entityId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.Id, Is.EqualTo(entityId));
+            Assert.That(persisted.TenantId, Is.EqualTo(tenantId));
+            Assert.That(persisted.Name, Is.EqualTo("Updated Client"));
+            Assert.That(persisted.City, Is.EqualTo("Barcelona"));
+            Assert.That(persisted.State, Is.EqualTo("Cataluña"));
+            Assert.That(persisted.PostalCode, Is.EqualTo("08001"));
+            Assert.That(persisted.IsDeleted, Is.False);
+        });
+    }
+
+    [Test]
+    public async Task I18_006_PutProvider_WithValidPayload_UpdatesEditableFields()
+    {
+        var tenantId = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var original = new Provider
+        {
+            Id = entityId, TenantId = tenantId, Name = "Original Provider",
+            City = "Madrid", State = "Madrid", PostalCode = "28001", IsDeleted = false
+        };
+        await using (var db = CreateDbContext(tenantId))
+        {
+            db.Providers.Add(original);
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PutAsJsonAsync($"/api/example/providers/{entityId}", new
+        {
+            name = "Updated Provider", city = "Valencia", state = "Comunidad Valenciana", postalCode = "46001"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            "I18-006 requires a valid Provider update to return HTTP 200.");
+        await using var verification = CreateDbContext(tenantId);
+        var persisted = await verification.Providers.SingleAsync(x => x.Id == entityId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.Id, Is.EqualTo(entityId));
+            Assert.That(persisted.TenantId, Is.EqualTo(tenantId));
+            Assert.That(persisted.Name, Is.EqualTo("Updated Provider"));
+            Assert.That(persisted.City, Is.EqualTo("Valencia"));
+            Assert.That(persisted.State, Is.EqualTo("Comunidad Valenciana"));
+            Assert.That(persisted.PostalCode, Is.EqualTo("46001"));
+            Assert.That(persisted.IsDeleted, Is.False);
+        });
+    }
+
+    [Test]
+    public async Task I18_007_PutProduct_WithValidPayload_UpdatesEditableFields()
+    {
+        var tenantId = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var original = new Product
+        {
+            Id = entityId, TenantId = tenantId, Code = "OLD-CODE",
+            Name = "Original Product", Description = "Original description"
+        };
+        await using (var db = CreateDbContext(tenantId))
+        {
+            db.Products.Add(original);
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PutAsJsonAsync($"/api/example/products/{entityId}", new
+        {
+            code = "NEW-CODE", name = "Updated Product", description = "Updated description"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            "I18-007 requires a valid Product update to return HTTP 200.");
+        await using var verification = CreateDbContext(tenantId);
+        var persisted = await verification.Products.SingleAsync(x => x.Id == entityId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.Id, Is.EqualTo(entityId));
+            Assert.That(persisted.TenantId, Is.EqualTo(tenantId));
+            Assert.That(persisted.Code, Is.EqualTo("NEW-CODE"));
+            Assert.That(persisted.Name, Is.EqualTo("Updated Product"));
+            Assert.That(persisted.Description, Is.EqualTo("Updated description"));
+        });
+    }
+
+    [Test]
+    public async Task I18_008_PutWarehouse_WithValidPayload_UpdatesEditableFields()
+    {
+        var tenantId = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        await using var factory = new ClientProviderCreationTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+        var original = new Warehouse
+        {
+            Id = entityId, TenantId = tenantId, Name = "Original Warehouse",
+            City = "Madrid", State = "Madrid", PostalCode = "28001"
+        };
+        await using (var db = CreateDbContext(tenantId))
+        {
+            db.Warehouses.Add(original);
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PutAsJsonAsync($"/api/example/warehouses/{entityId}", new
+        {
+            name = "Updated Warehouse", city = "Sevilla", state = "Andalucía", postalCode = "41001"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            "I18-008 requires a valid Warehouse update to return HTTP 200.");
+        await using var verification = CreateDbContext(tenantId);
+        var persisted = await verification.Warehouses.SingleAsync(x => x.Id == entityId);
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.Id, Is.EqualTo(entityId));
+            Assert.That(persisted.TenantId, Is.EqualTo(tenantId));
+            Assert.That(persisted.Name, Is.EqualTo("Updated Warehouse"));
+            Assert.That(persisted.City, Is.EqualTo("Sevilla"));
+            Assert.That(persisted.State, Is.EqualTo("Andalucía"));
+            Assert.That(persisted.PostalCode, Is.EqualTo("41001"));
+        });
+    }
+
     private static HttpClient CreateAuthenticatedClient(
         WebApplicationFactory<Program> factory, Guid tenantId)
     {
