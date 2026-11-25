@@ -788,7 +788,7 @@ public sealed class ClientProviderCreationEndpointIntegrationTests : ExampleData
     [TestCase("name", "null", 0)]
     [TestCase("name", "empty", 0)]
     [TestCase("name", "whitespace", 0)]
-    [TestCase("name", "too-long", 161)]
+    [TestCase("name", "too-long", 201)]
     [TestCase("description", "too-long", 1001)]
     public async Task I18_011_PutProduct_WithInvalidField_ReturnsBadRequestWithoutChangingPersistedRecord(
         string field, string invalidKind, int invalidLength)
@@ -830,11 +830,60 @@ public sealed class ClientProviderCreationEndpointIntegrationTests : ExampleData
         });
     }
 
+    [Test]
+    public async Task I18_011_PutProduct_WithNameAtMaximumLength_UpdatesSuccessfully()
+    {
+        var tenantId = Guid.NewGuid();
+        var entityId = Guid.NewGuid();
+        var expectedName = new string('P', 200);
+
+        await using var factory = new ClientProviderCreationTestApplicationFactory(
+            ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+
+        await using (var db = CreateDbContext(tenantId))
+        {
+            db.Products.Add(new Product
+            {
+                Id = entityId,
+                TenantId = tenantId,
+                Code = "ORIGINAL-CODE",
+                Name = "Original product",
+                Description = "Original description"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var response = await client.PutAsJsonAsync(
+            $"/api/example/products/{entityId}",
+            new
+            {
+                code = "ORIGINAL-CODE",
+                name = expectedName,
+                description = "Updated description"
+            });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK),
+            "Product.Name must accept exactly 200 characters.");
+
+        await using var verification = CreateDbContext(tenantId);
+        var persisted = await verification.Products.SingleAsync(x => x.Id == entityId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(persisted.Id, Is.EqualTo(entityId));
+            Assert.That(persisted.TenantId, Is.EqualTo(tenantId));
+            Assert.That(persisted.Code, Is.EqualTo("ORIGINAL-CODE"));
+            Assert.That(persisted.Name, Is.EqualTo(expectedName));
+            Assert.That(persisted.Description, Is.EqualTo("Updated description"));
+        });
+    }
+
     [TestCase("name", "missing", 0)]
     [TestCase("name", "null", 0)]
     [TestCase("name", "empty", 0)]
     [TestCase("name", "whitespace", 0)]
-    [TestCase("name", "too-long", 201)]
+    [TestCase("name", "too-long", 161)]
     [TestCase("city", "too-long", 121)]
     [TestCase("state", "too-long", 121)]
     [TestCase("postalCode", "too-long", 33)]
