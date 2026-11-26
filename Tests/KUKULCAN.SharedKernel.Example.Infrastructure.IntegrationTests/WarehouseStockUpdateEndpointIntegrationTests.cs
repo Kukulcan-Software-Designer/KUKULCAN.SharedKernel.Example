@@ -130,11 +130,23 @@ public sealed class WarehouseStockUpdateEndpointIntegrationTests : ExampleDataba
         await using var factory = CreateFactory(fixture.TenantId);
         using var client = CreateAuthenticatedClient(factory, fixture.TenantId);
 
-        using var response = await SendPutAsync(
-            client, fixture.StockId, 12.345m, ifMatch: "\"0\"");
+        using var firstResponse = await SendPutAsync(
+            client, fixture.StockId, 12.345m, ifMatch: "\"1\"");
 
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
-        await AssertPersistedStockAsync(fixture.TenantId, fixture.StockId, fixture.OriginalQuantity, 1, fixture.WarehouseId, fixture.ProductId);
+        Assert.That(firstResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        AssertStrongEtag(firstResponse, "\"2\"");
+
+        using var staleResponse = await SendPutAsync(
+            client, fixture.StockId, 20m, ifMatch: "\"1\"");
+
+        Assert.That(staleResponse.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
+        await AssertPersistedStockAsync(
+            fixture.TenantId,
+            fixture.StockId,
+            12.345m,
+            2,
+            fixture.WarehouseId,
+            fixture.ProductId);
     }
 
     [Test]
