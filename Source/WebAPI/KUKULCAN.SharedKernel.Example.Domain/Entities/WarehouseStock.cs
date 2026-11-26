@@ -19,4 +19,7 @@ public sealed class WarehouseStock
     public Product Product { get; set; } = null!;
 
     public decimal Quantity { get; set; }
+
+    /// <summary>Application-managed optimistic concurrency version.</summary>
+    public int Version { get; set; } = 1;
 }

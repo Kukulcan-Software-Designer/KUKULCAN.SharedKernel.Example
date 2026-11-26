@@ -62,12 +62,21 @@ public static class WarehouseStockEndpoints
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict);
 
+        endpoints.MapPut("/api/example/warehouse-stocks/{id}", UpdateWarehouseStockAsync)
+            .WithName("UpdateWarehouseStock")
+            .WithTags("WarehouseStocks")
+            .Produces<WarehouseStockUpdateResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status428PreconditionRequired);
+
         return endpoints;
     }
 
     private static async Task<IResult> GetWarehouseStockByIdAsync(string id,
         [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context, ITenantContext tenantContext,
-        CancellationToken cancellationToken)
+        HttpContext httpContext, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(id, out Guid parsedId))
         {
@@ -82,24 +91,125 @@ public static class WarehouseStockEndpoints
             return HttpResults.Forbid();
         }
 
-        WarehouseStockListItemResponse? stock = await context.WarehouseStocks
+        var stock = await context.WarehouseStocks
             .AsNoTracking()
             .Where(entity =>
                 entity.Id == parsedId
                 && entity.TenantId == tenantContext.TenantId)
-            .Select(entity => new WarehouseStockListItemResponse(
-                entity.Id,
-                entity.WarehouseId,
-                entity.Warehouse.Name,
-                entity.ProductId,
-                entity.Product.Code,
-                entity.Product.Name,
-                entity.Quantity))
+            .Select(entity => new
+            {
+                Response = new WarehouseStockListItemResponse(
+                    entity.Id,
+                    entity.WarehouseId,
+                    entity.Warehouse.Name,
+                    entity.ProductId,
+                    entity.Product.Code,
+                    entity.Product.Name,
+                    entity.Quantity),
+                entity.Version
+            })
             .SingleOrDefaultAsync(cancellationToken);
 
-        return stock is null
-            ? HttpResults.NotFound()
-            : HttpResults.Ok(stock);
+        if (stock is null)
+            return HttpResults.NotFound();
+
+        httpContext.Response.Headers["ETag"] = FormatEtag(stock.Version);
+        return HttpResults.Ok(stock.Response);
+    }
+
+    private static async Task<IResult> UpdateWarehouseStockAsync(
+        string id,
+        WarehouseStockUpdateRequest request,
+        HttpRequest httpRequest,
+        HttpContext httpContext,
+        [Microsoft.AspNetCore.Mvc.FromServices] ExampleDbContext context,
+        ITenantContext tenantContext,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(id, out Guid stockId))
+        {
+            return HttpResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid route parameter",
+                detail: "The identifier must be a valid GUID.");
+        }
+
+        if (tenantContext.TenantId == Guid.Empty)
+            return HttpResults.Forbid();
+
+        string ifMatch = httpRequest.Headers["If-Match"].ToString();
+        if (string.IsNullOrWhiteSpace(ifMatch))
+            return HttpResults.Problem(
+                statusCode: StatusCodes.Status428PreconditionRequired,
+                title: "If-Match is required",
+                detail: "Supply the current strong ETag for this warehouse stock.");
+
+        if (!TryParseStrongVersion(ifMatch, out int expectedVersion))
+        {
+            return HttpResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid If-Match header",
+                detail: "If-Match must contain one strong ETag with a positive integer version.");
+        }
+
+        int scale = (decimal.GetBits(request.Quantity)[3] >> 16) & 0x7F;
+        if (request.Quantity < 0 || scale > 3 || request.Quantity > 999999999999999.999m)
+        {
+            return HttpResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid stock quantity",
+                detail: "Quantity must be non-negative and fit the supported decimal precision of 18,3.");
+        }
+
+        var stockReferences = await context.WarehouseStocks
+            .AsNoTracking()
+            .Where(stock => stock.Id == stockId && stock.TenantId == tenantContext.TenantId)
+            .Select(stock => new { stock.WarehouseId, stock.ProductId })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (stockReferences is null)
+            return HttpResults.NotFound();
+
+        int updated = expectedVersion == int.MaxValue
+            ? 0
+            : await context.WarehouseStocks
+                .Where(stock =>
+                    stock.Id == stockId
+                    && stock.TenantId == tenantContext.TenantId
+                    && stock.Version == expectedVersion)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(stock => stock.Quantity, request.Quantity)
+                    .SetProperty(stock => stock.Version, stock => stock.Version + 1),
+                    cancellationToken);
+
+        if (updated == 0)
+        {
+            bool stillExists = await context.WarehouseStocks.AnyAsync(
+                stock => stock.Id == stockId && stock.TenantId == tenantContext.TenantId,
+                cancellationToken);
+            return stillExists ? HttpResults.Conflict() : HttpResults.NotFound();
+        }
+
+        int nextVersion = expectedVersion + 1;
+        httpContext.Response.Headers["ETag"] = FormatEtag(nextVersion);
+        return HttpResults.Ok(new WarehouseStockUpdateResponse(
+            stockId, stockReferences.WarehouseId, stockReferences.ProductId, request.Quantity));
+    }
+
+    private static string FormatEtag(int version)
+        => $"\\"{version.ToString(CultureInfo.InvariantCulture)}\\"";
+
+    private static bool TryParseStrongVersion(string value, out int version)
+    {
+        version = 0;
+        if (value.Length < 3 || value[0] != '"' || value[^1] != '"')
+            return false;
+
+        return int.TryParse(
+                   value.AsSpan(1, value.Length - 2),
+                   NumberStyles.None,
+                   CultureInfo.InvariantCulture,
+                   out version)
+               && version > 0;
     }
 
     private static string NormalizeSearchText(string value)
@@ -370,6 +480,12 @@ public static class WarehouseStockEndpoints
 /// <param name="ProductId">The product id value.</param>
 /// <param name="Quantity">The quantity value.</param>
 public sealed record WarehouseStockCreateRequest(Guid WarehouseId, Guid ProductId, decimal Quantity);
+
+/// <summary>Represents an absolute warehouse-stock quantity update.</summary>
+public sealed record WarehouseStockUpdateRequest(decimal Quantity);
+
+/// <summary>Represents the result of an updated warehouse-stock quantity.</summary>
+public sealed record WarehouseStockUpdateResponse(Guid Id, Guid WarehouseId, Guid ProductId, decimal Quantity);
 
 /// <summary>Represents warehouse stock list item response data.</summary>
 /// <param name="Id">The id value.</param>

@@ -123,6 +123,7 @@ public static class ExampleDbContextModelConfiguration
             entity.HasKey(stock => stock.Id);
             entity.Property(stock => stock.Id).ValueGeneratedNever();
             entity.Property(stock => stock.Quantity).HasPrecision(18, 3);
+            entity.Property(stock => stock.Version).HasDefaultValue(1);
             entity.HasIndex(stock => new { stock.WarehouseId, stock.ProductId }).IsUnique();
             entity.HasIndex(stock => new { stock.TenantId, stock.ProductId });
             entity.HasIndex(stock => new { stock.TenantId, stock.WarehouseId });

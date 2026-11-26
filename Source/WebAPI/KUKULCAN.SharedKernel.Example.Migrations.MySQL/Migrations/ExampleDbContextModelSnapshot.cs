@@ -11,6 +11,6 @@ namespace KUKULCAN.SharedKernel.Example.Migrations.MySQL.Migrations;
 partial class ExampleDbContextModelSnapshot : ModelSnapshot
 {
     protected override void BuildModel(ModelBuilder modelBuilder)
-        => ExampleSchemaV1Model.Configure(modelBuilder);
+        => ExampleDbContextModelConfiguration.ConfigureForProvider(modelBuilder, DatabaseProvider.MySql);
 
 }
