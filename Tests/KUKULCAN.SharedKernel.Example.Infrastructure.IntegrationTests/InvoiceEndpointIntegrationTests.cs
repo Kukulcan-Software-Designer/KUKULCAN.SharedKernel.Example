@@ -464,6 +464,157 @@ public sealed class InvoiceEndpointIntegrationTests : ExampleDatabaseTestFixture
         });
     }
 
+    [Test]
+    public async Task PostInvoice_WithValidHeaderAndLines_CreatesInvoiceAndPersistsCompleteAggregate()
+    {
+        var tenantId = Guid.NewGuid();
+        var clientId = Guid.NewGuid();
+        var firstProductId = Guid.NewGuid();
+        var secondProductId = Guid.NewGuid();
+
+        const string clientName = "I18-015 Customer";
+        const string invoiceNumber = "SALE-I18-015-001";
+        const string firstProductCode = "I18-015-P01";
+        const string firstProductName = "I18-015 Product One";
+        const string secondProductCode = "I18-015-P02";
+        const string secondProductName = "I18-015 Product Two";
+
+        var issuedAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+        issuedAt = issuedAt.AddTicks(-(issuedAt.Ticks % TimeSpan.TicksPerSecond));
+
+        await using (var seedContext = CreateDbContext(tenantId))
+        {
+            seedContext.Clients.Add(new Client
+            {
+                Id = clientId,
+                TenantId = tenantId,
+                Name = clientName
+            });
+            seedContext.Products.AddRange(
+                new Product
+                {
+                    Id = firstProductId,
+                    TenantId = tenantId,
+                    Code = firstProductCode,
+                    Name = firstProductName
+                },
+                new Product
+                {
+                    Id = secondProductId,
+                    TenantId = tenantId,
+                    Code = secondProductCode,
+                    Name = secondProductName
+                });
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var factory = new InvoiceTestApplicationFactory(ConnectionString, ProviderName, tenantId);
+        using var client = CreateAuthenticatedClient(factory, tenantId);
+
+        using var response = await client.PostAsJsonAsync(
+            "/api/example/invoices",
+            new
+            {
+                clientId,
+                invoiceNumber,
+                issuedAt,
+                lines = new[]
+                {
+                    new
+                    {
+                        lineNumber = 1,
+                        productId = firstProductId,
+                        quantity = 2m,
+                        unitPrice = 15.50m
+                    },
+                    new
+                    {
+                        lineNumber = 2,
+                        productId = secondProductId,
+                        quantity = 3m,
+                        unitPrice = 8.25m
+                    }
+                }
+            });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+        Assert.That(response.Headers.Location, Is.Not.Null);
+
+        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var invoiceId = payload.GetProperty("id").GetGuid();
+        var responseLines = payload.GetProperty("lines")
+            .EnumerateArray()
+            .OrderBy(line => line.GetProperty("lineNumber").GetInt32())
+            .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(invoiceId, Is.Not.EqualTo(Guid.Empty));
+            Assert.That(
+                response.Headers.Location!.ToString(),
+                Does.EndWith($"/api/example/invoices/{invoiceId}"));
+            Assert.That(payload.GetProperty("invoiceNumber").GetString(), Is.EqualTo(invoiceNumber));
+            Assert.That(payload.GetProperty("issuedAt").GetDateTimeOffset(), Is.EqualTo(issuedAt));
+            Assert.That(payload.GetProperty("clientId").GetGuid(), Is.EqualTo(clientId));
+            Assert.That(payload.GetProperty("clientName").GetString(), Is.EqualTo(clientName));
+            Assert.That(responseLines, Has.Length.EqualTo(2));
+
+            Assert.That(responseLines[0].GetProperty("id").GetGuid(), Is.Not.EqualTo(Guid.Empty));
+            Assert.That(responseLines[0].GetProperty("lineNumber").GetInt32(), Is.EqualTo(1));
+            Assert.That(responseLines[0].GetProperty("productId").GetGuid(), Is.EqualTo(firstProductId));
+            Assert.That(responseLines[0].GetProperty("productCode").GetString(), Is.EqualTo(firstProductCode));
+            Assert.That(responseLines[0].GetProperty("productName").GetString(), Is.EqualTo(firstProductName));
+            Assert.That(responseLines[0].GetProperty("quantity").GetDecimal(), Is.EqualTo(2m));
+            Assert.That(responseLines[0].GetProperty("unitPrice").GetDecimal(), Is.EqualTo(15.50m));
+
+            Assert.That(responseLines[1].GetProperty("id").GetGuid(), Is.Not.EqualTo(Guid.Empty));
+            Assert.That(responseLines[1].GetProperty("lineNumber").GetInt32(), Is.EqualTo(2));
+            Assert.That(responseLines[1].GetProperty("productId").GetGuid(), Is.EqualTo(secondProductId));
+            Assert.That(responseLines[1].GetProperty("productCode").GetString(), Is.EqualTo(secondProductCode));
+            Assert.That(responseLines[1].GetProperty("productName").GetString(), Is.EqualTo(secondProductName));
+            Assert.That(responseLines[1].GetProperty("quantity").GetDecimal(), Is.EqualTo(3m));
+            Assert.That(responseLines[1].GetProperty("unitPrice").GetDecimal(), Is.EqualTo(8.25m));
+
+            Assert.That(payload.TryGetProperty("tenantId", out _), Is.False);
+            Assert.That(responseLines.All(line => !line.TryGetProperty("tenantId", out _)), Is.True);
+        });
+
+        await using var verificationContext = CreateDbContext(tenantId);
+        var persistedInvoice = await verificationContext.Invoices
+            .Include(invoice => invoice.Lines)
+            .SingleAsync(invoice => invoice.Id == invoiceId);
+        var persistedLines = persistedInvoice.Lines
+            .OrderBy(line => line.LineNumber)
+            .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(persistedInvoice.TenantId, Is.EqualTo(tenantId));
+            Assert.That(persistedInvoice.ClientId, Is.EqualTo(clientId));
+            Assert.That(persistedInvoice.InvoiceNumber, Is.EqualTo(invoiceNumber));
+            Assert.That(persistedInvoice.IssuedAt, Is.EqualTo(issuedAt));
+            Assert.That(persistedInvoice.ClientName, Is.EqualTo(clientName));
+            Assert.That(persistedLines, Has.Length.EqualTo(2));
+            Assert.That(
+                persistedLines.Select(line => line.Id),
+                Is.EqualTo(responseLines.Select(line => line.GetProperty("id").GetGuid())));
+            Assert.That(persistedLines.All(line => line.TenantId == tenantId), Is.True);
+            Assert.That(persistedLines.All(line => line.InvoiceId == invoiceId), Is.True);
+
+            Assert.That(persistedLines[0].ProductId, Is.EqualTo(firstProductId));
+            Assert.That(persistedLines[0].ProductCode, Is.EqualTo(firstProductCode));
+            Assert.That(persistedLines[0].ProductName, Is.EqualTo(firstProductName));
+            Assert.That(persistedLines[0].Quantity, Is.EqualTo(2m));
+            Assert.That(persistedLines[0].UnitPrice, Is.EqualTo(15.50m));
+
+            Assert.That(persistedLines[1].ProductId, Is.EqualTo(secondProductId));
+            Assert.That(persistedLines[1].ProductCode, Is.EqualTo(secondProductCode));
+            Assert.That(persistedLines[1].ProductName, Is.EqualTo(secondProductName));
+            Assert.That(persistedLines[1].Quantity, Is.EqualTo(3m));
+            Assert.That(persistedLines[1].UnitPrice, Is.EqualTo(8.25m));
+        });
+    }
+
     private async Task<SeededInvoices> SeedInvoicesAsync(Guid tenantId, params InvoiceSeed[] invoiceSeeds)
     {
         if (invoiceSeeds.Length == 0)
