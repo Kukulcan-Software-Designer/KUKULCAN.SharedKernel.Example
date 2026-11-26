@@ -196,7 +196,7 @@ public static class WarehouseStockEndpoints
     }
 
     private static string FormatEtag(int version)
-        => $"\\"{version.ToString(CultureInfo.InvariantCulture)}\\"";
+        => $"\"{version.ToString(CultureInfo.InvariantCulture)}\"";
 
     private static bool TryParseStrongVersion(string value, out int version)
     {
