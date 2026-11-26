@@ -1,8 +1,8 @@
 # Issue #18 — HTTP Test Matrix Addendum
 
-**Base document:** `Diseno_Funcional_WebAPI_Example.docx`, consolidated functional design v1.2, including the approved decisions D-01–D-14 and the approved Issue #18 scope.  
-**Branch:** `FEATURES/M4-Issue-18-WebAPI-Business`  
-**Traceability workbook:** `Issue_18_T16-T17_I18-001-I18-037_Traceability.xlsx`  
+**Base document:** `Diseno_Funcional_WebAPI_Example.docx`, consolidated functional design v1.2, including the approved decisions D-01–D-14 and the approved Issue #18 scope.
+**Branch:** `FEATURES/M4-Issue-18-WebAPI-Business`
+**Traceability workbook:** `Issue_18_T16-T17_I18-001-I18-037_Traceability.xlsx`
 **Purpose:** Define the HTTP acceptance cases owned by Issue #18 and make their expected observable behavior explicit before implementation.
 
 This addendum complements the consolidated functional design and the Issue #18 traceability workbook. It does not reopen or replace the approved functional decisions. T16 and T17 retain their existing identifiers and are included because they are the first implemented acceptance slice for Issue #18. I18-001–I18-037 are the remaining approved cases.
