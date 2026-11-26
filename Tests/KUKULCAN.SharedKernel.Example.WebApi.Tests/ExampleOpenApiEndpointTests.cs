@@ -23,6 +23,7 @@ public sealed class ExampleOpenApiEndpointTests
         ("/api/example/warehouse-stocks", "get", "WarehouseStocks"),
         ("/api/example/warehouse-stocks/{id}", "get", "WarehouseStocks"),
         ("/api/example/warehouse-stocks", "post", "WarehouseStocks"),
+        ("/api/example/warehouse-stocks/{id}", "put", "WarehouseStocks"),
         ("/api/example/invoices", "get", "Invoices"),
         ("/api/example/invoices/{id}", "get", "Invoices"),
         ("/api/example/prod-invoices", "get", "ProdInvoices"),

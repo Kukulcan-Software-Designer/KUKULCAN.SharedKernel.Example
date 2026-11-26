@@ -48,6 +48,7 @@ public sealed class ExampleApiAuthorizationEndpointTests
             ("api/example/warehouse-stocks", "GET"),
             ("api/example/warehouse-stocks/{id}", "GET"),
             ("api/example/warehouse-stocks", "POST"),
+            ("api/example/warehouse-stocks/{id}", "PUT"),
             ("api/example/invoices", "GET"),
             ("api/example/invoices/{id}", "GET"),
             ("api/example/prod-invoices", "GET"),
@@ -125,6 +126,7 @@ public sealed class ExampleApiAuthorizationEndpointTests
             ("api/example/warehouse-stocks", "GET"),
             ("api/example/warehouse-stocks/{id}", "GET"),
             ("api/example/warehouse-stocks", "POST"),
+            ("api/example/warehouse-stocks/{id}", "PUT"),
             ("api/example/invoices", "GET"),
             ("api/example/invoices/{id}", "GET"),
             ("api/example/prod-invoices", "GET"),
@@ -157,7 +159,7 @@ public sealed class ExampleApiAuthorizationEndpointTests
         Assert.That(
             unexpectedOperations,
             Is.Empty,
-            "The commercial API must not expose operations outside the documented GET and POST contract (including PUT or DELETE).");
+            "The commercial API must not expose operations outside the documented contract (including DELETE).");
     }
 
     [Test]
